@@ -1,4 +1,4 @@
-use clap_v3::App;
+use clap_v3::{App, Arg};
 
 fn main() {
     let matches = App::new("repost")
@@ -10,12 +10,50 @@ fn main() {
         .subcommand(
             App::new("create")
                 .about("Create an HTTP request or variable")
-                .arg("<object> 'type of object to create'"),
+                .aliases(&["c"])
+                .subcommand(
+                    App::new("request")
+                        .about("Create an HTTP request")
+                        .aliases(&["req", "r"])
+                        .arg("<name> 'Name of the request'")
+                        .arg("<url> 'HTTP request URL'")
+                        .arg(
+                            Arg::with_name("method")
+                                .help("HTTP request method")
+                                .short('m')
+                                .long("method")
+                                .possible_values(&[
+                                    "GET", "POST", "HEAD", "PUT", "PATCH", "DELETE",
+                                ]),
+                        )
+                        .arg(
+                            Arg::with_name("headers")
+                                .help("HTTP request headers")
+                                .short('H')
+                                .long("header")
+                                .multiple(true),
+                        )
+                        .arg("-d, --data=[DATA] 'HTTP request body'"),
+                )
+                .subcommand(
+                    App::new("variable")
+                        .about("Create a variable")
+                        .aliases(&["var", "v"])
+                        .arg("<name> 'Name of the variable'")
+                        .arg(
+                            Arg::with_name("environment=value")
+                                .help("Value for environment")
+                                .required(true)
+                                .validator(contains_equal)
+                                .multiple(true),
+                        ),
+                ),
         )
         .subcommand(
             App::new("list")
                 .about("List HTTP requests or variables")
-                .arg("[object] 'type of object to list (default: all)'"),
+                // TODO: make this arg sub-commands
+                .arg("[requests|variables] 'Type of resources to list (default: all)'"),
         )
         .get_matches();
 
@@ -28,10 +66,44 @@ fn main() {
     }
 
     // Check sub-commands
-match matches.subcommand_name() {
-        Some("create") => println!("create!"),
-        Some("list") => println!("list!"),
-        None => println!("No subcommand was used"),
-        _ => println!("Unrecognized subcommand"),
+    match matches.subcommand() {
+        ("create", Some(create_matches)) => match create_matches.subcommand() {
+            ("request", Some(cr_matches)) => {
+                println!(
+                    "create request {} {}",
+                    cr_matches.value_of("name").unwrap(),
+                    cr_matches.value_of("url").unwrap()
+                );
+            }
+            ("variable", Some(cv_matches)) => {
+                println!(
+                    "create variable {} {:?}",
+                    cv_matches.value_of("name").unwrap(),
+                    cv_matches.values_of("environment=value").unwrap().collect::<Vec<_>>(),
+                );
+            }
+            // TODO: print help when no subcommand was used
+            ("", None) => println!("No subcommand was used"),
+            _ => unreachable!(),
+        },
+        ("list", Some(list_matches)) => {
+            let mut resources = "all";
+            if let Some(r) = list_matches.value_of("requests|variables") {
+                resources = r;
+            }
+            println!("list {}", resources)
+        },
+        // TODO: print help when no subcommand was used
+        ("", None) => println!("No subcommand was used"),
+        _ => unreachable!(),
+    }
+}
+
+fn contains_equal(val: String) -> Result<(), String> {
+    // val is the argument value passed in by the user
+    if val.contains("=") {
+        Ok(())
+    } else {
+        Err(String::from("missing '=' in argument"))
     }
 }
