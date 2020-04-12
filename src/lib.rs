@@ -1,7 +1,7 @@
 pub mod config {
     use clap_v3::{App, Arg};
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     pub enum Command {
         CreateRequest {
             name: String,
@@ -170,8 +170,117 @@ pub mod config {
         use super::*;
 
         #[test]
+        fn test_create_request() {
+            let possible_commands = vec![
+                "repost create request name url",
+                "repost create req name url",
+                "repost create r name url",
+                "repost c request name url",
+                "repost c req name url",
+                "repost c r name url",
+            ];
+            for cmd in possible_commands {
+                let args: Vec<String> = cmd.split_whitespace().map(|s| String::from(s)).collect();
+                assert_eq!(
+                    parse_args(&args),
+                    Command::CreateRequest {
+                        name: String::from("name"),
+                        url: String::from("url"),
+                        method: None,
+                        body: None
+                    }
+                );
+            }
+        }
+
+        #[test]
+        fn test_create_request_method() {
+            let possible_commands = vec![
+                "repost create request name url -m GET",
+                "repost create request name url --method GET",
+            ];
+            for cmd in possible_commands {
+                let args: Vec<String> = cmd.split_whitespace().map(|s| String::from(s)).collect();
+                assert_eq!(
+                    parse_args(&args),
+                    Command::CreateRequest {
+                        name: String::from("name"),
+                        url: String::from("url"),
+                        method: Some(String::from("GET")),
+                        body: None
+                    }
+                );
+            }
+
+            let cmd = "repost create request get_name url";
+            let args: Vec<String> = cmd.split_whitespace().map(|s| String::from(s)).collect();
+            assert_eq!(
+                parse_args(&args),
+                Command::CreateRequest {
+                    name: String::from("get_name"),
+                    url: String::from("url"),
+                    method: Some(String::from("GET")),
+                    body: None
+                }
+            );
+        }
+
+        #[test]
+        fn test_create_request_body() {
+            let possible_commands = vec![
+                "repost create request name url -d yay",
+                "repost create request name url --data yay",
+            ];
+            for cmd in possible_commands {
+                let args: Vec<String> = cmd.split_whitespace().map(|s| String::from(s)).collect();
+                assert_eq!(
+                    parse_args(&args),
+                    Command::CreateRequest {
+                        name: String::from("name"),
+                        url: String::from("url"),
+                        method: None,
+                        body: Some(String::from("yay"))
+                    }
+                );
+            }
+        }
+
+        #[test]
+        fn test_create_variable() {
+            let possible_commands = vec![
+                "repost create variable name env=val",
+                "repost create var name env=val",
+                "repost create v name env=val",
+                "repost c variable name env=val",
+                "repost c var name env=val",
+                "repost c v name env=val",
+            ];
+            for cmd in possible_commands {
+                let args: Vec<String> = cmd.split_whitespace().map(|s| String::from(s)).collect();
+                assert_eq!(
+                    parse_args(&args),
+                    Command::CreateVariable {
+                        name: String::from("name"),
+                        env_vals: vec![(String::from("env"), String::from("val"))],
+                    }
+                );
+            }
+        }
+
+        #[test]
         fn test_name_to_method() {
-            assert_eq!(name_to_method("get_something"), Some(String::from("GET")));
+            assert_eq!(name_to_method("get_req"), Some(String::from("GET")));
+            assert_eq!(name_to_method("GET_REQ"), Some(String::from("GET")));
+            assert_eq!(name_to_method("create_req"), Some(String::from("POST")));
+            assert_eq!(name_to_method("CREATE_REQ"), Some(String::from("POST")));
+            assert_eq!(name_to_method("delete_req"), Some(String::from("DELETE")));
+            assert_eq!(name_to_method("DELETE_REQ"), Some(String::from("DELETE")));
+            assert_eq!(name_to_method("replace_req"), Some(String::from("PUT")));
+            assert_eq!(name_to_method("REPLACE_REQ"), Some(String::from("PUT")));
+            assert_eq!(name_to_method("update_req"), Some(String::from("PATCH")));
+            assert_eq!(name_to_method("UPDATE_REQ"), Some(String::from("PATCH")));
+            assert_eq!(name_to_method("req"), None);
+            assert_eq!(name_to_method("REQ"), None);
         }
     }
 }
