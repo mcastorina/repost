@@ -8,6 +8,7 @@ pub mod config {
             url: String,
             method: Option<String>,
             body: Option<String>,
+            headers: Vec<String>,
         },
         CreateVariable {
             name: String,
@@ -16,15 +17,8 @@ pub mod config {
         None,
     }
 
+
     pub fn parse_args(args: &[String]) -> Command {
-        let contains_equal = |val: String| {
-            // val is the argument value passed in by the user
-            if val.contains("=") {
-                Ok(())
-            } else {
-                Err(String::from("missing '=' in argument"))
-            }
-        };
         let matches = App::new("repost")
             .version("0.1.0") // TODO: automatic version
             .author("miccah")
@@ -35,43 +29,8 @@ pub mod config {
                 App::new("create")
                     .about("Create an HTTP request or variable")
                     .aliases(&["c"])
-                    .subcommand(
-                        App::new("request")
-                            .about("Create an HTTP request")
-                            .aliases(&["req", "r"])
-                            .arg("<name> 'Name of the request'")
-                            .arg("<url> 'HTTP request URL'")
-                            .arg(
-                                Arg::with_name("method")
-                                    .help("HTTP request method")
-                                    .short('m')
-                                    .long("method")
-                                    .possible_values(&[
-                                        "GET", "POST", "HEAD", "PUT", "PATCH", "DELETE",
-                                    ]),
-                            )
-                            .arg(
-                                Arg::with_name("headers")
-                                    .help("HTTP request headers")
-                                    .short('H')
-                                    .long("header")
-                                    .multiple(true),
-                            )
-                            .arg("-d, --data=[DATA] 'HTTP request body'"),
-                    )
-                    .subcommand(
-                        App::new("variable")
-                            .about("Create a variable")
-                            .aliases(&["var", "v"])
-                            .arg("<name> 'Name of the variable'")
-                            .arg(
-                                Arg::with_name("environment=value")
-                                    .help("Value for environment")
-                                    .required(true)
-                                    .validator(contains_equal)
-                                    .multiple(true),
-                            ),
-                    ),
+                    .subcommand(create_request_subcommand())
+                    .subcommand(create_variable_subcommand()),
             )
             .get_matches_from(args);
 
@@ -92,6 +51,7 @@ pub mod config {
                     let url = cr_matches.value_of("url").unwrap();
                     let method: Option<String>;
                     let body: Option<String>;
+                    let headers: Vec<String>;
                     if let Some(m) = cr_matches.value_of("method") {
                         method = Some(String::from(m));
                     } else if let Some(m) = name_to_method(&name) {
@@ -104,12 +64,18 @@ pub mod config {
                     } else {
                         body = None;
                     }
+                    if let Some(h) = cr_matches.values_of("headers") {
+                        headers = h.map(|h| { String::from(h) }).collect();
+                    } else {
+                        headers = vec![];
+                    }
 
                     return Command::CreateRequest {
                         name: String::from(name),
                         url: String::from(url),
                         method: method,
                         body: body,
+                        headers: headers,
                     };
                 }
                 ("variable", Some(cv_matches)) => {
@@ -147,6 +113,58 @@ pub mod config {
             _ => unreachable!(),
         }
         Command::None
+    }
+    fn create_request_subcommand() -> App<'static> {
+        let contains_colon = |val: String| {
+            // val is the argument value passed in by the user
+            if val.contains(":") {
+                Ok(())
+            } else {
+                Err(String::from("missing ':' in argument"))
+            }
+        };
+        App::new("request")
+            .about("Create an HTTP request")
+            .aliases(&["req", "r"])
+            .arg("<name> 'Name of the request'")
+            .arg("<url> 'HTTP request URL'")
+            .arg(
+                Arg::with_name("method")
+                    .help("HTTP request method")
+                    .short('m')
+                    .long("method")
+                    .possible_values(&["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"]),
+            )
+            .arg(
+                Arg::with_name("headers")
+                    .help("HTTP request headers")
+                    .short('H')
+                    .long("header")
+                    .validator(contains_colon)
+                    .multiple(true),
+            )
+            .arg("-d, --data=[DATA] 'HTTP request body'")
+    }
+    fn create_variable_subcommand() -> App<'static> {
+        let contains_equal = |val: String| {
+            // val is the argument value passed in by the user
+            if val.contains("=") {
+                Ok(())
+            } else {
+                Err(String::from("missing '=' in argument"))
+            }
+        };
+        App::new("variable")
+            .about("Create a variable")
+            .aliases(&["var", "v"])
+            .arg("<name> 'Name of the variable'")
+            .arg(
+                Arg::with_name("environment=value")
+                    .help("Value for environment")
+                    .required(true)
+                    .validator(contains_equal)
+                    .multiple(true),
+            )
     }
     fn name_to_method(name: &str) -> Option<String> {
         let name = name.to_lowercase();
