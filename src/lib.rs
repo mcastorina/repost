@@ -17,7 +17,6 @@ pub mod config {
         None,
     }
 
-
     pub fn parse_args(args: &[String]) -> Command {
         let matches = App::new("repost")
             .version("0.1.0") // TODO: automatic version
@@ -65,7 +64,7 @@ pub mod config {
                         body = None;
                     }
                     if let Some(h) = cr_matches.values_of("headers") {
-                        headers = h.map(|h| { String::from(h) }).collect();
+                        headers = h.map(|h| String::from(h)).collect();
                     } else {
                         headers = vec![];
                     }
@@ -300,5 +299,92 @@ pub mod config {
             assert_eq!(name_to_method("req"), None);
             assert_eq!(name_to_method("REQ"), None);
         }
+    }
+}
+
+pub mod models {
+    use std::collections::HashMap;
+
+    #[derive(Debug)]
+    pub struct Request {
+        name: String,
+        url: String,
+        method: String,
+        headers: Vec<String>,
+        body: Option<String>,
+    }
+    #[derive(Debug)]
+    pub struct Variable {
+        name: String,
+        env_vals: HashMap<String, String>,
+    }
+
+    impl Request {
+        pub fn new(
+            name: String,
+            url: String,
+            method: String,
+            headers: Vec<String>,
+            body: Option<String>,
+        ) -> Result<Request, &'static str> {
+            // TODO: validate name is unique
+            // TODO: validate method
+            // TODO: validate headers
+            Ok(Request {
+                name,
+                url,
+                method,
+                headers,
+                body,
+            })
+        }
+
+        pub fn save(&self) -> Result<(), &'static str> {
+            Err("save not implemented")
+        }
+    }
+    impl Variable {
+        pub fn new(
+            name: String,
+            env_vals: Vec<(String, String)>,
+        ) -> Result<Variable, &'static str> {
+            let mut env_vals_map = HashMap::new();
+            for env_val in env_vals {
+                let (env, val) = env_val;
+                if env_vals_map.contains_key(&env) {
+                    return Err("multiple values provided for an environment");
+                }
+                env_vals_map.insert(env, val);
+            }
+            Ok(Variable {
+                name,
+                env_vals: env_vals_map,
+            })
+        }
+        pub fn save(&self) -> Result<(), &'static str> {
+            Err("save not implemented")
+        }
+    }
+}
+
+use config::Command;
+pub fn run(conf: Command) -> Result<(), &'static str> {
+    match conf {
+        Command::CreateRequest {
+            name,
+            url,
+            method,
+            body,
+            headers,
+        } => {
+            let method = method.unwrap_or(String::from("GET"));
+            let request = models::Request::new(name, url, method, headers, body)?;
+            request.save()
+        }
+        Command::CreateVariable { name, env_vals } => {
+            let variable = models::Variable::new(name, env_vals)?;
+            variable.save()
+        }
+        Command::None => Err("no command provided"),
     }
 }
