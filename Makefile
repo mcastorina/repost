@@ -1,5 +1,6 @@
 RM := rm -f
 
+RS_FILES := $(shell find src -name '*.rs')
 .DEFAULT_GOAL := build
 
 .PHONY: check
@@ -8,10 +9,10 @@ check:
 
 build: target/debug/repost
 
-target/debug/repost: Cargo.toml src/main.rs src/lib.rs
+target/debug/repost: Cargo.toml $(RS_FILES)
 	cargo build
 
-fmt: src/main.rs src/lib.rs
+fmt: $(RS_FILES)
 	cargo fmt
 
 .PHONY: test
