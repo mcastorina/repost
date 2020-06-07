@@ -122,13 +122,13 @@ fn name_to_method(name: &str) -> Option<String> {
     let name = name.to_lowercase();
     if name.starts_with("get") {
         Some(String::from("GET"))
-    } else if name.starts_with("create") {
+    } else if name.starts_with("create") || name.starts_with("post") {
         Some(String::from("POST"))
     } else if name.starts_with("delete") {
         Some(String::from("DELETE"))
-    } else if name.starts_with("replace") {
+    } else if name.starts_with("replace") || name.starts_with("put") {
         Some(String::from("PUT"))
-    } else if name.starts_with("update") {
+    } else if name.starts_with("update") || name.starts_with("patch") {
         Some(String::from("PATCH"))
     } else {
         None

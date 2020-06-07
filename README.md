@@ -10,11 +10,11 @@ send it any number of times.
 # create a request
 # repost create request <name> <url> [-m method] [-H header ...] [-d body]
 #   method is inferred from name or can be explicitly defined via -m
-#   - get_        GET
-#   - create_     POST
-#   - delete_     DELETE
-#   - replace_    PUT
-#   - update_     PATCH
+#   - get           GET
+#   - post, create  POST
+#   - delete        DELETE
+#   - put, replace  PUT
+#   - patch, update PATCH
 
 repost create request get_health '{host}/v1/health'
 
