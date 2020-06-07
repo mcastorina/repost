@@ -28,7 +28,7 @@ impl Variable {
         // TODO: don't use unwrap
         connection
             .execute(
-                "CREATE TABLE IF NOT EXISTS variables (name TEXT, env TEXT, val TEXT);",
+                "CREATE TABLE IF NOT EXISTS variables (name TEXT, env TEXT, val TEXT, UNIQUE(name, env) ON CONFLICT REPLACE);",
                 NO_PARAMS,
             )
             .unwrap();

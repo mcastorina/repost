@@ -33,7 +33,7 @@ impl Request {
 
         // TODO: don't use unwrap
         connection.execute(
-            "CREATE TABLE IF NOT EXISTS requests (name TEXT, url TEXT, method TEXT, headers TEXT, body TEXT);",
+            "CREATE TABLE IF NOT EXISTS requests (name TEXT PRIMARY KEY ON CONFLICT REPLACE, url TEXT, method TEXT, headers TEXT, body TEXT);",
             NO_PARAMS,
         ).unwrap();
 
