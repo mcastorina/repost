@@ -1,22 +1,6 @@
-use clap_v3::{App, Arg};
+use clap_v3::{App, Arg, ArgMatches};
 
-#[derive(Debug, PartialEq)]
-pub enum Command {
-    CreateRequest {
-        name: String,
-        url: String,
-        method: Option<String>,
-        body: Option<String>,
-        headers: Vec<String>,
-    },
-    CreateVariable {
-        name: String,
-        env_vals: Vec<(String, String)>,
-    },
-    None,
-}
-
-pub fn parse_args(args: &[String]) -> Result<Command, &'static str> {
+pub fn parse_args(args: &[String]) -> Result<Command, String> {
     let matches = App::new("repost")
         .version("0.1.0") // TODO: automatic version
         .author("miccah")
@@ -27,92 +11,130 @@ pub fn parse_args(args: &[String]) -> Result<Command, &'static str> {
             App::new("create")
                 .about("Create an HTTP request or variable")
                 .aliases(&["c"])
-                .subcommand(create_request_subcommand())
-                .subcommand(create_variable_subcommand()),
+                .subcommand(request_subcommand(args))
+                .subcommand(variable_subcommand(args)),
         )
         .get_matches_from(args);
+    Command::from_matches(matches)
+}
 
-    if let Some(c) = matches.value_of("config") {
-        println!("Value for config: {}", c);
-    }
+#[derive(Debug, PartialEq)]
+pub enum Command {
+    CreateRequest(CreateRequest),
+    CreateVariable(CreateVariable),
+    None,
+}
+#[derive(Debug, PartialEq)]
+pub struct CreateRequest {
+    pub name: String,
+    pub url: String,
+    pub method: Option<String>,
+    pub body: Option<String>,
+    pub headers: Vec<String>,
+}
+#[derive(Debug, PartialEq)]
+pub struct CreateVariable {
+    pub name: String,
+    pub env_vals: Vec<(String, String)>,
+}
 
-    if matches.is_present("verbose") {
-        println!("Verbose mode is on");
-    }
+impl Command {
+    pub fn from_matches(matches: ArgMatches) -> Result<Command, String> {
+        if let Some(c) = matches.value_of("config") {
+            println!("Value for config: {}", c);
+        }
 
-    // Check sub-commands
-    match matches.subcommand() {
-        ("create", Some(create_matches)) => match create_matches.subcommand() {
-            ("request", Some(cr_matches)) => {
-                // We can unwrap because name and url are required
-                let name = cr_matches.value_of("name").unwrap();
-                let url = cr_matches.value_of("url").unwrap();
-                let method: Option<String>;
-                let body: Option<String>;
-                let headers: Vec<String>;
-                if let Some(m) = cr_matches.value_of("method") {
-                    method = Some(String::from(m));
-                } else if let Some(m) = name_to_method(&name) {
-                    method = Some(m)
-                } else {
-                    method = None
+        if matches.is_present("verbose") {
+            println!("Verbose mode is on");
+        }
+
+        // Check sub-commands
+        match matches.subcommand() {
+            ("create", Some(create_matches)) => match create_matches.subcommand() {
+                ("request", Some(cr_matches)) => return Command::cr_from_matches(cr_matches),
+                ("variable", Some(cv_matches)) => return Command::cv_from_matches(cv_matches),
+                // TODO: print help when no subcommand was used
+                ("", None) => println!("No subcommand was used"),
+                _ => unreachable!(),
+            },
+            ("list", Some(list_matches)) => {
+                let mut resources = "all";
+                if let Some(r) = list_matches.value_of("requests|variables") {
+                    resources = r;
                 }
-                if let Some(d) = cr_matches.value_of("data") {
-                    body = Some(String::from(d));
-                } else {
-                    body = None;
-                }
-                if let Some(h) = cr_matches.values_of("headers") {
-                    headers = h.map(|h| String::from(h)).collect();
-                } else {
-                    headers = vec![];
-                }
-
-                return Ok(Command::CreateRequest {
-                    name: String::from(name),
-                    url: String::from(url),
-                    method: method,
-                    body: body,
-                    headers: headers,
-                });
-            }
-            ("variable", Some(cv_matches)) => {
-                let name = cv_matches.value_of("name").unwrap();
-                let env_vals = cv_matches
-                    .values_of("environment=value")
-                    .unwrap()
-                    .map(|s| {
-                        let mut items = s.splitn(2, "=");
-                        // We can unwrap because this argument is guaranteed to have one '='
-                        (
-                            String::from(items.next().unwrap()),
-                            String::from(items.next().unwrap()),
-                        )
-                    })
-                    .collect();
-                return Ok(Command::CreateVariable {
-                    name: String::from(name),
-                    env_vals: env_vals,
-                });
+                println!("list {}", resources)
             }
             // TODO: print help when no subcommand was used
             ("", None) => println!("No subcommand was used"),
             _ => unreachable!(),
-        },
-        ("list", Some(list_matches)) => {
-            let mut resources = "all";
-            if let Some(r) = list_matches.value_of("requests|variables") {
-                resources = r;
-            }
-            println!("list {}", resources)
         }
-        // TODO: print help when no subcommand was used
-        ("", None) => println!("No subcommand was used"),
-        _ => unreachable!(),
+        Ok(Command::None)
     }
-    Ok(Command::None)
+    fn cr_from_matches(matches: &ArgMatches) -> Result<Command, String> {
+        // We can unwrap because name and url are required
+        let name = String::from(matches.value_of("name").unwrap());
+        let url = String::from(matches.value_of("url").unwrap());
+        let method: Option<String>;
+        let body = matches.value_of("data").map(|b| String::from(b));
+        let headers: Vec<String> = matches
+            .values_of("headers")
+            .unwrap()
+            .map(|h| String::from(h))
+            .collect();
+        if let Some(m) = matches.value_of("method") {
+            method = Some(String::from(m));
+        } else if let Some(m) = name_to_method(&name) {
+            method = Some(m)
+        } else {
+            method = None
+        }
+
+        return Ok(Command::CreateRequest(CreateRequest {
+            name: name,
+            url: url,
+            method: method,
+            body: body,
+            headers: headers,
+        }));
+    }
+    fn cv_from_matches(matches: &ArgMatches) -> Result<Command, String> {
+        let name = matches.value_of("name").unwrap();
+        let env_vals = matches
+            .values_of("environment=value")
+            .unwrap()
+            .map(|s| {
+                let mut items = s.splitn(2, "=");
+                // We can unwrap because this argument is guaranteed to have one '='
+                (
+                    String::from(items.next().unwrap()),
+                    String::from(items.next().unwrap()),
+                )
+            })
+            .collect();
+        return Ok(Command::CreateVariable(CreateVariable {
+            name: String::from(name),
+            env_vals: env_vals,
+        }));
+    }
 }
-fn create_request_subcommand() -> App<'static> {
+
+fn name_to_method(name: &str) -> Option<String> {
+    let name = name.to_lowercase();
+    if name.starts_with("get") {
+        Some(String::from("GET"))
+    } else if name.starts_with("create") {
+        Some(String::from("POST"))
+    } else if name.starts_with("delete") {
+        Some(String::from("DELETE"))
+    } else if name.starts_with("replace") {
+        Some(String::from("PUT"))
+    } else if name.starts_with("update") {
+        Some(String::from("PATCH"))
+    } else {
+        None
+    }
+}
+fn request_subcommand(_args: &[String]) -> App {
     let contains_colon = |val: String| {
         // val is the argument value passed in by the user
         if val.contains(":") {
@@ -143,7 +165,7 @@ fn create_request_subcommand() -> App<'static> {
         )
         .arg("-d, --data=[DATA] 'HTTP request body'")
 }
-fn create_variable_subcommand() -> App<'static> {
+fn variable_subcommand(_args: &[String]) -> App {
     let contains_equal = |val: String| {
         // val is the argument value passed in by the user
         if val.contains("=") {
@@ -163,22 +185,6 @@ fn create_variable_subcommand() -> App<'static> {
                 .validator(contains_equal)
                 .multiple(true),
         )
-}
-fn name_to_method(name: &str) -> Option<String> {
-    let name = name.to_lowercase();
-    if name.starts_with("get") {
-        Some(String::from("GET"))
-    } else if name.starts_with("create") {
-        Some(String::from("POST"))
-    } else if name.starts_with("delete") {
-        Some(String::from("DELETE"))
-    } else if name.starts_with("replace") {
-        Some(String::from("PUT"))
-    } else if name.starts_with("update") {
-        Some(String::from("PATCH"))
-    } else {
-        None
-    }
 }
 
 #[cfg(test)]

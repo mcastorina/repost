@@ -4,23 +4,17 @@ mod models;
 use cli::Command;
 use models::{Request, Variable};
 
-pub fn run(conf: Command) -> Result<(), &'static str> {
+pub fn run(conf: Command) -> Result<(), String> {
     match conf {
-        Command::CreateRequest {
-            name,
-            url,
-            method,
-            body,
-            headers,
-        } => {
-            let method = method.unwrap_or(String::from("GET"));
-            let request = Request::new(name, url, method, headers, body)?;
+        Command::CreateRequest(cmd) => {
+            let method = cmd.method.unwrap_or(String::from("GET"));
+            let request = Request::new(cmd.name, cmd.url, method, cmd.headers, cmd.body)?;
             request.save()
         }
-        Command::CreateVariable { name, env_vals } => {
-            let variable = Variable::new(name, env_vals)?;
+        Command::CreateVariable(cmd) => {
+            let variable = Variable::new(cmd.name, cmd.env_vals)?;
             variable.save()
         }
-        Command::None => Err("no command provided"),
+        Command::None => Err(String::from("no command provided")),
     }
 }
