@@ -2,39 +2,55 @@
 `repost` is a tool to easily define and send HTTP requests.
 
 ## Usage
-There are three steps to get started. First you must create a
-request, then you define the required variables, then you can
-send it any number of times.
+Repost utilizes an interpreter environment to make creating and
+sending requests easier. Repost has context specific commands and
+you can always see which environment or request you are editing
+from the command prompt.
+
+Execute `repost` to start the session. All information is saved in
+a sqlite database in `$XDG_CONFIG_DIR/repost/$WORKSPACE_NAME.db`.
+
+### Getting started
+This section will walk you through creating a request, defining
+variables, and adding extractors.
 
 ```
-# create a request
-# repost create request <name> <url> [-m method] [-H header ...] [-d body]
-#   method is inferred from name or can be explicitly defined via -m
-#   - get           GET
-#   - post, create  POST
-#   - delete        DELETE
-#   - put, replace  PUT
-#   - patch, update PATCH
+repost
+[repost] > show requests
+[*] No data returned.
+[repost] > create request get-example {host}/api/example
+[repost] > create variable host local=localhost:8080 stage=https://stage.example.com
+[repost] > use environment stage
+[repost][stage] > use get-example
+[repost][stage][get-example] > info
 
-repost create request get_health '{host}/v1/health'
+      Name: get-example
+    Method: GET
+       URL: {host}/api/example
+   Headers:
+      Body:
 
-# create variables
-# repost create variable [-s|-r] <name> <environment>=<value> [environment=value ...]
-#   default constant variable
-#   -s for script generator (value is script to run)
-#   -r for request generator (value is request_name:json_path)
+Description:
+  None
 
-repost create variable host local=localhost:8080
+Options:
+  Name      Current Value              Required  Description
+  --------  -------------              --------  -----------
+  HOST      https://stage.example.com  yes       none
 
-# run the request
-# repost <environment> <request_name> [request_name ...]
+[repost][stage][get-example] > use environment stage
+[repost][local][get-example] > options show
 
-repost local get_health
+Options:
+  Name      Current Value          Required  Description
+  --------  -------------          --------  -----------
+  HOST      localhost:8080         yes       none
+
+[repost][local][get-example] > run
 ```
 
 ## Design
 There are two main resources managed in `repost`: **requests** and **variables**.
-All resources are stored in `$HOME/.config/repost/`.
 
 ### Requests
 A "request" is referring to a single named HTTP request. It has the following attributes:
