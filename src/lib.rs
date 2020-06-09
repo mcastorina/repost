@@ -88,9 +88,20 @@ impl Repl {
     }
 }
 
+#[macro_use] extern crate prettytable;
+use prettytable::{format, Table};
+
 struct Db {
     path: String,
     conn: Connection,
+}
+
+struct Request {
+    name: String,
+    method: String,
+    url: String,
+    headers: Option<String>,
+    body: Option<String>,
 }
 
 impl Db {
@@ -123,7 +134,7 @@ impl Db {
 
         if let Err(x) = self.conn.execute(
             "CREATE TABLE IF NOT EXISTS variables (
-                  id              INTEGER PRIMARY KEY,
+                  rowid           INTEGER PRIMARY KEY,
                   name            TEXT NOT NULL,
                   environment     TEXT NOT NULL,
                   value           TEXT,
@@ -148,14 +159,51 @@ impl Db {
         }
     }
     fn get_requests(&self) -> Result<(), String> {
-        Err(String::from("not implemented"))
+        let stmt = self.conn
+            .prepare("SELECT name, method, url, headers, body FROM requests;");
+        if let Err(x) = stmt {
+            return Err(x.to_string());
+        }
+        let mut stmt = stmt.unwrap();
+
+        let requests = stmt
+            .query_map(NO_PARAMS, |row| {
+                Ok(Request{
+                    name: row.get(0).unwrap(),
+                    method: row.get(1).unwrap(),
+                    url: row.get(2).unwrap(),
+                    headers: row.get(3).unwrap(),
+                    body: row.get(4).unwrap(),
+                })
+            })
+            .unwrap();
+
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+        table.get_format().indent(2);
+
+        table.set_titles(row!["name", "method", "url", "headers", "body?"]);
+        for req in requests {
+            let req = req.unwrap();
+            let headers = req.headers.unwrap_or(String::from(""));
+            let body: String;
+            if req.body.is_some() {
+                body = String::from("true");
+            } else {
+                body = String::from("false");
+            }
+            table.add_row(row![req.name, req.method, req.url, headers, body]);
+        }
+        println!();
+        table.printstd();
+        println!();
+        Ok(())
     }
     fn get_variables(&self) -> Result<(), String> {
         Err(String::from("not implemented"))
     }
     fn get_environments(&self) -> Result<(), String> {
-        let stmt = self
-            .conn
+        let stmt = self.conn
             .prepare("SELECT DISTINCT environment FROM variables;");
         if let Err(x) = stmt {
             return Err(x.to_string());
@@ -169,9 +217,14 @@ impl Db {
             })
             .unwrap();
 
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+
+        table.set_titles(row!["environments"]);
         for env in envs {
-            println!("Found env {:?}", env);
+            table.add_row(row![env.unwrap()]);
         }
+        table.printstd();
         Ok(())
     }
 }
