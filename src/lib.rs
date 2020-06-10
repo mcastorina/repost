@@ -1,4 +1,5 @@
-use rusqlite::{Connection, NO_PARAMS};
+use chrono::Utc;
+use rusqlite::{params, Connection, NO_PARAMS};
 use std::io;
 use std::io::prelude::*;
 
@@ -53,9 +54,9 @@ impl Repl {
 
     fn execute_base(&self, args: Vec<&str>) -> Result<(), String> {
         match args[0] {
-            "show" => self.execute_show(args),
+            "show" | "get" => self.execute_show(args),
             "create" => self.execute_create(args),
-            "use" => self.execute_use(args),
+            "use" | "set" => self.execute_use(args),
             x => Err(format!("Invalid command: {}.", x)),
         }
     }
@@ -70,10 +71,57 @@ impl Repl {
         }
     }
     fn execute_create(&self, args: Vec<&str>) -> Result<(), String> {
-        Err(String::from("not implemented: create"))
+        match args[1] {
+            "request" | "req" => self.create_request(args),
+            "variable" | "var" => self.create_variable(args),
+            // TODO: print usage
+            _ => Err(format!("Invalid argument to create: {}", args[2])),
+        }
     }
     fn execute_use(&self, args: Vec<&str>) -> Result<(), String> {
         Err(String::from("not implemented: use"))
+    }
+    fn create_request(&self, args: Vec<&str>) -> Result<(), String> {
+        // TODO: support method, header and body
+        //       use clap
+        if args.len() < 4 {
+            return Err(String::from(
+                "Usage: create request name url [-m method] [-H header] [-d body]",
+            ));
+        }
+        // TODO: infer method from name
+        let name = String::from(args[2]);
+        let url = String::from(args[3]);
+
+        self.db.create_request(Request {
+            name,
+            url,
+            method: String::from("GET"),
+            headers: None,
+            body: None,
+        })
+    }
+    fn create_variable(&self, args: Vec<&str>) -> Result<(), String> {
+        // TODO: use clap; verify arguments contain an =
+        if args.len() < 4 {
+            return Err(String::from("Usage: create variable name env=value"));
+        }
+        let name = String::from(args[2]);
+        for arg in &args[3..] {
+            // TODO: create a new variable function
+            let mut items = arg.splitn(2, "=");
+            let environment = String::from(items.next().unwrap());
+            let value = Some(String::from(items.next().unwrap()));
+            self.db.create_variable(Variable {
+                rowid: 0,
+                name: name.clone(),
+                environment,
+                value,
+                source: Some(String::from("user")),
+                timestamp: None,
+            })?;
+        }
+        Ok(())
     }
 
     fn get_table_from_alias(alias: &str) -> Option<String> {
@@ -88,7 +136,8 @@ impl Repl {
     }
 }
 
-#[macro_use] extern crate prettytable;
+#[macro_use]
+extern crate prettytable;
 use prettytable::{format, Table};
 
 struct Db {
@@ -101,7 +150,16 @@ struct Request {
     method: String,
     url: String,
     headers: Option<String>,
-    body: Option<String>,
+    body: Option<Vec<u8>>,
+}
+
+struct Variable {
+    rowid: u32,
+    name: String,
+    environment: String,
+    value: Option<String>,
+    source: Option<String>,
+    timestamp: Option<String>,
 }
 
 impl Db {
@@ -125,7 +183,7 @@ impl Db {
                   method          TEXT NOT NULL,
                   url             TEXT NOT NULL,
                   headers         TEXT,
-                  body            TEXT
+                  body            BLOB
               )",
             NO_PARAMS,
         ) {
@@ -158,8 +216,10 @@ impl Db {
             x => Err(format!("Table {} not recognized", x)),
         }
     }
+    // TODO: return Result<Vec<Request>, String>
     fn get_requests(&self) -> Result<(), String> {
-        let stmt = self.conn
+        let stmt = self
+            .conn
             .prepare("SELECT name, method, url, headers, body FROM requests;");
         if let Err(x) = stmt {
             return Err(x.to_string());
@@ -168,7 +228,7 @@ impl Db {
 
         let requests = stmt
             .query_map(NO_PARAMS, |row| {
-                Ok(Request{
+                Ok(Request {
                     name: row.get(0).unwrap(),
                     method: row.get(1).unwrap(),
                     url: row.get(2).unwrap(),
@@ -199,11 +259,57 @@ impl Db {
         println!();
         Ok(())
     }
+    // TODO: return Result<Vec<Variable>, String>
     fn get_variables(&self) -> Result<(), String> {
-        Err(String::from("not implemented"))
-    }
-    fn get_environments(&self) -> Result<(), String> {
         let stmt = self.conn
+            .prepare("SELECT rowid, name, environment, value, source, timestamp FROM variables ORDER BY timestamp DESC;");
+        if let Err(x) = stmt {
+            return Err(x.to_string());
+        }
+        let mut stmt = stmt.unwrap();
+
+        let vars = stmt
+            .query_map(NO_PARAMS, |row| {
+                Ok(Variable {
+                    rowid: row.get(0).unwrap(),
+                    name: row.get(1).unwrap(),
+                    environment: row.get(2).unwrap(),
+                    value: row.get(3).unwrap(),
+                    source: row.get(4).unwrap(),
+                    timestamp: row.get(5).unwrap(),
+                })
+            })
+            .unwrap();
+
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+
+        table.set_titles(row![
+            "rowid",
+            "name",
+            "environment",
+            "value",
+            "source",
+            "timestamp"
+        ]);
+        for var in vars {
+            let var = var.unwrap();
+            table.add_row(row![
+                var.rowid,
+                var.name,
+                var.environment,
+                var.value.unwrap_or(String::from("")),
+                var.source.unwrap_or(String::from("")),
+                var.timestamp.unwrap_or(String::from(""))
+            ]);
+        }
+        table.printstd();
+        Ok(())
+    }
+    // TODO: return Result<Vec<String>, String>
+    fn get_environments(&self) -> Result<(), String> {
+        let stmt = self
+            .conn
             .prepare("SELECT DISTINCT environment FROM variables;");
         if let Err(x) = stmt {
             return Err(x.to_string());
@@ -225,6 +331,35 @@ impl Db {
             table.add_row(row![env.unwrap()]);
         }
         table.printstd();
+        Ok(())
+    }
+
+    fn create_request(&self, req: Request) -> Result<(), String> {
+        let result = self.conn.execute(
+            "INSERT INTO requests (name, method, url, headers, body)
+                  VALUES (?1, ?2, ?3, ?4, ?5);",
+            params![req.name, req.method, req.url, req.headers, req.body],
+        );
+        if let Err(x) = result {
+            return Err(x.to_string());
+        }
+        Ok(())
+    }
+    fn create_variable(&self, var: Variable) -> Result<(), String> {
+        let result = self.conn.execute(
+            "INSERT INTO variables (name, environment, value, source, timestamp)
+                  VALUES (?1, ?2, ?3, ?4, ?5);",
+            params![
+                var.name,
+                var.environment,
+                var.value,
+                var.source,
+                format!("{}", Utc::now().format("%Y-%m-%d %T %Z"))
+            ],
+        );
+        if let Err(x) = result {
+            return Err(x.to_string());
+        }
         Ok(())
     }
 }
