@@ -64,6 +64,7 @@ impl Repl {
     fn execute_show(&self, args: Vec<&str>) -> Result<(), String> {
         if args.len() != 2 {
             println!("Show various saved data\n\nUsage: show <requests|variables|environments>\n");
+            return Ok(());
         }
         match Repl::get_table_from_alias(args[1]) {
             Some(table) => self.db.get_table(&table),
@@ -71,6 +72,10 @@ impl Repl {
         }
     }
     fn execute_create(&self, args: Vec<&str>) -> Result<(), String> {
+        if args.len() < 2 {
+            println!("Create various data\n\nUsage: create <request|variable> args...\n");
+            return Ok(());
+        }
         match args[1] {
             "request" | "req" => self.create_request(args),
             "variable" | "var" => self.create_variable(args),
