@@ -7,6 +7,8 @@ use db::{Db, Request, Variable};
 extern crate prettytable;
 use prettytable::{format, Cell, Row, Table};
 
+use reqwest::blocking;
+
 pub struct Repl {
     prompt: String,
     workspace: String,
@@ -43,20 +45,45 @@ impl Repl {
         Some(())
     }
 
-    pub fn execute(&self, command: &str) -> Result<(), String> {
+    pub fn execute(&mut self, command: &str) -> Result<(), String> {
         // TODO: investigate using shlex
         let args: Vec<&str> = command.split_whitespace().collect();
         if args.len() == 0 {
             return Ok(());
         }
-        if self.environment == None && self.request == None {
-            self.execute_base(args)
-        } else {
-            Ok(())
+        if self.environment.is_some() {
+            let ret = self.execute_environment(&args);
+            if let Err(x) = ret {
+                // TODO: error types
+                if !x.starts_with("Invalid command: ") {
+                    return Err(x);
+                }
+            } else {
+                return ret;
+            }
+            self.execute_base(&args)?;
         }
+        if self.environment.is_none() && self.request.is_none() {
+            self.execute_base(&args)?;
+        }
+        Ok(())
     }
 
-    fn execute_base(&self, args: Vec<&str>) -> Result<(), String> {
+    fn update_prompt(&mut self) {
+        let mut prompt = String::from("[repost]");
+        if let Some(x) = &self.environment {
+            prompt = format!("{}[{}]", prompt, x);
+        }
+        self.prompt = prompt;
+    }
+
+    fn execute_environment(&mut self, args: &Vec<&str>) -> Result<(), String> {
+        match args[0] {
+            "run" | "r" => self.execute_run(args),
+            _ => Err(format!("Invalid command: {}", args[0])),
+        }
+    }
+    fn execute_base(&mut self, args: &Vec<&str>) -> Result<(), String> {
         match args[0] {
             "show" | "get" => self.execute_show(args),
             "create" => self.execute_create(args),
@@ -65,7 +92,45 @@ impl Repl {
         }
     }
 
-    fn execute_show(&self, args: Vec<&str>) -> Result<(), String> {
+    fn execute_run(&self, args: &Vec<&str>) -> Result<(), String> {
+        // TODO run multiple in a row
+        if args.len() != 2 {
+            println!("Run a named HTTP request\n\nUsage: run <request>\n");
+            return Ok(());
+        }
+        let req: Vec<db::Request> = self.db.get_requests()?.into_iter().filter(|x| x.name == args[1]).collect();
+        if req.len() == 0 {
+            return Err(format!("Request not found: {}", args[1]));
+        }
+        let req = &req[0];
+        let client = blocking::Client::new();
+        let mut builder;
+        match req.method.as_ref() {
+            "GET" => {
+                builder = client.get(&req.url);
+            },
+            "POST" => {
+                builder = client.post(&req.url);
+            },
+            "PUT" => {
+                builder = client.put(&req.url);
+            },
+            "DELETE" => {
+                builder = client.delete(&req.url);
+            },
+            "PATCH" => {
+                builder = client.patch(&req.url);
+            },
+            x => {
+                return Err(format!("Invalid method: {}", x))
+            }
+        }
+        let resp = builder.send();
+        println!("{:?}", resp);
+        Ok(())
+    }
+
+    fn execute_show(&self, args: &Vec<&str>) -> Result<(), String> {
         if args.len() != 2 {
             println!("Show various saved data\n\nUsage: show <requests|variables|environments>\n");
             return Ok(());
@@ -99,7 +164,7 @@ impl Repl {
         Ok(())
     }
 
-    fn execute_create(&self, args: Vec<&str>) -> Result<(), String> {
+    fn execute_create(&self, args: &Vec<&str>) -> Result<(), String> {
         if args.len() < 2 {
             println!("Create various data\n\nUsage: create <request|variable> args...\n");
             return Ok(());
@@ -111,10 +176,19 @@ impl Repl {
             _ => Err(format!("Invalid argument to create: {}", args[2])),
         }
     }
-    fn execute_use(&self, args: Vec<&str>) -> Result<(), String> {
-        Err(String::from("not implemented: use"))
+    fn execute_use(&mut self, args: &Vec<&str>) -> Result<(), String> {
+        if args.len() != 2 {
+            println!("Use an environment\n\nUsage: use <environment>\n");
+            return Ok(());
+        }
+        if !self.db.get_environments()?.iter().any(|x| x.environment == args[1]) {
+            return Err(format!("Environment not found: {}", args[1]));
+        }
+        self.environment = Some(String::from(args[1]));
+        self.update_prompt();
+        Ok(())
     }
-    fn create_request(&self, args: Vec<&str>) -> Result<(), String> {
+    fn create_request(&self, args: &Vec<&str>) -> Result<(), String> {
         // TODO: support method, header and body
         //       use clap
         if args.len() < 4 {
@@ -125,7 +199,7 @@ impl Repl {
         // TODO: infer method from name
         self.db.create_request(Request::new(args[2], None, args[3]))
     }
-    fn create_variable(&self, args: Vec<&str>) -> Result<(), String> {
+    fn create_variable(&self, args: &Vec<&str>) -> Result<(), String> {
         // TODO: use clap; verify arguments contain an =
         if args.len() < 4 {
             return Err(String::from("Usage: create variable name env=value"));

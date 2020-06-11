@@ -2,7 +2,7 @@ use repost::Repl;
 
 fn main() -> Result<(), String> {
     let mut input = String::new();
-    let repl = Repl::new()?;
+    let mut repl = Repl::new()?;
 
     loop {
         if repl.get_input(&mut input) == None {
