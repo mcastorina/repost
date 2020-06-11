@@ -125,21 +125,27 @@ impl Request {
     }
 }
 
+pub enum DbError {
+    Rusqlite(rusqlite::Error),
+}
+
+impl From<rusqlite::Error> for DbError {
+    fn from(err: rusqlite::Error) -> DbError {
+        DbError::Rusqlite(err)
+    }
+}
+
 impl Db {
-    pub fn new(path: &str) -> Result<Db, String> {
-        let conn = Connection::open(path);
-        if let Err(x) = conn {
-            return Err(format!("Error connecting to {}: {}", path, x));
-        }
+    pub fn new(path: &str) -> Result<Db, DbError> {
         let db = Db {
-            conn: conn.unwrap(),
+            conn: Connection::open(path)?,
         };
         db.create_tables()?;
         Ok(db)
     }
 
-    fn create_tables(&self) -> Result<(), String> {
-        if let Err(x) = self.conn.execute(
+    fn create_tables(&self) -> Result<(), DbError> {
+        self.conn.execute(
             "CREATE TABLE IF NOT EXISTS requests (
                   name            TEXT PRIMARY KEY,
                   method          TEXT NOT NULL,
@@ -148,11 +154,9 @@ impl Db {
                   body            BLOB
               )",
             NO_PARAMS,
-        ) {
-            return Err(format!("Error creating requests table: {}", x));
-        }
+        )?;
 
-        if let Err(x) = self.conn.execute(
+        self.conn.execute(
             "CREATE TABLE IF NOT EXISTS variables (
                   rowid           INTEGER PRIMARY KEY,
                   name            TEXT NOT NULL,
@@ -162,92 +166,69 @@ impl Db {
                   timestamp       TEXT
               )",
             NO_PARAMS,
-        ) {
-            return Err(format!("Error creating variables table: {}", x));
-        }
+        )?;
 
         Ok(())
     }
 
-    pub fn get_requests(&self) -> Result<Vec<Request>, String> {
-        let stmt = self
+    pub fn get_requests(&self) -> Result<Vec<Request>, DbError> {
+        let mut stmt = self
             .conn
-            .prepare("SELECT name, method, url, headers, body FROM requests;");
-        if let Err(x) = stmt {
-            return Err(x.to_string());
-        }
-        let mut stmt = stmt.unwrap();
+            .prepare("SELECT name, method, url, headers, body FROM requests;")?;
 
-        let requests = stmt
-            .query_map(NO_PARAMS, |row| {
-                Ok(Request {
-                    name: row.get(0).unwrap(),
-                    method: row.get(1).unwrap(),
-                    url: row.get(2).unwrap(),
-                    headers: row.get(3).unwrap(),
-                    body: row.get(4).unwrap(),
-                })
+        let requests = stmt.query_map(NO_PARAMS, |row| {
+            Ok(Request {
+                name: row.get(0)?,
+                method: row.get(1)?,
+                url: row.get(2)?,
+                headers: row.get(3)?,
+                body: row.get(4)?,
             })
-            .unwrap();
+        })?;
 
         Ok(requests.map(|req| req.unwrap()).collect())
     }
-    pub fn get_variables(&self) -> Result<Vec<Variable>, String> {
-        let stmt = self.conn
-            .prepare("SELECT rowid, name, environment, value, source, timestamp FROM variables ORDER BY timestamp DESC;");
-        if let Err(x) = stmt {
-            return Err(x.to_string());
-        }
-        let mut stmt = stmt.unwrap();
+    pub fn get_variables(&self) -> Result<Vec<Variable>, DbError> {
+        let mut stmt = self.conn
+            .prepare("SELECT rowid, name, environment, value, source, timestamp FROM variables ORDER BY timestamp DESC;")?;
 
-        let vars = stmt
-            .query_map(NO_PARAMS, |row| {
-                Ok(Variable {
-                    rowid: row.get(0).unwrap(),
-                    name: row.get(1).unwrap(),
-                    environment: row.get(2).unwrap(),
-                    value: row.get(3).unwrap(),
-                    source: row.get(4).unwrap(),
-                    timestamp: row.get(5).unwrap(),
-                })
+        let vars = stmt.query_map(NO_PARAMS, |row| {
+            Ok(Variable {
+                rowid: row.get(0)?,
+                name: row.get(1)?,
+                environment: row.get(2)?,
+                value: row.get(3)?,
+                source: row.get(4)?,
+                timestamp: row.get(5)?,
             })
-            .unwrap();
+        })?;
 
         Ok(vars.map(|var| var.unwrap()).collect())
     }
-    pub fn get_environments(&self) -> Result<Vec<Environment>, String> {
-        let stmt = self
+    pub fn get_environments(&self) -> Result<Vec<Environment>, DbError> {
+        let mut stmt = self
             .conn
-            .prepare("SELECT DISTINCT environment FROM variables;");
-        if let Err(x) = stmt {
-            return Err(x.to_string());
-        }
-        let mut stmt = stmt.unwrap();
+            .prepare("SELECT DISTINCT environment FROM variables;")?;
 
-        let envs = stmt
-            .query_map(NO_PARAMS, |row| {
-                Ok(Environment {
-                    environment: row.get(0).unwrap(),
-                })
+        let envs = stmt.query_map(NO_PARAMS, |row| {
+            Ok(Environment {
+                environment: row.get(0)?,
             })
-            .unwrap();
+        })?;
 
         Ok(envs.map(|env| env.unwrap()).collect())
     }
 
-    pub fn create_request(&self, req: Request) -> Result<(), String> {
-        let result = self.conn.execute(
+    pub fn create_request(&self, req: Request) -> Result<(), DbError> {
+        self.conn.execute(
             "INSERT INTO requests (name, method, url, headers, body)
                   VALUES (?1, ?2, ?3, ?4, ?5);",
             params![req.name, req.method, req.url, req.headers, req.body],
-        );
-        if let Err(x) = result {
-            return Err(x.to_string());
-        }
+        )?;
         Ok(())
     }
-    pub fn create_variable(&self, var: Variable) -> Result<(), String> {
-        let result = self.conn.execute(
+    pub fn create_variable(&self, var: Variable) -> Result<(), DbError> {
+        self.conn.execute(
             "INSERT INTO variables (name, environment, value, source, timestamp)
                   VALUES (?1, ?2, ?3, ?4, ?5);",
             params![
@@ -257,10 +238,7 @@ impl Db {
                 var.source,
                 format!("{}", Utc::now().format("%Y-%m-%d %T %Z"))
             ],
-        );
-        if let Err(x) = result {
-            return Err(x.to_string());
-        }
+        )?;
         Ok(())
     }
 }
