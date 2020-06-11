@@ -5,13 +5,13 @@ use db::{Db, Request, Variable};
 
 #[macro_use]
 extern crate prettytable;
-use prettytable::{format, Cell, Row, Table};
+use prettytable::{format, Table};
 
 use reqwest::blocking;
 
 pub struct Repl {
     prompt: String,
-    workspace: String,
+    _workspace: String,
     db: Db,
     environment: Option<String>,
     request: Option<String>,
@@ -21,7 +21,7 @@ impl Repl {
     pub fn new() -> Result<Repl, String> {
         Ok(Repl {
             prompt: String::from("[repost]"),
-            workspace: String::from("repost"),
+            _workspace: String::from("repost"),
             db: Db::new("repost.db")?,
             environment: None,
             request: None,
@@ -78,17 +78,17 @@ impl Repl {
     }
 
     fn execute_environment(&mut self, args: &Vec<&str>) -> Result<(), String> {
-        match args[0] {
+        match args[0].to_lowercase().as_ref() {
             "run" | "r" => self.execute_run(args),
             _ => Err(format!("Invalid command: {}", args[0])),
         }
     }
     fn execute_base(&mut self, args: &Vec<&str>) -> Result<(), String> {
-        match args[0] {
+        match args[0].to_lowercase().as_ref() {
             "show" | "get" => self.execute_show(args),
             "create" => self.execute_create(args),
             "use" | "set" => self.execute_use(args),
-            x => Err(format!("Invalid command: {}.", x)),
+            _ => Err(format!("Invalid command: {}.", args[0])),
         }
     }
 
@@ -104,7 +104,7 @@ impl Repl {
         }
         let req = &req[0];
         let client = blocking::Client::new();
-        let mut builder;
+        let builder;
         match req.method.as_ref() {
             "GET" => {
                 builder = client.get(&req.url);
@@ -220,16 +220,5 @@ impl Repl {
             })?;
         }
         Ok(())
-    }
-
-    fn get_table_from_alias(alias: &str) -> Option<String> {
-        match alias {
-            "r" | "req" | "reqs" | "request" | "requests" => Some(String::from("requests")),
-            "v" | "var" | "vars" | "variable" | "variables" => Some(String::from("variables")),
-            "e" | "env" | "envs" | "environment" | "environments" => {
-                Some(String::from("environments"))
-            }
-            _ => None,
-        }
     }
 }

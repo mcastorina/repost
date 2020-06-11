@@ -1,8 +1,6 @@
 use chrono::Utc;
 use rusqlite::{params, Connection, NO_PARAMS};
 
-use prettytable::{format, Table};
-
 pub trait PrintableTable {
     fn column_names(&self) -> prettytable::Row;
     fn rows(&self) -> Vec<prettytable::Row>;
@@ -71,7 +69,6 @@ impl PrintableTable for Vec<Environment> {
 }
 
 pub struct Db {
-    path: String,
     conn: Connection,
 }
 
@@ -135,7 +132,6 @@ impl Db {
             return Err(format!("Error connecting to {}: {}", path, x));
         }
         let db = Db {
-            path: String::from(path),
             conn: conn.unwrap(),
         };
         db.create_tables()?;
