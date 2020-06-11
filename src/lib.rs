@@ -1,7 +1,7 @@
 use std::io;
 use std::io::prelude::*;
 pub mod db;
-use db::{Db, DbError, Request, Variable};
+use db::{Db, DbError, Method, Request, Variable};
 
 #[macro_use]
 extern crate prettytable;
@@ -103,7 +103,7 @@ impl Repl {
             .db
             .get_requests()?
             .into_iter()
-            .filter(|x| x.name == args[1])
+            .filter(|x| x.name() == args[1])
             .collect();
         if req.len() == 0 {
             return Err(CmdError::ArgsError(format!(
@@ -113,25 +113,14 @@ impl Repl {
         }
         let req = &req[0];
         let client = blocking::Client::new();
-        let builder;
-        match req.method.as_ref() {
-            "GET" => {
-                builder = client.get(&req.url);
-            }
-            "POST" => {
-                builder = client.post(&req.url);
-            }
-            "PUT" => {
-                builder = client.put(&req.url);
-            }
-            "DELETE" => {
-                builder = client.delete(&req.url);
-            }
-            "PATCH" => {
-                builder = client.patch(&req.url);
-            }
-            x => return Err(CmdError::ArgsError(format!("Invalid method: {}", x))),
-        }
+        let builder = match req.method() {
+            Method::GET => client.get(req.url()),
+            Method::POST => client.post(req.url()),
+            Method::PUT => client.put(req.url()),
+            Method::PATCH => client.patch(req.url()),
+            Method::DELETE => client.delete(req.url()),
+            Method::HEAD => client.head(req.url()),
+        };
         let resp = builder.send();
         println!("{:?}", resp);
         Ok(())
