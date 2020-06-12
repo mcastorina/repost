@@ -1,20 +1,13 @@
-use std::io;
-use std::io::prelude::*;
 pub mod db;
-use db::{Db, DbError, Method, Request, Variable};
+pub mod cmd;
 
 #[macro_use]
 extern crate prettytable;
-use prettytable::{format, Table};
 
-use reqwest::blocking;
+use std::io::{self,prelude::*};
+use db::Db;
+use cmd::{Cmd,CmdError};
 
-pub enum CmdError {
-    DbError(db::DbError),
-    ArgsError(String),
-    NotFound,
-    NotImplemented,
-}
 pub struct Repl {
     prompt: String,
     _workspace: String,
@@ -51,14 +44,21 @@ impl Repl {
         Some(())
     }
 
+    fn cmds() -> Vec<Box<dyn Cmd>> {
+        vec![
+            Box::new(cmd::EnvironmentalCommand{}),
+            Box::new(cmd::BaseCommand{}),
+        ]
+    }
+
     pub fn execute(&mut self, command: &str) -> Result<(), CmdError> {
         // TODO: investigate using shlex
         let args: Vec<&str> = command.split_whitespace().collect();
         if args.len() == 0 {
             return Ok(());
         }
-        if self.environment.is_some() {
-            let ret = self.execute_environment(&args);
+        for cmd in Repl::cmds() {
+            let ret = cmd.execute(self, &args);
             match ret {
                 Ok(x) => return Ok(x),
                 Err(x) => match x {
@@ -67,7 +67,7 @@ impl Repl {
                 },
             }
         }
-        self.execute_base(&args)
+        Err(CmdError::NotFound)
     }
 
     fn update_prompt(&mut self) {
@@ -76,193 +76,5 @@ impl Repl {
             prompt = format!("{}[{}]", prompt, x);
         }
         self.prompt = prompt;
-    }
-
-    fn execute_environment(&mut self, args: &Vec<&str>) -> Result<(), CmdError> {
-        match args[0].to_lowercase().as_ref() {
-            "run" | "r" => self.execute_run(args),
-            _ => Err(CmdError::NotFound),
-        }
-    }
-    fn execute_base(&mut self, args: &Vec<&str>) -> Result<(), CmdError> {
-        match args[0].to_lowercase().as_ref() {
-            "show" | "get" => self.execute_show(args),
-            "create" => self.execute_create(args),
-            "use" | "set" => self.execute_use(args),
-            _ => Err(CmdError::NotFound),
-        }
-    }
-
-    fn execute_run(&self, args: &Vec<&str>) -> Result<(), CmdError> {
-        // TODO run multiple in a row
-        if args.len() != 2 {
-            println!("Run a named HTTP request\n\nUsage: run <request>\n");
-            return Ok(());
-        }
-        let req: Vec<db::Request> = self
-            .db
-            .get_requests()?
-            .into_iter()
-            .filter(|x| x.name() == args[1])
-            .collect();
-        if req.len() == 0 {
-            return Err(CmdError::ArgsError(format!(
-                "Request not found: {}",
-                args[1]
-            )));
-        }
-        let req = &req[0];
-        let client = blocking::Client::new();
-        let builder = match req.method() {
-            Method::GET => client.get(req.url()),
-            Method::POST => client.post(req.url()),
-            Method::PUT => client.put(req.url()),
-            Method::PATCH => client.patch(req.url()),
-            Method::DELETE => client.delete(req.url()),
-            Method::HEAD => client.head(req.url()),
-        };
-        let resp = builder.send();
-        println!("{:?}", resp);
-        Ok(())
-    }
-
-    fn execute_show(&self, args: &Vec<&str>) -> Result<(), CmdError> {
-        if args.len() != 2 {
-            println!("Show various saved data\n\nUsage: show <requests|variables|environments>\n");
-            return Ok(());
-        }
-        match args[1].to_lowercase().as_ref() {
-            "r" | "req" | "reqs" | "request" | "requests" => {
-                self.print_table(self.db.get_requests()?)
-            }
-            "v" | "var" | "vars" | "variable" | "variables" => {
-                self.print_table(self.db.get_variables()?)
-            }
-            "e" | "env" | "envs" | "environment" | "environments" => {
-                self.print_table(self.db.get_environments()?)
-            }
-            _ => Err(CmdError::ArgsError(format!(
-                "Invalid argument: {}",
-                args[1]
-            ))),
-        }
-    }
-
-    fn print_table<T: db::PrintableTable>(&self, t: T) -> Result<(), CmdError> {
-        let mut table = Table::new();
-        table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-        table.get_format().indent(2);
-
-        table.set_titles(t.column_names());
-        for row in t.rows() {
-            table.add_row(row);
-        }
-        println!();
-        table.printstd();
-        println!();
-        Ok(())
-    }
-
-    fn execute_create(&self, args: &Vec<&str>) -> Result<(), CmdError> {
-        if args.len() < 2 {
-            println!("Create various data\n\nUsage: create <request|variable> args...\n");
-            return Ok(());
-        }
-        match args[1] {
-            "request" | "req" => self.create_request(args),
-            "variable" | "var" => self.create_variable(args),
-            // TODO: print usage
-            _ => Err(CmdError::ArgsError(format!(
-                "Invalid argument to create: {}",
-                args[2]
-            ))),
-        }
-    }
-    fn execute_use(&mut self, args: &Vec<&str>) -> Result<(), CmdError> {
-        if args.len() != 2 {
-            println!("Use an environment\n\nUsage: use <environment>\n");
-            return Ok(());
-        }
-        if !self
-            .db
-            .get_environments()?
-            .iter()
-            .any(|x| x.environment == args[1])
-        {
-            return Err(CmdError::ArgsError(format!(
-                "Environment not found: {}",
-                args[1]
-            )));
-        }
-        self.environment = Some(String::from(args[1]));
-        self.update_prompt();
-        Ok(())
-    }
-    fn create_request(&self, args: &Vec<&str>) -> Result<(), CmdError> {
-        // TODO: support method, header and body
-        //       use clap
-        if args.len() < 4 {
-            return Err(CmdError::ArgsError(String::from(
-                "Usage: create request name url [-m method] [-H header] [-d body]",
-            )));
-        }
-        // TODO: infer method from name
-        self.db
-            .create_request(Request::new(args[2], None, args[3]))?;
-        Ok(())
-    }
-    fn create_variable(&self, args: &Vec<&str>) -> Result<(), CmdError> {
-        // TODO: use clap; verify arguments contain an =
-        if args.len() < 4 {
-            return Err(CmdError::ArgsError(String::from(
-                "Usage: create variable name env=value",
-            )));
-        }
-        let name = String::from(args[2]);
-        for arg in &args[3..] {
-            // TODO: create a new variable function
-            let mut items = arg.splitn(2, "=");
-            let environment = String::from(items.next().unwrap());
-            let value = Some(String::from(items.next().unwrap()));
-            self.db.create_variable(Variable {
-                rowid: 0,
-                name: name.clone(),
-                environment,
-                value,
-                source: Some(String::from("user")),
-                timestamp: None,
-            })?;
-        }
-        Ok(())
-    }
-}
-
-impl std::fmt::Display for CmdError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            CmdError::DbError(x) => match x {
-                DbError::Rusqlite(x) => write!(f, "{}", x),
-            },
-            CmdError::ArgsError(x) => write!(f, "{}", x),
-            CmdError::NotFound => write!(f, "Command not found."),
-            CmdError::NotImplemented => write!(f, "Command not implemented."),
-        }
-    }
-}
-impl From<CmdError> for String {
-    fn from(err: CmdError) -> String {
-        match err {
-            CmdError::DbError(x) => match x {
-                DbError::Rusqlite(x) => format!("{}", x),
-            },
-            CmdError::ArgsError(x) => x,
-            CmdError::NotFound => String::from("Command not found."),
-            CmdError::NotImplemented => String::from("Command not implemented."),
-        }
-    }
-}
-impl From<DbError> for CmdError {
-    fn from(err: DbError) -> CmdError {
-        CmdError::DbError(err)
     }
 }
