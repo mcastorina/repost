@@ -169,8 +169,7 @@ impl Db {
             })
         })?;
 
-        // TODO: print a warning for errors
-        Ok(requests.filter(|req| req.is_ok()).map(|req| req.unwrap()).collect())
+        Ok(requests.filter_map(|req| req.ok()).collect())
     }
     pub fn get_variables(&self) -> Result<Vec<Variable>, DbError> {
         let mut stmt = self.conn
@@ -188,7 +187,7 @@ impl Db {
         })?;
 
         // TODO: print a warning for errors
-        Ok(vars.filter(|var| var.is_ok()).map(|var| var.unwrap()).collect())
+        Ok(vars.filter_map(|var| var.ok()).collect())
     }
     pub fn get_environments(&self) -> Result<Vec<Environment>, DbError> {
         let mut stmt = self
@@ -202,7 +201,7 @@ impl Db {
         })?;
 
         // TODO: print a warning for errors
-        Ok(envs.filter(|env| env.is_ok()).map(|env| env.unwrap()).collect())
+        Ok(envs.filter_map(|env| env.ok()).collect())
     }
 
     pub fn create_request(&self, req: Request) -> Result<(), DbError> {
