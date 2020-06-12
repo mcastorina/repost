@@ -56,7 +56,7 @@ pub struct Variable {
 }
 
 pub struct Environment {
-    pub environment: String,
+    environment: String,
 }
 
 impl Request {
@@ -215,6 +215,13 @@ impl Db {
 
         // TODO: print a warning for errors
         Ok(envs.filter_map(|env| env.ok()).collect())
+    }
+    pub fn environment_exists(&self, name: &str) -> Result<bool, DbError> {
+        // TODO: single query
+        Ok(self
+            .get_environments()?
+            .iter()
+            .any(|x| x.environment == name))
     }
 
     pub fn create_request(&self, req: Request) -> Result<(), DbError> {

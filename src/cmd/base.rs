@@ -61,17 +61,30 @@ impl Cmd for BaseCommand {
                     .multiple(true),
             )
             .arg("-d, --data=[DATA] 'HTTP request body'");
+        let set_environment = App::new("environment")
+            .about("Set the environment as used for variable substitution")
+            .aliases(&["env", "e"])
+            .arg("<environment> 'Environment to use'");
+        let set_request = App::new("request")
+            .about("Set the request to view and modify specific options")
+            .aliases(&["req", "r"])
+            .arg("<request> 'Request to use'");
+        let set_workspace = App::new("workspace")
+            .about("Set the workspace where all data is stored")
+            .aliases(&["ws", "w"])
+            .arg("<workspace> 'Workspace to use'");
         let matches = App::new("repost")
             .setting(AppSettings::NoBinaryName)
             .subcommand(
                 App::new("create")
                     .setting(AppSettings::SubcommandRequiredElseHelp)
                     .about("Create an HTTP request or variable")
-                    .aliases(&["c"])
+                    .aliases(&["new", "c"])
                     .subcommand(create_request)
                     .subcommand(create_variable),
             )
             .subcommand(
+                // TODO: use subcommand for show_requests show_variables show_environments
                 App::new("show")
                     .about("Print resources")
                     .aliases(&["get", "print", "g", "p"])
@@ -99,16 +112,38 @@ impl Cmd for BaseCommand {
                             ]),
                     ),
             )
+            .subcommand(
+                App::new("set")
+                    .setting(AppSettings::SubcommandRequiredElseHelp)
+                    .about(
+                        "Set workspace, environment, or request for environment specific commands",
+                    )
+                    .aliases(&["use", "load", "u"])
+                    .subcommand(set_workspace)
+                    .subcommand(set_environment)
+                    .subcommand(set_request),
+            )
             .try_get_matches_from(args)?;
 
         match matches.subcommand() {
-            ("create", Some(create_matches)) => match create_matches.subcommand() {
-                ("request", Some(cr_matches)) => BaseCommand::create_request(repl, cr_matches),
-                ("variable", Some(cv_matches)) => BaseCommand::create_variable(repl, cv_matches),
-                // TODO: print help when no subcommand was used
+            ("create", Some(matches)) => match matches.subcommand() {
+                ("request", Some(matches)) => BaseCommand::create_request(repl, matches),
+                ("variable", Some(matches)) => BaseCommand::create_variable(repl, matches),
                 _ => unreachable!(),
             },
-            ("show", Some(show_matches)) => BaseCommand::show(repl, show_matches),
+            ("show", Some(matches)) => BaseCommand::show(repl, matches),
+            ("set", Some(matches)) => match matches.subcommand() {
+                ("workspace", Some(matches)) => {
+                    BaseCommand::set_workspace(repl, matches.value_of("workspace").unwrap())
+                }
+                ("environment", Some(matches)) => {
+                    BaseCommand::set_environment(repl, matches.value_of("environment").unwrap())
+                }
+                ("request", Some(matches)) => {
+                    BaseCommand::set_request(repl, matches.value_of("request").unwrap())
+                }
+                _ => unreachable!(),
+            },
             _ => unreachable!(),
         }
     }
@@ -131,24 +166,22 @@ impl BaseCommand {
         }
     }
 
-    fn set(repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError> {
-        if args.len() != 2 {
-            println!("Use an environment\n\nUsage: use <environment>\n");
-            return Ok(());
-        }
-        if !repl
-            .db
-            .get_environments()?
-            .iter()
-            .any(|x| x.environment == args[1])
-        {
+    fn set_workspace(repl: &mut Repl, workspace: &str) -> Result<(), CmdError> {
+        repl.update_workspace(workspace)
+    }
+    fn set_environment(repl: &mut Repl, environment: &str) -> Result<(), CmdError> {
+        if !repl.db.environment_exists(environment)? {
             return Err(CmdError::ArgsError(format!(
                 "Environment not found: {}",
-                args[1]
+                environment,
             )));
         }
-        repl.environment = Some(String::from(args[1]));
+        repl.environment = Some(String::from(environment));
         repl.update_prompt();
+        Ok(())
+    }
+    fn set_request(repl: &mut Repl, request: &str) -> Result<(), CmdError> {
+        // TODO
         Ok(())
     }
 
