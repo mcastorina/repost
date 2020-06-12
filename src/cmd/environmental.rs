@@ -1,9 +1,9 @@
-use crate::cmd::{Cmd,CmdError};
+use crate::cmd::{Cmd, CmdError};
 use crate::db::{Method, Request};
 use crate::Repl;
 use reqwest::blocking;
 
-pub struct EnvironmentalCommand{}
+pub struct EnvironmentalCommand {}
 impl Cmd for EnvironmentalCommand {
     fn execute(&self, repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError> {
         match args[0].to_lowercase().as_ref() {

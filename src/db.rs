@@ -25,7 +25,7 @@ impl Method {
             Method::HEAD => "HEAD",
         }
     }
-    fn new(s: &str) -> Method {
+    pub fn new(s: &str) -> Method {
         match s {
             "GET" => Method::GET,
             "POST" => Method::POST,
@@ -68,6 +68,19 @@ impl Request {
             headers: None,
             body: None,
         }
+    }
+    pub fn add_header(&mut self, key: &str, value: &str) {
+        let mut headers = {
+            match &self.headers {
+                Some(x) => format!("{}\n", x),
+                None => String::new(),
+            }
+        };
+        headers.push_str(format!("{}: {}", key, value).as_ref());
+        self.headers = Some(headers);
+    }
+    pub fn set_body(&mut self, body: Option<Vec<u8>>) {
+        self.body = body;
     }
 
     fn name_to_method(name: &str, method: Option<Method>) -> Method {

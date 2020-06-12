@@ -1,12 +1,12 @@
-pub mod db;
 pub mod cmd;
+pub mod db;
 
 #[macro_use]
 extern crate prettytable;
 
-use std::io::{self,prelude::*};
+use cmd::{Cmd, CmdError};
 use db::Db;
-use cmd::{Cmd,CmdError};
+use std::io::{self, prelude::*};
 
 pub struct Repl {
     prompt: String,
@@ -46,8 +46,8 @@ impl Repl {
 
     fn cmds() -> Vec<Box<dyn Cmd>> {
         vec![
-            Box::new(cmd::EnvironmentalCommand{}),
-            Box::new(cmd::BaseCommand{}),
+            Box::new(cmd::EnvironmentalCommand {}),
+            Box::new(cmd::BaseCommand {}),
         ]
     }
 
