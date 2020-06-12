@@ -52,11 +52,11 @@ impl Repl {
     }
 
     pub fn execute(&mut self, command: &str) -> Result<(), CmdError> {
-        // TODO: investigate using shlex
-        let args: Vec<&str> = command.split_whitespace().collect();
+        let args: Vec<String> = shlex::split(command).unwrap_or(vec![]);
         if args.len() == 0 {
             return Ok(());
         }
+        let args = args.iter().map(|x| x.as_ref()).collect();
         for cmd in Repl::cmds() {
             let ret = cmd.execute(self, &args);
             match ret {
