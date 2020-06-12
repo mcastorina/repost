@@ -1,19 +1,7 @@
-use prettytable::{format, Table};
-use reqwest::blocking;
-
+use crate::cmd::{Cmd,CmdError};
+use crate::db::{Request, Variable, PrintableTable};
 use crate::Repl;
-use crate::db::{DbError, Method, Request, Variable, PrintableTable};
-
-pub enum CmdError {
-    DbError(DbError),
-    ArgsError(String),
-    NotFound,
-    NotImplemented,
-}
-
-pub trait Cmd {
-    fn execute(&self, repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError>;
-}
+use prettytable::{format, Table};
 
 pub struct BaseCommand{}
 impl Cmd for BaseCommand {
@@ -137,80 +125,5 @@ impl BaseCommand {
         table.printstd();
         println!();
         Ok(())
-    }
-}
-
-
-pub struct EnvironmentalCommand{}
-impl Cmd for EnvironmentalCommand {
-    fn execute(&self, repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError> {
-        match args[0].to_lowercase().as_ref() {
-            "run" | "r" => EnvironmentalCommand::execute_run(repl, args),
-            _ => Err(CmdError::NotFound),
-        }
-    }
-}
-impl EnvironmentalCommand {
-    fn execute_run(repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError> {
-        // TODO run multiple in a row
-        if args.len() != 2 {
-            println!("Run a named HTTP request\n\nUsage: run <request>\n");
-            return Ok(());
-        }
-        let req: Vec<Request> = repl
-            .db
-            .get_requests()?
-            .into_iter()
-            .filter(|x| x.name() == args[1])
-            .collect();
-        if req.len() == 0 {
-            return Err(CmdError::ArgsError(format!(
-                "Request not found: {}",
-                args[1]
-            )));
-        }
-        let req = &req[0];
-        let client = blocking::Client::new();
-        let builder = match req.method() {
-            Method::GET => client.get(req.url()),
-            Method::POST => client.post(req.url()),
-            Method::PUT => client.put(req.url()),
-            Method::PATCH => client.patch(req.url()),
-            Method::DELETE => client.delete(req.url()),
-            Method::HEAD => client.head(req.url()),
-        };
-        let resp = builder.send();
-        println!("{:?}", resp);
-        Ok(())
-    }
-}
-
-impl std::fmt::Display for CmdError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            CmdError::DbError(x) => match x {
-                DbError::Rusqlite(x) => write!(f, "{}", x),
-            },
-            CmdError::ArgsError(x) => write!(f, "{}", x),
-            CmdError::NotFound => write!(f, "Command not found."),
-            CmdError::NotImplemented => write!(f, "Command not implemented."),
-        }
-    }
-}
-impl From<CmdError> for String {
-    fn from(err: CmdError) -> String {
-        match err {
-            CmdError::DbError(x) => match x {
-                DbError::Rusqlite(x) => format!("{}", x),
-            },
-            CmdError::ArgsError(x) => x,
-            CmdError::NotFound => String::from("Command not found."),
-            CmdError::NotImplemented => String::from("Command not implemented."),
-        }
-    }
-}
-impl From<DbError> for CmdError {
-    fn from(err: DbError) -> CmdError {
-        CmdError::DbError(err)
     }
 }
