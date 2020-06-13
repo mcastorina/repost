@@ -153,13 +153,13 @@ impl Cmd for BaseCommand {
             ("show", Some(matches)) => BaseCommand::show(repl, matches),
             ("set", Some(matches)) => match matches.subcommand() {
                 ("workspace", Some(matches)) => {
-                    BaseCommand::set_workspace(repl, matches.value_of("workspace").unwrap())
+                    repl.update_workspace(matches.value_of("workspace").unwrap())
                 }
                 ("environment", Some(matches)) => {
-                    BaseCommand::set_environment(repl, matches.value_of("environment").unwrap())
+                    repl.update_environment(matches.value_of("environment").unwrap())
                 }
                 ("request", Some(matches)) => {
-                    BaseCommand::set_request(repl, matches.value_of("request").unwrap())
+                    repl.update_request(matches.value_of("request").unwrap())
                 }
                 _ => unreachable!(),
             },
@@ -186,25 +186,6 @@ impl BaseCommand {
             }
             _ => unreachable!(),
         }
-    }
-
-    fn set_workspace(repl: &mut Repl, workspace: &str) -> Result<(), CmdError> {
-        repl.update_workspace(workspace)
-    }
-    fn set_environment(repl: &mut Repl, environment: &str) -> Result<(), CmdError> {
-        if !repl.db.environment_exists(environment)? {
-            return Err(CmdError::ArgsError(format!(
-                "Environment not found: {}",
-                environment,
-            )));
-        }
-        repl.environment = Some(String::from(environment));
-        repl.update_prompt();
-        Ok(())
-    }
-    fn set_request(repl: &mut Repl, request: &str) -> Result<(), CmdError> {
-        // TODO
-        Ok(())
     }
 
     fn create_request(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {

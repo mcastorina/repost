@@ -78,7 +78,19 @@ impl Repl {
         self.prompt = prompt;
     }
 
-    fn update_workspace(&mut self, workspace: &str) -> Result<(), CmdError> {
+    pub fn update_environment(&mut self, environment: &str) -> Result<(), CmdError> {
+        if !self.db.environment_exists(environment)? {
+            return Err(CmdError::ArgsError(format!(
+                "Environment not found: {}",
+                environment,
+            )));
+        }
+        self.environment = Some(String::from(environment));
+        self.update_prompt();
+        Ok(())
+    }
+
+    pub fn update_workspace(&mut self, workspace: &str) -> Result<(), CmdError> {
         self.workspace = String::from(workspace);
         self.db = Db::new(format!("{}.db", workspace).as_ref())?;
         if let Some(environment) = self.environment.as_ref() {
@@ -89,6 +101,17 @@ impl Repl {
         // TODO: check request exists in new workspace
         self.update_prompt();
         Ok(())
+    }
+
+    pub fn update_request(&mut self, request: &str) -> Result<(), CmdError> {
+        Err(CmdError::NotImplemented)
+    }
+
+    fn update_options_for_request(&self) -> Result<(), CmdError> {
+        Err(CmdError::NotImplemented)
+    }
+    fn update_options_for_variables(&self) -> Result<(), CmdError> {
+        Err(CmdError::NotImplemented)
     }
 
     fn environment(&self) -> Option<&str> {
