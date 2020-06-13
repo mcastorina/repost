@@ -5,7 +5,7 @@ pub mod db;
 extern crate prettytable;
 
 use cmd::{Cmd, CmdError};
-use db::Db;
+use db::{Db, RequestOption, Variable};
 use std::io::{self, prelude::*};
 
 pub struct Repl {
@@ -86,6 +86,7 @@ impl Repl {
             )));
         }
         self.environment = Some(String::from(environment));
+        self.update_options()?;
         self.update_prompt();
         Ok(())
     }
@@ -95,10 +96,12 @@ impl Repl {
         self.db = Db::new(format!("{}.db", workspace).as_ref())?;
         if let Some(environment) = self.environment.as_ref() {
             if !self.db.environment_exists(environment)? {
-                self.environment = None
+                self.environment = None;
+                self.request = None;
             }
         }
         // TODO: check request exists in new workspace
+        self.update_options()?;
         self.update_prompt();
         Ok(())
     }
@@ -107,10 +110,58 @@ impl Repl {
         Err(CmdError::NotImplemented)
     }
 
-    fn update_options_for_request(&self) -> Result<(), CmdError> {
-        Err(CmdError::NotImplemented)
+    fn update_options(&self) -> Result<(), CmdError> {
+        // get all unique request_name in options table
+        let request_names = self.db.get_unique_request_names_from_options()?;
+        // call self.update_options_for_request(req)
+        for name in request_names {
+            self.update_options_for_request(name.as_ref())?;
+        }
+        Ok(())
     }
-    fn update_options_for_variables(&self) -> Result<(), CmdError> {
+    fn update_options_for_request(&self, request: &str) -> Result<(), CmdError> {
+        // get all options for request
+        let opts: Vec<RequestOption> = self
+            .db
+            .get_options()?
+            .into_iter()
+            .filter(|opt| opt.request_name() == request)
+            .collect();
+        if self.environment.is_none() {
+            // if the current environment is none, clear the value
+            for mut opt in opts {
+                opt.update_value(None);
+                self.db.update_option(opt)?;
+            }
+        } else {
+            // else set option.value according to the environment
+            for mut opt in opts {
+                let mut var: Vec<Variable> = self
+                    .db
+                    .get_variables()?
+                    .into_iter()
+                    .filter(|var| {
+                        var.environment() == self.environment().unwrap()
+                            && var.name() == opt.option_name()
+                    })
+                    .collect();
+                if var.len() == 0 {
+                    opt.update_value(None);
+                } else if var.len() == 1 {
+                    let var = &mut var[0];
+                    opt.update_value(var.consume_value());
+                } else {
+                    unreachable!();
+                }
+                self.db.update_option(opt)?;
+            }
+        }
+        Ok(())
+    }
+    fn update_options_for_variable(&self, variable: &str) -> Result<(), CmdError> {
+        // get all opts where option_name == variable_name
+        // if the current environment is none, clear the value
+        // else set option.value according to the environment
         Err(CmdError::NotImplemented)
     }
 

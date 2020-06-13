@@ -217,7 +217,9 @@ impl BaseCommand {
         }
 
         // TODO: body
+        // TODO: move these functions into repl
         repl.db.create_request(request)?;
+        repl.update_options_for_request(name)?;
         Ok(())
     }
     fn create_variable(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
@@ -247,6 +249,7 @@ impl BaseCommand {
                 timestamp: None,
             })?;
         }
+        repl.update_options_for_variable(&name)?;
         Ok(())
     }
 

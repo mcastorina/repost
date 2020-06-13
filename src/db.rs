@@ -165,6 +165,29 @@ impl RequestOption {
             required: true,
         }
     }
+
+    pub fn request_name(&self) -> &str {
+        self.request_name.as_ref()
+    }
+    pub fn option_name(&self) -> &str {
+        self.option_name.as_ref()
+    }
+
+    pub fn update_value(&mut self, val: Option<String>) {
+        self.value = val;
+    }
+}
+
+impl Variable {
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+    pub fn environment(&self) -> &str {
+        self.environment.as_ref()
+    }
+    pub fn consume_value(&mut self) -> Option<String> {
+        self.value.take()
+    }
 }
 
 pub enum DbError {
@@ -291,6 +314,18 @@ impl Db {
         // TODO: print a warning for errors
         Ok(opts.filter_map(|opt| opt.ok()).collect())
     }
+    pub fn get_unique_request_names_from_options(&self) -> Result<Vec<String>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT request_name FROM options;")?;
+
+        let req_names = stmt.query_map(NO_PARAMS, |row| {
+            Ok(row.get(0)?)
+        })?;
+
+        // TODO: print a warning for errors
+        Ok(req_names.filter_map(|req_name| req_name.ok()).collect())
+    }
 
     pub fn get_environments(&self) -> Result<Vec<Environment>, DbError> {
         let mut stmt = self
@@ -346,12 +381,18 @@ impl Db {
         Ok(())
     }
     pub fn create_option(&self, opt: RequestOption) -> Result<(), DbError> {
-        println!("{} : {}", &opt.request_name, &opt.option_name);
         self.conn.execute(
             "INSERT INTO options (request_name, option_name, value, required)
                   VALUES (?1, ?2, ?3, ?4);",
             params![opt.request_name, opt.option_name, opt.value, opt.required,],
         )?;
+        Ok(())
+    }
+
+    pub fn update_option(&self, opt: RequestOption) -> Result<(), DbError> {
+        self.conn.execute(
+            "UPDATE options SET value = ?1, required = ?2 WHERE request_name = ?3 AND option_name = ?4;",
+            params![opt.value, opt.required, opt.request_name, opt.option_name])?;
         Ok(())
     }
 }
