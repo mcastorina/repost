@@ -194,7 +194,7 @@ impl BaseCommand {
         // let body = matches.value_of("data").map(|b| String::from(b));
         let headers: Vec<(&str, &str)> = matches
             .values_of("headers")
-            .unwrap()
+            .unwrap_or_default()
             .map(|h| {
                 let mut items = h.splitn(2, ":");
                 // We can unwrap because this argument is guaranteed to have one ':'
