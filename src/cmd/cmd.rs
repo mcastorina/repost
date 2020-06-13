@@ -7,7 +7,7 @@ pub enum CmdError {
     ArgParseError(clap_v3::Error),
     NotFound,
     NotImplemented,
-    MissingVariables,
+    MissingOptions,
 }
 
 pub trait Cmd {
@@ -25,9 +25,9 @@ impl std::fmt::Display for CmdError {
             CmdError::ArgParseError(x) => write!(f, "{}", x),
             CmdError::NotFound => write!(f, "Command not found."),
             CmdError::NotImplemented => write!(f, "Command not implemented."),
-            CmdError::MissingVariables => write!(
+            CmdError::MissingOptions => write!(
                 f,
-                "Could not send the request due to missing variables in the environment."
+                "Could not send the request due to missing required options."
             ),
         }
     }
@@ -43,8 +43,8 @@ impl From<CmdError> for String {
             CmdError::ArgParseError(x) => format!("{}", x),
             CmdError::NotFound => String::from("Command not found."),
             CmdError::NotImplemented => String::from("Command not implemented."),
-            CmdError::MissingVariables => String::from(
-                "Could not send the request due to missing variables in the environment.",
+            CmdError::MissingOptions => String::from(
+                "Could not send the request due to missing required options.",
             ),
         }
     }

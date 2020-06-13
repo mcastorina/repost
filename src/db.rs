@@ -119,8 +119,24 @@ impl Request {
             .map(|cap| String::from(cap.get(1).unwrap().as_str()))
             .collect())
     }
-    pub fn substitute_variables(&self, vars: Vec<Variable>) -> bool {
-        false
+    // TODO: return another type to ensure this does not get saved to the DB
+    //       or used anywhere other than run
+    pub fn substitute_options(&mut self, opts: Vec<RequestOption>) -> bool {
+        // find all variables and replace with values in options
+        for opt in opts {
+            if opt.value.is_none() {
+                if opt.required {
+                    return false
+                }
+                continue
+            }
+            let needle = format!("{{{}}}", &opt.option_name);
+            self.url = self.url.replace(&needle, &opt.value.unwrap());
+        }
+        true
+    }
+    pub fn has_option(&self, opt: &RequestOption) -> bool {
+        self.name == opt.request_name
     }
 
     pub fn name(&self) -> &str {

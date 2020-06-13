@@ -20,19 +20,12 @@ impl EnvironmentalCommand {
             return Ok(());
         }
         let mut req = repl.db.get_request(args[1])?;
-        let vars = req.get_variable_names()?;
-        if vars.len() != 0 {
-            let vars_in_env = repl
-                .db
-                .get_variables()?
-                .into_iter()
-                .filter(|x| {
-                    Some(x.environment.as_ref()) == repl.environment() && vars.contains(&x.name)
-                })
-                .collect();
-            if !req.substitute_variables(vars_in_env) {
-                return Err(CmdError::MissingVariables);
-            }
+        // get options for this request
+        let opts = repl.db.get_options()?.into_iter().filter(|x| req.has_option(&x)).collect();
+        // do option substitution
+        // TODO: return result with missing options
+        if !req.substitute_options(opts) {
+            return Err(CmdError::MissingOptions);
         }
 
         // TODO: this can be a method of Request
