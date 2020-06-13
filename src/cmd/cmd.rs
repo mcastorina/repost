@@ -43,9 +43,9 @@ impl From<CmdError> for String {
             CmdError::ArgParseError(x) => format!("{}", x),
             CmdError::NotFound => String::from("Command not found."),
             CmdError::NotImplemented => String::from("Command not implemented."),
-            CmdError::MissingOptions => String::from(
-                "Could not send the request due to missing required options.",
-            ),
+            CmdError::MissingOptions => {
+                String::from("Could not send the request due to missing required options.")
+            }
         }
     }
 }

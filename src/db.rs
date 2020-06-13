@@ -126,9 +126,9 @@ impl Request {
         for opt in opts {
             if opt.value.is_none() {
                 if opt.required {
-                    return false
+                    return false;
                 }
-                continue
+                continue;
             }
             let needle = format!("{{{}}}", &opt.option_name);
             self.url = self.url.replace(&needle, &opt.value.unwrap());

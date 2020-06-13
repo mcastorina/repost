@@ -21,7 +21,12 @@ impl EnvironmentalCommand {
         }
         let mut req = repl.db.get_request(args[1])?;
         // get options for this request
-        let opts = repl.db.get_options()?.into_iter().filter(|x| req.has_option(&x)).collect();
+        let opts = repl
+            .db
+            .get_options()?
+            .into_iter()
+            .filter(|x| req.has_option(&x))
+            .collect();
         // do option substitution
         // TODO: return result with missing options
         if !req.substitute_options(opts) {
@@ -45,7 +50,7 @@ impl EnvironmentalCommand {
                 let mut items = hv.splitn(2, ":");
                 let (header, value) = (items.next(), items.next());
                 if header.and(value).is_none() {
-                    continue
+                    continue;
                 }
                 builder = builder.header(header.unwrap(), value.unwrap());
             }
