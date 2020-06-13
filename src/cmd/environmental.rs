@@ -35,8 +35,9 @@ impl EnvironmentalCommand {
             }
         }
 
+        // TODO: this can be a method of Request
         let client = blocking::Client::new();
-        let builder = match req.method() {
+        let mut builder = match req.method() {
             Method::GET => client.get(req.url()),
             Method::POST => client.post(req.url()),
             Method::PUT => client.put(req.url()),
@@ -44,6 +45,19 @@ impl EnvironmentalCommand {
             Method::DELETE => client.delete(req.url()),
             Method::HEAD => client.head(req.url()),
         };
+
+        // add headers
+        if let Some(x) = req.headers() {
+            for hv in x.split('\n') {
+                let mut items = hv.splitn(2, ":");
+                let (header, value) = (items.next(), items.next());
+                if header.and(value).is_none() {
+                    continue
+                }
+                builder = builder.header(header.unwrap(), value.unwrap());
+            }
+        }
+
         let resp = builder.send();
         println!("{:?}", resp);
         Ok(())
