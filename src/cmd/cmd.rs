@@ -7,6 +7,7 @@ pub enum CmdError {
     ArgParseError(clap_v3::Error),
     NotFound,
     NotImplemented,
+    MissingVariables,
 }
 
 pub trait Cmd {
@@ -18,11 +19,16 @@ impl std::fmt::Display for CmdError {
         match self {
             CmdError::DbError(x) => match x {
                 DbError::Rusqlite(x) => write!(f, "{}", x),
+                DbError::NotFound => write!(f, "Resource not found."),
             },
             CmdError::ArgsError(x) => write!(f, "{}", x),
             CmdError::ArgParseError(x) => write!(f, "{}", x),
             CmdError::NotFound => write!(f, "Command not found."),
             CmdError::NotImplemented => write!(f, "Command not implemented."),
+            CmdError::MissingVariables => write!(
+                f,
+                "Could not send the request due to missing variables in the environment."
+            ),
         }
     }
 }
@@ -31,11 +37,15 @@ impl From<CmdError> for String {
         match err {
             CmdError::DbError(x) => match x {
                 DbError::Rusqlite(x) => format!("{}", x),
+                DbError::NotFound => String::from("Resource not found."),
             },
             CmdError::ArgsError(x) => x,
             CmdError::ArgParseError(x) => format!("{}", x),
             CmdError::NotFound => String::from("Command not found."),
             CmdError::NotImplemented => String::from("Command not implemented."),
+            CmdError::MissingVariables => String::from(
+                "Could not send the request due to missing variables in the environment.",
+            ),
         }
     }
 }

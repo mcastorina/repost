@@ -90,4 +90,11 @@ impl Repl {
         self.update_prompt();
         Ok(())
     }
+
+    fn environment(&self) -> Option<&str> {
+        match &self.environment {
+            Some(x) => Some(x.as_ref()),
+            None => None,
+        }
+    }
 }

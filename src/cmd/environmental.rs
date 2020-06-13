@@ -19,19 +19,22 @@ impl EnvironmentalCommand {
             println!("Run a named HTTP request\n\nUsage: run <request>\n");
             return Ok(());
         }
-        let req: Vec<Request> = repl
-            .db
-            .get_requests()?
-            .into_iter()
-            .filter(|x| x.name() == args[1])
-            .collect();
-        if req.len() == 0 {
-            return Err(CmdError::ArgsError(format!(
-                "Request not found: {}",
-                args[1]
-            )));
+        let mut req = repl.db.get_request(args[1])?;
+        let vars = req.get_variable_names()?;
+        if vars.len() != 0 {
+            let vars_in_env = repl
+                .db
+                .get_variables()?
+                .into_iter()
+                .filter(|x| {
+                    Some(x.environment.as_ref()) == repl.environment() && vars.contains(&x.name)
+                })
+                .collect();
+            if !req.substitute_variables(vars_in_env) {
+                return Err(CmdError::MissingVariables);
+            }
         }
-        let req = &req[0];
+
         let client = blocking::Client::new();
         let builder = match req.method() {
             Method::GET => client.get(req.url()),

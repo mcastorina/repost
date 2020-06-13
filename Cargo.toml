@@ -13,3 +13,4 @@ chrono = "0.4.11"
 reqwest = { version = "0.10", features = ["blocking"] }
 clap-v3 = "3.0.0-beta.1"
 shlex = "0.1.1"
+regex = "1"

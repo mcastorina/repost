@@ -97,18 +97,23 @@ impl Cmd for BaseCommand {
                                 "requests",
                                 "variables",
                                 "environments",
+                                "options",
                                 "request",
                                 "variable",
                                 "environment",
+                                "option",
                                 "reqs",
                                 "vars",
                                 "envs",
+                                "opts",
                                 "req",
                                 "var",
                                 "env",
+                                "opt",
                                 "r",
                                 "v",
                                 "e",
+                                "o",
                             ]),
                     ),
             )
@@ -161,6 +166,9 @@ impl BaseCommand {
             }
             "e" | "env" | "envs" | "environment" | "environments" => {
                 BaseCommand::print_table(repl.db.get_environments()?)
+            }
+            "o" | "opt" | "opts" | "option" | "options" => {
+                BaseCommand::print_table(repl.db.get_options()?)
             }
             _ => unreachable!(),
         }

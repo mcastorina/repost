@@ -1,4 +1,5 @@
 use chrono::Utc;
+use regex::Regex;
 use rusqlite::{params, Connection, NO_PARAMS};
 
 pub struct Db {
@@ -44,6 +45,13 @@ pub struct Request {
     url: String,
     headers: Option<String>,
     body: Option<Vec<u8>>,
+}
+
+pub struct RequestOption {
+    request_name: String,
+    option_name: String,
+    value: Option<String>,
+    required: bool,
 }
 
 pub struct Variable {
@@ -102,6 +110,18 @@ impl Request {
             Method::GET
         }
     }
+    pub fn get_variable_names(&self) -> Result<Vec<String>, DbError> {
+        // find all variables in the request
+        // TODO: lazy static
+        let re = Regex::new(r"\{(.*?)\}").unwrap();
+        Ok(re
+            .captures_iter(&self.url)
+            .map(|cap| String::from(cap.get(1).unwrap().as_str()))
+            .collect())
+    }
+    pub fn substitute_variables(&self, vars: Vec<Variable>) -> bool {
+        false
+    }
 
     pub fn name(&self) -> &str {
         self.name.as_ref()
@@ -120,8 +140,20 @@ impl Request {
     }
 }
 
+impl RequestOption {
+    pub fn from_variable(req_name: &str, var_name: &str) -> RequestOption {
+        RequestOption {
+            request_name: String::from(req_name),
+            option_name: String::from(var_name),
+            value: None,
+            required: true,
+        }
+    }
+}
+
 pub enum DbError {
     Rusqlite(rusqlite::Error),
+    NotFound,
 }
 
 impl From<rusqlite::Error> for DbError {
@@ -163,6 +195,19 @@ impl Db {
             NO_PARAMS,
         )?;
 
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS options (
+                  request_name    TEXT,
+                  option_name     TEXT NOT NULL,
+                  value           TEXT,
+                  required        INTEGER,
+                  FOREIGN KEY(request_name) REFERENCES requests(name)
+              )",
+            NO_PARAMS,
+        )?;
+
+        self.conn.execute("PRAGMA foreign_keys = ON", NO_PARAMS)?;
+
         Ok(())
     }
 
@@ -184,6 +229,16 @@ impl Db {
 
         Ok(requests.filter_map(|req| req.ok()).collect())
     }
+    pub fn get_request(&self, name: &str) -> Result<Request, DbError> {
+        // TODO: single call
+        for req in self.get_requests()? {
+            if req.name == name {
+                return Ok(req);
+            }
+        }
+        Err(DbError::NotFound)
+    }
+
     pub fn get_variables(&self) -> Result<Vec<Variable>, DbError> {
         let mut stmt = self.conn
             .prepare("SELECT rowid, name, environment, value, source, timestamp FROM variables ORDER BY timestamp DESC;")?;
@@ -202,6 +257,25 @@ impl Db {
         // TODO: print a warning for errors
         Ok(vars.filter_map(|var| var.ok()).collect())
     }
+
+    pub fn get_options(&self) -> Result<Vec<RequestOption>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT request_name, option_name, value, required FROM options;")?;
+
+        let opts = stmt.query_map(NO_PARAMS, |row| {
+            Ok(RequestOption {
+                request_name: row.get(0)?,
+                option_name: row.get(1)?,
+                value: row.get(2)?,
+                required: row.get(3)?,
+            })
+        })?;
+
+        // TODO: print a warning for errors
+        Ok(opts.filter_map(|opt| opt.ok()).collect())
+    }
+
     pub fn get_environments(&self) -> Result<Vec<Environment>, DbError> {
         let mut stmt = self
             .conn
@@ -236,6 +310,9 @@ impl Db {
                 req.body
             ],
         )?;
+        for var_name in req.get_variable_names()?.iter() {
+            self.create_option(RequestOption::from_variable(&req.name, var_name))?;
+        }
         Ok(())
     }
     pub fn create_variable(&self, var: Variable) -> Result<(), DbError> {
@@ -249,6 +326,15 @@ impl Db {
                 var.source,
                 format!("{}", Utc::now().format("%Y-%m-%d %T %Z"))
             ],
+        )?;
+        Ok(())
+    }
+    pub fn create_option(&self, opt: RequestOption) -> Result<(), DbError> {
+        println!("{} : {}", &opt.request_name, &opt.option_name);
+        self.conn.execute(
+            "INSERT INTO options (request_name, option_name, value, required)
+                  VALUES (?1, ?2, ?3, ?4);",
+            params![opt.request_name, opt.option_name, opt.value, opt.required,],
         )?;
         Ok(())
     }
@@ -318,5 +404,23 @@ impl PrintableTable for Vec<Environment> {
     }
     fn rows(&self) -> Vec<prettytable::Row> {
         self.iter().map(|env| row![env.environment,]).collect()
+    }
+}
+
+impl PrintableTable for Vec<RequestOption> {
+    fn column_names(&self) -> prettytable::Row {
+        row!["request_name", "option_name", "value", "required"]
+    }
+    fn rows(&self) -> Vec<prettytable::Row> {
+        self.iter()
+            .map(|opt| {
+                row![
+                    opt.request_name,
+                    opt.option_name,
+                    opt.value.as_ref().unwrap_or(&String::from("")),
+                    opt.required
+                ]
+            })
+            .collect()
     }
 }
