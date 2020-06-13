@@ -29,6 +29,15 @@ impl Cmd for BaseCommand {
                 )))
             }
         };
+        let is_alphanumeric = |val: String| {
+            if val.chars().all(char::is_alphanumeric) {
+                Ok(())
+            } else {
+                Err(CmdError::ArgsError(String::from(
+                    "only alphanumeric characters are allowed",
+                )))
+            }
+        };
         let create_variable = App::new("variable")
             .about("Create a variable")
             .aliases(&["var", "v"])
@@ -72,7 +81,12 @@ impl Cmd for BaseCommand {
         let set_workspace = App::new("workspace")
             .about("Set the workspace where all data is stored")
             .aliases(&["ws", "w"])
-            .arg("<workspace> 'Workspace to use'");
+            .arg(
+                Arg::with_name("workspace")
+                    .help("Workspace to use")
+                    .required(true)
+                    .validator(is_alphanumeric),
+            );
         let matches = App::new("repost")
             .setting(AppSettings::NoBinaryName)
             .subcommand(
