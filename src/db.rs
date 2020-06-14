@@ -114,14 +114,38 @@ impl Request {
         // find all variables in the request
         // TODO: lazy static
         let re = Regex::new(r"\{(.*?)\}").unwrap();
-        Ok(re
+        let mut names: Vec<String> = re
             .captures_iter(&self.url)
             .map(|cap| String::from(cap.get(1).unwrap().as_str()))
-            .collect())
+            .collect();
+        if let Some(headers) = &self.headers {
+            let mut headers: Vec<String> = re
+                .captures_iter(&headers)
+                .map(|cap| String::from(cap.get(1).unwrap().as_str()))
+                .collect();
+            names.append(&mut headers);
+        }
+        if let Some(body) = &self.body {
+            let re = regex::bytes::Regex::new(r"\{(.*?)\}").unwrap();
+            let mut body: Vec<String> = re
+            .captures_iter(&body)
+            .map(|cap| String::from_utf8(cap.get(1).unwrap().as_bytes().to_vec()))
+            .filter_map(|x| x.ok())
+            .collect();
+            names.append(&mut body);
+        }
+
+        // TODO: unique names
+        Ok(names)
     }
     // TODO: return another type to ensure this does not get saved to the DB
     //       or used anywhere other than run
     pub fn substitute_options(&mut self, opts: Vec<RequestOption>) -> bool {
+        // TODO: better replacement for all options
+        //       this could result in some unexpected behavior
+        //       will need to do a two pass approach:
+        //          1. find all start/end indices
+        //          2. iterate backwards to perform replacement
         // find all variables and replace with values in options
         for opt in opts {
             if opt.value.is_none() {
@@ -130,8 +154,17 @@ impl Request {
                 }
                 continue;
             }
-            let needle = format!("{{{}}}", &opt.option_name);
-            self.url = self.url.replace(&needle, &opt.value.unwrap());
+            let old = format!("{{{}}}", &opt.option_name);
+            let new = opt.value.unwrap();
+            self.url = self.url.replace(&old, &new);
+            if let Some(headers) = &self.headers {
+                self.headers = Some(headers.replace(&old, &new));
+            }
+            if let Some(body) = &self.body {
+                let old = format!(r"\{{{}\}}", &opt.option_name);
+                let re = regex::bytes::Regex::new(&old).unwrap();
+                self.body = Some(re.replace_all(&body, new.as_bytes()).to_vec());
+            }
         }
         true
     }
