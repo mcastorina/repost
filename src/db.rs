@@ -154,6 +154,9 @@ impl Request {
     pub fn body(&self) -> &Option<Vec<u8>> {
         &self.body
     }
+    pub fn consume_body(&mut self) -> Option<Vec<u8>> {
+        self.body.take()
+    }
 }
 
 impl RequestOption {

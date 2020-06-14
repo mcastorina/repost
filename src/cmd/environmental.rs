@@ -55,6 +55,10 @@ impl EnvironmentalCommand {
                 builder = builder.header(header.unwrap(), value.unwrap());
             }
         }
+        // add body
+        if let Some(x) = req.consume_body() {
+            builder = builder.body(x);
+        }
 
         let resp = builder.send();
         println!("{:?}", resp);

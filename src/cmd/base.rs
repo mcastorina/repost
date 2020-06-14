@@ -194,7 +194,7 @@ impl BaseCommand {
         let url = matches.value_of("url").unwrap();
         let method: Option<Method>;
         // TODO
-        // let body = matches.value_of("data").map(|b| String::from(b));
+        let body = matches.value_of("data").map(|b| b.as_bytes().to_vec());
         let headers: Vec<(&str, &str)> = matches
             .values_of("headers")
             .unwrap_or_default()
@@ -216,7 +216,7 @@ impl BaseCommand {
             request.add_header(header.0, header.1);
         }
 
-        // TODO: body
+        request.set_body(body);
         // TODO: move these functions into repl
         repl.db.create_request(request)?;
         repl.update_options_for_request(name)?;
