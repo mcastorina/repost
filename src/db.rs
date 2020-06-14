@@ -319,9 +319,7 @@ impl Db {
             .conn
             .prepare("SELECT DISTINCT request_name FROM options;")?;
 
-        let req_names = stmt.query_map(NO_PARAMS, |row| {
-            Ok(row.get(0)?)
-        })?;
+        let req_names = stmt.query_map(NO_PARAMS, |row| Ok(row.get(0)?))?;
 
         // TODO: print a warning for errors
         Ok(req_names.filter_map(|req_name| req_name.ok()).collect())

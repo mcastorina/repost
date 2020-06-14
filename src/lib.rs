@@ -18,13 +18,15 @@ pub struct Repl {
 
 impl Repl {
     pub fn new() -> Result<Repl, CmdError> {
-        Ok(Repl {
+        let repl = Repl {
             prompt: String::from("[repost]"),
             workspace: String::from("repost"),
             db: Db::new("repost.db")?,
             environment: None,
             request: None,
-        })
+        };
+        repl.update_all_options()?;
+        Ok(repl)
     }
 
     pub fn get_input(&self, mut input: &mut String) -> Option<()> {
@@ -86,7 +88,7 @@ impl Repl {
             )));
         }
         self.environment = Some(String::from(environment));
-        self.update_options()?;
+        self.update_all_options()?;
         self.update_prompt();
         Ok(())
     }
@@ -99,9 +101,9 @@ impl Repl {
                 self.environment = None;
                 self.request = None;
             }
+            // TODO: check request exists in new workspace
         }
-        // TODO: check request exists in new workspace
-        self.update_options()?;
+        self.update_all_options()?;
         self.update_prompt();
         Ok(())
     }
@@ -110,7 +112,7 @@ impl Repl {
         Err(CmdError::NotImplemented)
     }
 
-    fn update_options(&self) -> Result<(), CmdError> {
+    fn update_all_options(&self) -> Result<(), CmdError> {
         // get all unique request_name in options table
         let request_names = self.db.get_unique_request_names_from_options()?;
         // call self.update_options_for_request(req)
@@ -119,14 +121,7 @@ impl Repl {
         }
         Ok(())
     }
-    fn update_options_for_request(&self, request: &str) -> Result<(), CmdError> {
-        // get all options for request
-        let opts: Vec<RequestOption> = self
-            .db
-            .get_options()?
-            .into_iter()
-            .filter(|opt| opt.request_name() == request)
-            .collect();
+    fn update_options(&self, opts: Vec<RequestOption>) -> Result<(), CmdError> {
         if self.environment.is_none() {
             // if the current environment is none, clear the value
             for mut opt in opts {
@@ -158,11 +153,25 @@ impl Repl {
         }
         Ok(())
     }
+    fn update_options_for_request(&self, request: &str) -> Result<(), CmdError> {
+        // get all options for request
+        let opts: Vec<RequestOption> = self
+            .db
+            .get_options()?
+            .into_iter()
+            .filter(|opt| opt.request_name() == request)
+            .collect();
+        self.update_options(opts)
+    }
     fn update_options_for_variable(&self, variable: &str) -> Result<(), CmdError> {
         // get all opts where option_name == variable_name
-        // if the current environment is none, clear the value
-        // else set option.value according to the environment
-        Err(CmdError::NotImplemented)
+        let opts: Vec<RequestOption> = self
+            .db
+            .get_options()?
+            .into_iter()
+            .filter(|opt| opt.option_name() == variable)
+            .collect();
+        self.update_options(opts)
     }
 
     fn environment(&self) -> Option<&str> {
