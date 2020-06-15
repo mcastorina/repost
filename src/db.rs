@@ -429,6 +429,22 @@ impl Db {
             params![opt.value, opt.required, opt.request_name, opt.option_name])?;
         Ok(())
     }
+
+    pub fn delete_request_by_name(&self, request: &str) -> Result<(), DbError> {
+        self.conn.execute(
+            "DELETE FROM options WHERE request_name = ?1;",
+            params![request],
+        )?;
+        self.conn
+            .execute("DELETE FROM requests WHERE name = ?1;", params![request])?;
+        Ok(())
+    }
+
+    pub fn delete_variable_by_name(&self, variable: &str) -> Result<(), DbError> {
+        self.conn
+            .execute("DELETE FROM variables WHERE name = ?1;", params![variable])?;
+        Ok(())
+    }
 }
 
 pub trait PrintableTable {

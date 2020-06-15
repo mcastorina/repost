@@ -7,6 +7,7 @@ use prettytable::{format, Table};
 pub struct BaseCommand {}
 impl Cmd for BaseCommand {
     fn execute(&self, repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError> {
+        // TODO: can this be a sinlge static clap_v3::App variable?
         let contains_equal = |val: String| {
             // val is the argument value passed in by the user
             if val.contains("=") {
@@ -103,6 +104,24 @@ impl Cmd for BaseCommand {
                     .required(true)
                     .validator(is_alphanumeric),
             );
+        let delete_requests = App::new("requests")
+            .about("Delete the named HTTP requests")
+            .aliases(&["request", "reqs", "req", "r"])
+            .arg(
+                Arg::with_name("request")
+                    .help("Request to delete")
+                    .required(true)
+                    .multiple(true),
+            );
+        let delete_variables = App::new("variables")
+            .about("Delete the named variables")
+            .aliases(&["variable", "vars", "var", "v"])
+            .arg(
+                Arg::with_name("variable")
+                    .help("Variable to delete")
+                    .required(true)
+                    .multiple(true),
+            );
         let matches = App::new("repost")
             .setting(AppSettings::NoBinaryName)
             .subcommand(
@@ -136,6 +155,14 @@ impl Cmd for BaseCommand {
                     .subcommand(set_environment)
                     .subcommand(set_request),
             )
+            .subcommand(
+                App::new("delete")
+                    .setting(AppSettings::SubcommandRequiredElseHelp)
+                    .about("Delete named requests or variables")
+                    .aliases(&["remove", "del", "rm"])
+                    .subcommand(delete_requests)
+                    .subcommand(delete_variables),
+            )
             .try_get_matches_from(args)?;
 
         match matches.subcommand() {
@@ -162,6 +189,11 @@ impl Cmd for BaseCommand {
                 ("request", Some(matches)) => {
                     repl.update_request(matches.value_of("request").unwrap())
                 }
+                _ => unreachable!(),
+            },
+            ("delete", Some(matches)) => match matches.subcommand() {
+                ("requests", Some(matches)) => BaseCommand::delete_requests(repl, matches),
+                ("variables", Some(matches)) => BaseCommand::delete_variables(repl, matches),
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -232,6 +264,24 @@ impl BaseCommand {
             })?;
         }
         repl.update_options_for_variable(&name)?;
+        Ok(())
+    }
+    fn delete_requests(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
+        let requests: Vec<&str> = matches.values_of("request").unwrap().collect();
+        for request in requests {
+            // TODO: notify when not found
+            repl.db.delete_request_by_name(request)?;
+            repl.update_options_for_request(request)?;
+        }
+        Ok(())
+    }
+    fn delete_variables(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
+        let vars: Vec<&str> = matches.values_of("variable").unwrap().collect();
+        for var in vars {
+            // TODO: notify when not found
+            repl.db.delete_variable_by_name(var)?;
+            repl.update_options_for_variable(var)?;
+        }
         Ok(())
     }
 
