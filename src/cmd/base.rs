@@ -7,163 +7,7 @@ use prettytable::{format, Table};
 pub struct BaseCommand {}
 impl Cmd for BaseCommand {
     fn execute(&self, repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError> {
-        // TODO: can this be a sinlge static clap_v3::App variable?
-        let contains_equal = |val: String| {
-            // val is the argument value passed in by the user
-            if val.contains("=") {
-                Ok(())
-            } else {
-                Err(CmdError::ArgsError(format!(
-                    "missing '=' in argument: {}",
-                    val
-                )))
-            }
-        };
-        let contains_colon = |val: String| {
-            // val is the argument value passed in by the user
-            if val.contains(":") {
-                Ok(())
-            } else {
-                Err(CmdError::ArgsError(format!(
-                    "missing ':' in argument: {}",
-                    val
-                )))
-            }
-        };
-        let is_alphanumeric = |val: String| {
-            if val.chars().all(char::is_alphanumeric) {
-                Ok(())
-            } else {
-                Err(CmdError::ArgsError(String::from(
-                    "only alphanumeric characters are allowed",
-                )))
-            }
-        };
-        let create_variable = App::new("variable")
-            .about("Create a variable")
-            .aliases(&["var", "v"])
-            .arg("<name> 'Name of the variable'")
-            .arg(
-                Arg::with_name("environment=value")
-                    .help("Value for environment")
-                    .required(true)
-                    .validator(contains_equal)
-                    .multiple(true),
-            );
-        let create_request = App::new("request")
-            .about("Create an HTTP request")
-            .aliases(&["req", "r"])
-            .arg("<name> 'Name of the request'")
-            .arg("<url> 'HTTP request URL'")
-            .arg(
-                Arg::with_name("method")
-                    .help("HTTP request method")
-                    .short('m')
-                    .long("method")
-                    .possible_values(&["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"]),
-            )
-            .arg(
-                Arg::with_name("headers")
-                    .help("HTTP request headers")
-                    .short('H')
-                    .long("header")
-                    .validator(contains_colon)
-                    .multiple(true),
-            )
-            .arg("-d, --data=[DATA] 'HTTP request body'");
-        let show_requests = App::new("requests")
-            .about("Print requests")
-            .aliases(&["request", "reqs", "req", "r"]);
-        let show_variables = App::new("variables")
-            .about("Print variables")
-            .aliases(&["variable", "vars", "var", "v"]);
-        let show_environments = App::new("environments")
-            .about("Print environments")
-            .aliases(&["environment", "envs", "env", "e"]);
-        let show_options = App::new("options")
-            .about("Print options")
-            .aliases(&["option", "opts", "opt", "o"]);
-        let show_workspaces =
-            App::new("workspaces")
-                .about("Print workspaces")
-                .aliases(&["workspace", "ws", "w"]);
-        let set_environment = App::new("environment")
-            .about("Set the environment as used for variable substitution")
-            .aliases(&["env", "e"])
-            .arg("<environment> 'Environment to use'");
-        let set_request = App::new("request")
-            .about("Set the request to view and modify specific options")
-            .aliases(&["req", "r"])
-            .arg("<request> 'Request to use'");
-        let set_workspace = App::new("workspace")
-            .about("Set the workspace where all data is stored")
-            .aliases(&["ws", "w"])
-            .arg(
-                Arg::with_name("workspace")
-                    .help("Workspace to use")
-                    .required(true)
-                    .validator(is_alphanumeric),
-            );
-        let delete_requests = App::new("requests")
-            .about("Delete the named HTTP requests")
-            .aliases(&["request", "reqs", "req", "r"])
-            .arg(
-                Arg::with_name("request")
-                    .help("Request to delete")
-                    .required(true)
-                    .multiple(true),
-            );
-        let delete_variables = App::new("variables")
-            .about("Delete the named variables")
-            .aliases(&["variable", "vars", "var", "v"])
-            .arg(
-                Arg::with_name("variable")
-                    .help("Variable to delete")
-                    .required(true)
-                    .multiple(true),
-            );
-        let matches = App::new("repost")
-            .setting(AppSettings::NoBinaryName)
-            .subcommand(
-                App::new("create")
-                    .setting(AppSettings::SubcommandRequiredElseHelp)
-                    .about("Create an HTTP request or variable")
-                    .aliases(&["new", "c"])
-                    .subcommand(create_request)
-                    .subcommand(create_variable),
-            )
-            .subcommand(
-                // TODO: use subcommand for show_requests show_variables show_environments
-                App::new("show")
-                    .setting(AppSettings::SubcommandRequiredElseHelp)
-                    .about("Print resources")
-                    .aliases(&["get", "print", "g", "p"])
-                    .subcommand(show_requests)
-                    .subcommand(show_variables)
-                    .subcommand(show_environments)
-                    .subcommand(show_options)
-                    .subcommand(show_workspaces),
-            )
-            .subcommand(
-                App::new("set")
-                    .setting(AppSettings::SubcommandRequiredElseHelp)
-                    .about(
-                        "Set workspace, environment, or request for environment specific commands",
-                    )
-                    .aliases(&["use", "load", "u"])
-                    .subcommand(set_workspace)
-                    .subcommand(set_environment)
-                    .subcommand(set_request),
-            )
-            .subcommand(
-                App::new("delete")
-                    .setting(AppSettings::SubcommandRequiredElseHelp)
-                    .about("Delete named requests or variables")
-                    .aliases(&["remove", "del", "rm"])
-                    .subcommand(delete_requests)
-                    .subcommand(delete_variables),
-            )
-            .try_get_matches_from(args)?;
+        let matches = clap_args().try_get_matches_from(args)?;
 
         match matches.subcommand() {
             ("create", Some(matches)) => match matches.subcommand() {
@@ -299,4 +143,161 @@ impl BaseCommand {
         println!();
         Ok(())
     }
+}
+
+fn clap_args() -> clap_v3::App<'static> {
+    // TODO: can this be a sinlge static clap_v3::App variable?
+    let contains_equal = |val: String| {
+        // val is the argument value passed in by the user
+        if val.contains("=") {
+            Ok(())
+        } else {
+            Err(CmdError::ArgsError(format!(
+                "missing '=' in argument: {}",
+                val
+            )))
+        }
+    };
+    let contains_colon = |val: String| {
+        // val is the argument value passed in by the user
+        if val.contains(":") {
+            Ok(())
+        } else {
+            Err(CmdError::ArgsError(format!(
+                "missing ':' in argument: {}",
+                val
+            )))
+        }
+    };
+    let is_alphanumeric = |val: String| {
+        if val.chars().all(char::is_alphanumeric) {
+            Ok(())
+        } else {
+            Err(CmdError::ArgsError(String::from(
+                "only alphanumeric characters are allowed",
+            )))
+        }
+    };
+    let create_variable = App::new("variable")
+        .about("Create a variable")
+        .aliases(&["var", "v"])
+        .arg("<name> 'Name of the variable'")
+        .arg(
+            Arg::with_name("environment=value")
+                .help("Value for environment")
+                .required(true)
+                .validator(contains_equal)
+                .multiple(true),
+        );
+    let create_request = App::new("request")
+        .about("Create an HTTP request")
+        .aliases(&["req", "r"])
+        .arg("<name> 'Name of the request'")
+        .arg("<url> 'HTTP request URL'")
+        .arg(
+            Arg::with_name("method")
+                .help("HTTP request method")
+                .short('m')
+                .long("method")
+                .possible_values(&["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"]),
+        )
+        .arg(
+            Arg::with_name("headers")
+                .help("HTTP request headers")
+                .short('H')
+                .long("header")
+                .validator(contains_colon)
+                .multiple(true),
+        )
+        .arg("-d, --data=[DATA] 'HTTP request body'");
+    let show_requests = App::new("requests")
+        .about("Print requests")
+        .aliases(&["request", "reqs", "req", "r"]);
+    let show_variables = App::new("variables")
+        .about("Print variables")
+        .aliases(&["variable", "vars", "var", "v"]);
+    let show_environments = App::new("environments")
+        .about("Print environments")
+        .aliases(&["environment", "envs", "env", "e"]);
+    let show_options = App::new("options")
+        .about("Print options")
+        .aliases(&["option", "opts", "opt", "o"]);
+    let show_workspaces =
+        App::new("workspaces")
+            .about("Print workspaces")
+            .aliases(&["workspace", "ws", "w"]);
+    let set_environment = App::new("environment")
+        .about("Set the environment as used for variable substitution")
+        .aliases(&["env", "e"])
+        .arg("<environment> 'Environment to use'");
+    let set_request = App::new("request")
+        .about("Set the request to view and modify specific options")
+        .aliases(&["req", "r"])
+        .arg("<request> 'Request to use'");
+    let set_workspace = App::new("workspace")
+        .about("Set the workspace where all data is stored")
+        .aliases(&["ws", "w"])
+        .arg(
+            Arg::with_name("workspace")
+                .help("Workspace to use")
+                .required(true)
+                .validator(is_alphanumeric),
+        );
+    let delete_requests = App::new("requests")
+        .about("Delete the named HTTP requests")
+        .aliases(&["request", "reqs", "req", "r"])
+        .arg(
+            Arg::with_name("request")
+                .help("Request to delete")
+                .required(true)
+                .multiple(true),
+        );
+    let delete_variables = App::new("variables")
+        .about("Delete the named variables")
+        .aliases(&["variable", "vars", "var", "v"])
+        .arg(
+            Arg::with_name("variable")
+                .help("Variable to delete")
+                .required(true)
+                .multiple(true),
+        );
+    App::new("repost")
+        .setting(AppSettings::NoBinaryName)
+        .subcommand(
+            App::new("create")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .about("Create an HTTP request or variable")
+                .aliases(&["new", "c"])
+                .subcommand(create_request)
+                .subcommand(create_variable),
+        )
+        .subcommand(
+            // TODO: use subcommand for show_requests show_variables show_environments
+            App::new("show")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .about("Print resources")
+                .aliases(&["get", "print", "g", "p"])
+                .subcommand(show_requests)
+                .subcommand(show_variables)
+                .subcommand(show_environments)
+                .subcommand(show_options)
+                .subcommand(show_workspaces),
+        )
+        .subcommand(
+            App::new("set")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .about("Set workspace, environment, or request for environment specific commands")
+                .aliases(&["use", "load", "u"])
+                .subcommand(set_workspace)
+                .subcommand(set_environment)
+                .subcommand(set_request),
+        )
+        .subcommand(
+            App::new("delete")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .about("Delete named requests or variables")
+                .aliases(&["remove", "del", "rm"])
+                .subcommand(delete_requests)
+                .subcommand(delete_variables),
+        )
 }
