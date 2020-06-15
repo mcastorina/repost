@@ -128,10 +128,10 @@ impl Request {
         if let Some(body) = &self.body {
             let re = regex::bytes::Regex::new(r"\{(.*?)\}").unwrap();
             let mut body: Vec<String> = re
-            .captures_iter(&body)
-            .map(|cap| String::from_utf8(cap.get(1).unwrap().as_bytes().to_vec()))
-            .filter_map(|x| x.ok())
-            .collect();
+                .captures_iter(&body)
+                .map(|cap| String::from_utf8(cap.get(1).unwrap().as_bytes().to_vec()))
+                .filter_map(|x| x.ok())
+                .collect();
             names.append(&mut body);
         }
 

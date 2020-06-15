@@ -6,8 +6,8 @@ extern crate prettytable;
 
 use cmd::{Cmd, CmdError};
 use db::{Db, RequestOption, Variable};
-use std::io::{self, prelude::*};
 use std::fs;
+use std::io::{self, prelude::*};
 
 pub struct Repl {
     prompt: String,
@@ -196,8 +196,8 @@ impl Repl {
                     if x != "db" {
                         continue;
                     }
-                },
-                _ => continue
+                }
+                _ => continue,
             }
             let ws = path.file_stem().unwrap();
             if let Some(x) = ws.to_str() {

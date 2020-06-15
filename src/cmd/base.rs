@@ -82,9 +82,10 @@ impl Cmd for BaseCommand {
         let show_options = App::new("options")
             .about("Print options")
             .aliases(&["option", "opts", "opt", "o"]);
-        let show_workspaces = App::new("workspaces")
-            .about("Print workspaces")
-            .aliases(&["workspace", "ws", "w"]);
+        let show_workspaces =
+            App::new("workspaces")
+                .about("Print workspaces")
+                .aliases(&["workspace", "ws", "w"]);
         let set_environment = App::new("environment")
             .about("Set the environment as used for variable substitution")
             .aliases(&["env", "e"])
@@ -150,7 +151,7 @@ impl Cmd for BaseCommand {
                 ("options", _) => BaseCommand::print_table(repl.db.get_options()?),
                 ("workspaces", _) => BaseCommand::print_table(repl.get_workspaces()?),
                 _ => unreachable!(),
-            }
+            },
             ("set", Some(matches)) => match matches.subcommand() {
                 ("workspace", Some(matches)) => {
                     repl.update_workspace(matches.value_of("workspace").unwrap())
