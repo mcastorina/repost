@@ -70,6 +70,21 @@ impl Cmd for BaseCommand {
                     .multiple(true),
             )
             .arg("-d, --data=[DATA] 'HTTP request body'");
+        let show_requests = App::new("requests")
+            .about("Print requests")
+            .aliases(&["request", "reqs", "req", "r"]);
+        let show_variables = App::new("variables")
+            .about("Print variables")
+            .aliases(&["variable", "vars", "var", "v"]);
+        let show_environments = App::new("environments")
+            .about("Print environments")
+            .aliases(&["environment", "envs", "env", "e"]);
+        let show_options = App::new("options")
+            .about("Print options")
+            .aliases(&["option", "opts", "opt", "o"]);
+        let show_workspaces = App::new("workspaces")
+            .about("Print workspaces")
+            .aliases(&["workspace", "ws", "w"]);
         let set_environment = App::new("environment")
             .about("Set the environment as used for variable substitution")
             .aliases(&["env", "e"])
@@ -100,36 +115,14 @@ impl Cmd for BaseCommand {
             .subcommand(
                 // TODO: use subcommand for show_requests show_variables show_environments
                 App::new("show")
+                    .setting(AppSettings::SubcommandRequiredElseHelp)
                     .about("Print resources")
                     .aliases(&["get", "print", "g", "p"])
-                    .arg(
-                        Arg::with_name("resource")
-                            .help("Resource to show")
-                            .required(true)
-                            .case_insensitive(true)
-                            .possible_values(&[
-                                "requests",
-                                "variables",
-                                "environments",
-                                "options",
-                                "request",
-                                "variable",
-                                "environment",
-                                "option",
-                                "reqs",
-                                "vars",
-                                "envs",
-                                "opts",
-                                "req",
-                                "var",
-                                "env",
-                                "opt",
-                                "r",
-                                "v",
-                                "e",
-                                "o",
-                            ]),
-                    ),
+                    .subcommand(show_requests)
+                    .subcommand(show_variables)
+                    .subcommand(show_environments)
+                    .subcommand(show_options)
+                    .subcommand(show_workspaces),
             )
             .subcommand(
                 App::new("set")
@@ -150,7 +143,14 @@ impl Cmd for BaseCommand {
                 ("variable", Some(matches)) => BaseCommand::create_variable(repl, matches),
                 _ => unreachable!(),
             },
-            ("show", Some(matches)) => BaseCommand::show(repl, matches),
+            ("show", Some(matches)) => match matches.subcommand() {
+                ("requests", _) => BaseCommand::print_table(repl.db.get_requests()?),
+                ("variables", _) => BaseCommand::print_table(repl.db.get_variables()?),
+                ("environments", _) => BaseCommand::print_table(repl.db.get_environments()?),
+                ("options", _) => BaseCommand::print_table(repl.db.get_options()?),
+                ("workspaces", _) => BaseCommand::print_table(repl.get_workspaces()?),
+                _ => unreachable!(),
+            }
             ("set", Some(matches)) => match matches.subcommand() {
                 ("workspace", Some(matches)) => {
                     repl.update_workspace(matches.value_of("workspace").unwrap())
@@ -169,25 +169,6 @@ impl Cmd for BaseCommand {
 }
 
 impl BaseCommand {
-    fn show(repl: &mut Repl, args: &ArgMatches) -> Result<(), CmdError> {
-        let resource = args.value_of("resource").unwrap();
-        match resource.to_lowercase().as_ref() {
-            "r" | "req" | "reqs" | "request" | "requests" => {
-                BaseCommand::print_table(repl.db.get_requests()?)
-            }
-            "v" | "var" | "vars" | "variable" | "variables" => {
-                BaseCommand::print_table(repl.db.get_variables()?)
-            }
-            "e" | "env" | "envs" | "environment" | "environments" => {
-                BaseCommand::print_table(repl.db.get_environments()?)
-            }
-            "o" | "opt" | "opts" | "option" | "options" => {
-                BaseCommand::print_table(repl.db.get_options()?)
-            }
-            _ => unreachable!(),
-        }
-    }
-
     fn create_request(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
         // We can unwrap because name and url are required
         let name = matches.value_of("name").unwrap();

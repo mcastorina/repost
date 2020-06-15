@@ -5,6 +5,7 @@ pub enum CmdError {
     DbError(DbError),
     ArgsError(String),
     ArgParseError(clap_v3::Error),
+    IOError(std::io::Error),
     NotFound,
     NotImplemented,
     MissingOptions,
@@ -23,6 +24,7 @@ impl std::fmt::Display for CmdError {
             },
             CmdError::ArgsError(x) => write!(f, "{}", x),
             CmdError::ArgParseError(x) => write!(f, "{}", x),
+            CmdError::IOError(x) => write!(f, "{}", x),
             CmdError::NotFound => write!(f, "Command not found."),
             CmdError::NotImplemented => write!(f, "Command not implemented."),
             CmdError::MissingOptions => write!(
@@ -41,6 +43,7 @@ impl From<CmdError> for String {
             },
             CmdError::ArgsError(x) => x,
             CmdError::ArgParseError(x) => format!("{}", x),
+            CmdError::IOError(x) => format!("{}", x),
             CmdError::NotFound => String::from("Command not found."),
             CmdError::NotImplemented => String::from("Command not implemented."),
             CmdError::MissingOptions => {
@@ -57,5 +60,10 @@ impl From<DbError> for CmdError {
 impl From<clap_v3::Error> for CmdError {
     fn from(err: clap_v3::Error) -> CmdError {
         CmdError::ArgParseError(err)
+    }
+}
+impl From<std::io::Error> for CmdError {
+    fn from(err: std::io::Error) -> CmdError {
+        CmdError::IOError(err)
     }
 }

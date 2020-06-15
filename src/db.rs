@@ -316,7 +316,7 @@ impl Db {
 
     pub fn get_variables(&self) -> Result<Vec<Variable>, DbError> {
         let mut stmt = self.conn
-            .prepare("SELECT rowid, name, environment, value, source, timestamp FROM variables ORDER BY timestamp DESC;")?;
+            .prepare("SELECT rowid, name, environment, value, source, timestamp FROM variables ORDER BY timestamp ASC;")?;
 
         let vars = stmt.query_map(NO_PARAMS, |row| {
             Ok(Variable {
@@ -513,5 +513,16 @@ impl PrintableTable for Vec<RequestOption> {
                 ]
             })
             .collect()
+    }
+}
+
+impl PrintableTable for Vec<String> {
+    fn column_names(&self) -> prettytable::Row {
+        row![&self[0]]
+    }
+    fn rows(&self) -> Vec<prettytable::Row> {
+        let mut iter = self.iter();
+        iter.next();
+        iter.map(|row| row![row]).collect()
     }
 }

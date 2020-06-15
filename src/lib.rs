@@ -7,6 +7,7 @@ extern crate prettytable;
 use cmd::{Cmd, CmdError};
 use db::{Db, RequestOption, Variable};
 use std::io::{self, prelude::*};
+use std::fs;
 
 pub struct Repl {
     prompt: String,
@@ -179,5 +180,30 @@ impl Repl {
             Some(x) => Some(x.as_ref()),
             None => None,
         }
+    }
+
+    fn get_workspaces(&self) -> Result<Vec<String>, CmdError> {
+        // TODO: use a struct if this is needed in other operations
+        //       for now, it is only being used to print the workspaces
+        //       so we prefix the vector with the header "workspace"
+        let mut result = vec![String::from("workspace")];
+        let paths = fs::read_dir("./")?;
+        for path in paths {
+            let path = path?.path();
+            // filter out .db extensions
+            match path.extension() {
+                Some(x) => {
+                    if x != "db" {
+                        continue;
+                    }
+                },
+                _ => continue
+            }
+            let ws = path.file_stem().unwrap();
+            if let Some(x) = ws.to_str() {
+                result.push(String::from(x));
+            }
+        }
+        Ok(result)
     }
 }
