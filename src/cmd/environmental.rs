@@ -33,9 +33,9 @@ impl EnvironmentalCommand {
         }
 
         let req = create_request(req)?;
-        let verbose = matches.is_present("verbose");
+        let quiet = matches.is_present("quiet");
 
-        if verbose {
+        if !quiet {
             println!("> {} {}", req.method(), req.url());
             for header in req.headers() {
                 let (name, value) = header;
@@ -45,7 +45,7 @@ impl EnvironmentalCommand {
         }
 
         let resp = blocking::Client::new().execute(req)?;
-        if verbose {
+        if !quiet {
             println!("{}", resp.status());
             for header in resp.headers() {
                 let (name, value) = header;
@@ -110,10 +110,10 @@ fn clap_args() -> clap_v3::App<'static> {
                         .multiple(false), // TODO run multiple in a row
                 )
                 .arg(
-                    Arg::with_name("verbose")
+                    Arg::with_name("quiet")
                         .help("Verbose output")
-                        .short('v')
-                        .long("verbose")
+                        .short('q')
+                        .long("quiet")
                         .takes_value(false)
                         .required(false),
                 ),
