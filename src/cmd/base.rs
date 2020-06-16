@@ -263,6 +263,7 @@ fn clap_args() -> clap_v3::App<'static> {
         );
     App::new("repost")
         .setting(AppSettings::NoBinaryName)
+        .setting(AppSettings::DisableVersion)
         .subcommand(
             App::new("create")
                 .setting(AppSettings::SubcommandRequiredElseHelp)

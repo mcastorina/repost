@@ -1,11 +1,13 @@
 use crate::db::DbError;
 use crate::Repl;
+use reqwest;
 
 pub enum CmdError {
     DbError(DbError),
     ArgsError(String),
     ArgParseError(clap_v3::Error),
     IOError(std::io::Error),
+    ReqwestError(reqwest::Error),
     NotFound,
     NotImplemented,
     MissingOptions,
@@ -25,6 +27,7 @@ impl std::fmt::Display for CmdError {
             CmdError::ArgsError(x) => write!(f, "{}", x),
             CmdError::ArgParseError(x) => write!(f, "{}", x),
             CmdError::IOError(x) => write!(f, "{}", x),
+            CmdError::ReqwestError(x) => write!(f, "{}", x),
             CmdError::NotFound => write!(f, "Command not found."),
             CmdError::NotImplemented => write!(f, "Command not implemented."),
             CmdError::MissingOptions => write!(
@@ -44,6 +47,7 @@ impl From<CmdError> for String {
             CmdError::ArgsError(x) => x,
             CmdError::ArgParseError(x) => format!("{}", x),
             CmdError::IOError(x) => format!("{}", x),
+            CmdError::ReqwestError(x) => format!("{}", x),
             CmdError::NotFound => String::from("Command not found."),
             CmdError::NotImplemented => String::from("Command not implemented."),
             CmdError::MissingOptions => {
@@ -65,5 +69,10 @@ impl From<clap_v3::Error> for CmdError {
 impl From<std::io::Error> for CmdError {
     fn from(err: std::io::Error) -> CmdError {
         CmdError::IOError(err)
+    }
+}
+impl From<reqwest::Error> for CmdError {
+    fn from(err: reqwest::Error) -> CmdError {
+        CmdError::ReqwestError(err)
     }
 }
