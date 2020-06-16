@@ -5,7 +5,7 @@ pub mod db;
 extern crate prettytable;
 
 use cmd::{Cmd, CmdError};
-use db::{Db, RequestOption, Variable};
+use db::{Db, Environment, Request, RequestOption, Variable};
 use std::fs;
 use std::io::{self, prelude::*};
 
@@ -78,6 +78,9 @@ impl Repl {
         if let Some(x) = &self.environment {
             prompt = format!("{}[{}]", prompt, x);
         }
+        if let Some(x) = &self.request {
+            prompt = format!("{}<{}>", prompt, x);
+        }
         self.prompt = prompt;
     }
 
@@ -110,7 +113,10 @@ impl Repl {
     }
 
     pub fn update_request(&mut self, request: &str) -> Result<(), CmdError> {
-        Err(CmdError::NotImplemented)
+        self.db.get_request(request)?;
+        self.request = Some(String::from(request));
+        self.update_prompt();
+        Ok(())
     }
 
     fn update_all_options(&self) -> Result<(), CmdError> {
@@ -181,7 +187,39 @@ impl Repl {
             None => None,
         }
     }
+    fn request(&self) -> Option<&str> {
+        match &self.request {
+            Some(x) => Some(x.as_ref()),
+            None => None,
+        }
+    }
 
+    fn get_requests(&self) -> Result<Vec<Request>, CmdError> {
+        Ok(self.db.get_requests()?)
+    }
+    fn get_variables(&self) -> Result<Vec<Variable>, CmdError> {
+        let mut result = self.db.get_variables()?;
+        if let Some(env) = self.environment() {
+            result = result
+                .into_iter()
+                .filter(|x| x.environment == env)
+                .collect();
+        }
+        Ok(result)
+    }
+    fn get_options(&self) -> Result<Vec<RequestOption>, CmdError> {
+        let mut result = self.db.get_options()?;
+        if let Some(req) = self.request() {
+            result = result
+                .into_iter()
+                .filter(|x| x.request_name() == req)
+                .collect();
+        }
+        Ok(result)
+    }
+    fn get_environments(&self) -> Result<Vec<Environment>, CmdError> {
+        Ok(self.db.get_environments()?)
+    }
     fn get_workspaces(&self) -> Result<Vec<String>, CmdError> {
         // TODO: use a struct if this is needed in other operations
         //       for now, it is only being used to print the workspaces

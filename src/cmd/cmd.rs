@@ -63,7 +63,11 @@ impl From<DbError> for CmdError {
 }
 impl From<clap_v3::Error> for CmdError {
     fn from(err: clap_v3::Error) -> CmdError {
-        CmdError::ArgParseError(err)
+        match err.kind {
+            clap_v3::ErrorKind::UnrecognizedSubcommand => CmdError::NotFound,
+            clap_v3::ErrorKind::UnknownArgument => CmdError::NotFound,
+            _ => CmdError::ArgParseError(err),
+        }
     }
 }
 impl From<std::io::Error> for CmdError {

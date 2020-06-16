@@ -11,7 +11,7 @@ impl Cmd for EnvironmentalCommand {
         let matches = clap_args().try_get_matches_from(args)?;
         match matches.subcommand() {
             ("run", Some(matches)) => EnvironmentalCommand::execute_run(repl, matches),
-            _ => unreachable!(),
+            _ => Err(CmdError::NotFound),
         }
     }
 }
@@ -98,7 +98,6 @@ fn clap_args() -> clap_v3::App<'static> {
         .setting(AppSettings::NoBinaryName)
         .setting(AppSettings::DisableVersion)
         .setting(AppSettings::DisableHelpSubcommand)
-        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             App::new("run")
                 .about("Run a named HTTP request")
