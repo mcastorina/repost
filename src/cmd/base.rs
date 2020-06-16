@@ -28,11 +28,9 @@ impl Cmd for BaseCommand {
                     repl.update_workspace(matches.value_of("workspace").unwrap())
                 }
                 ("environment", Some(matches)) => {
-                    repl.update_environment(matches.value_of("environment").unwrap())
+                    repl.update_environment(matches.value_of("environment"))
                 }
-                ("request", Some(matches)) => {
-                    repl.update_request(matches.value_of("request").unwrap())
-                }
+                ("request", Some(matches)) => repl.update_request(matches.value_of("request")),
                 _ => unreachable!(),
             },
             ("delete", Some(matches)) => match matches.subcommand() {
@@ -229,11 +227,11 @@ fn clap_args() -> clap_v3::App<'static> {
     let set_environment = App::new("environment")
         .about("Set the environment as used for variable substitution")
         .aliases(&["env", "e"])
-        .arg("<environment> 'Environment to use'");
+        .arg("[environment] 'Environment to use'");
     let set_request = App::new("request")
         .about("Set the request to view and modify specific options")
         .aliases(&["req", "r"])
-        .arg("<request> 'Request to use'");
+        .arg("[request] 'Request to use'");
     let set_workspace = App::new("workspace")
         .about("Set the workspace where all data is stored")
         .aliases(&["ws", "w"])

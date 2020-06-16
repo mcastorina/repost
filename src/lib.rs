@@ -84,14 +84,18 @@ impl Repl {
         self.prompt = prompt;
     }
 
-    pub fn update_environment(&mut self, environment: &str) -> Result<(), CmdError> {
-        if !self.db.environment_exists(environment)? {
-            return Err(CmdError::ArgsError(format!(
-                "Environment not found: {}",
-                environment,
-            )));
+    pub fn update_environment(&mut self, environment: Option<&str>) -> Result<(), CmdError> {
+        if let Some(environment) = environment {
+            if !self.db.environment_exists(environment)? {
+                return Err(CmdError::ArgsError(format!(
+                    "Environment not found: {}",
+                    environment,
+                )));
+            }
+            self.environment = Some(String::from(environment));
+        } else {
+            self.environment = None;
         }
-        self.environment = Some(String::from(environment));
         self.update_all_options()?;
         self.update_prompt();
         Ok(())
@@ -112,9 +116,13 @@ impl Repl {
         Ok(())
     }
 
-    pub fn update_request(&mut self, request: &str) -> Result<(), CmdError> {
-        self.db.get_request(request)?;
-        self.request = Some(String::from(request));
+    pub fn update_request(&mut self, request: Option<&str>) -> Result<(), CmdError> {
+        if let Some(request) = request {
+            self.db.get_request(request)?;
+            self.request = Some(String::from(request));
+        } else {
+            self.request = None;
+        }
         self.update_prompt();
         Ok(())
     }
