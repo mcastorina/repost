@@ -193,13 +193,16 @@ impl Request {
 }
 
 impl RequestOption {
-    pub fn from_variable(req_name: &str, var_name: &str) -> RequestOption {
+    pub fn new(req_name: &str, opt_name: &str, value: Option<String>) -> RequestOption {
         RequestOption {
             request_name: String::from(req_name),
-            option_name: String::from(var_name),
-            value: None,
+            option_name: String::from(opt_name),
+            value,
             required: true,
         }
+    }
+    pub fn from_variable(req_name: &str, var_name: &str) -> RequestOption {
+        RequestOption::new(req_name, var_name, None)
     }
 
     pub fn request_name(&self) -> &str {
@@ -424,9 +427,12 @@ impl Db {
     }
 
     pub fn update_option(&self, opt: RequestOption) -> Result<(), DbError> {
-        self.conn.execute(
+        let num = self.conn.execute(
             "UPDATE options SET value = ?1, required = ?2 WHERE request_name = ?3 AND option_name = ?4;",
             params![opt.value, opt.required, opt.request_name, opt.option_name])?;
+        if num == 0 {
+            return Err(DbError::NotFound);
+        }
         Ok(())
     }
 

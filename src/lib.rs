@@ -5,6 +5,7 @@ pub mod db;
 extern crate prettytable;
 
 use cmd::{Cmd, CmdError};
+use colored::*;
 use db::{Db, Environment, Request, RequestOption, Variable};
 use std::fs;
 use std::io::{self, prelude::*};
@@ -19,7 +20,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn new() -> Result<Repl, CmdError> {
-        let repl = Repl {
+        let mut repl = Repl {
             prompt: String::from("[repost]"),
             workspace: String::from("repost"),
             db: Db::new("repost.db")?,
@@ -27,6 +28,7 @@ impl Repl {
             request: None,
         };
         repl.update_all_options()?;
+        repl.update_prompt();
         Ok(repl)
     }
 
@@ -74,12 +76,12 @@ impl Repl {
     }
 
     fn update_prompt(&mut self) {
-        let mut prompt = format!("[{}]", &self.workspace);
+        let mut prompt = format!("[{}]", &self.workspace.yellow());
         if let Some(x) = &self.environment {
-            prompt = format!("{}[{}]", prompt, x);
+            prompt = format!("{}[{}]", prompt, x.bold().cyan());
         }
         if let Some(x) = &self.request {
-            prompt = format!("{}<{}>", prompt, x);
+            prompt = format!("{}[{}]", prompt, x.bold().green());
         }
         self.prompt = prompt;
     }
@@ -251,5 +253,19 @@ impl Repl {
             }
         }
         Ok(result)
+    }
+    fn set_option(&self, opt_name: &str, value_ref: Option<&str>) -> Result<(), CmdError> {
+        if self.request.is_none() {
+            return Err(CmdError::ArgsError(String::from("Set option is only available in a request specific context. Try setting a request first.")));
+        }
+
+        let value = match value_ref {
+            Some(x) => Some(String::from(x)),
+            None => None,
+        };
+        let opt = RequestOption::new(self.request().unwrap(), opt_name, value);
+        self.db.update_option(opt)?;
+        println!("{} => {}", opt_name, value_ref.unwrap_or("None"));
+        Ok(())
     }
 }

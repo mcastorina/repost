@@ -31,6 +31,10 @@ impl Cmd for BaseCommand {
                     repl.update_environment(matches.value_of("environment"))
                 }
                 ("request", Some(matches)) => repl.update_request(matches.value_of("request")),
+                ("option", Some(matches)) => repl.set_option(
+                    matches.value_of("option").unwrap(),
+                    matches.value_of("value"),
+                ),
                 _ => unreachable!(),
             },
             ("delete", Some(matches)) => match matches.subcommand() {
@@ -241,6 +245,15 @@ fn clap_args() -> clap_v3::App<'static> {
                 .required(true)
                 .validator(is_alphanumeric),
         );
+    let set_option = App::new("option")
+        .about("Set the request specific options")
+        .aliases(&["opt", "o"])
+        .arg(
+            Arg::with_name("option")
+                .help("Option to set")
+                .required(true),
+        )
+        .arg(Arg::with_name("value").help("Option value"));
     let delete_requests = App::new("requests")
         .about("Delete the named HTTP requests")
         .aliases(&["request", "reqs", "req", "r"])
@@ -289,7 +302,8 @@ fn clap_args() -> clap_v3::App<'static> {
                 .aliases(&["use", "load", "u"])
                 .subcommand(set_workspace)
                 .subcommand(set_environment)
-                .subcommand(set_request),
+                .subcommand(set_request)
+                .subcommand(set_option),
         )
         .subcommand(
             App::new("delete")
