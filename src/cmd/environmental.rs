@@ -91,7 +91,6 @@ fn create_request(mut req: Request) -> Result<blocking::Request, CmdError> {
 
     Ok(builder.build()?)
 }
-
 fn clap_args() -> clap_v3::App<'static> {
     // TODO: can this be a sinlge static clap_v3::App variable?
     App::new("repost")

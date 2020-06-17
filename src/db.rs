@@ -2,244 +2,13 @@ use chrono::Utc;
 use regex::Regex;
 use rusqlite::{params, Connection, NO_PARAMS};
 
-pub struct Db {
-    conn: Connection,
-}
-
-pub enum Method {
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
-    HEAD,
-}
-
-impl Method {
-    fn to_string(&self) -> &str {
-        match self {
-            Method::GET => "GET",
-            Method::POST => "POST",
-            Method::PUT => "PUT",
-            Method::PATCH => "PATCH",
-            Method::DELETE => "DELETE",
-            Method::HEAD => "HEAD",
-        }
-    }
-    pub fn new(s: &str) -> Method {
-        match s {
-            "GET" => Method::GET,
-            "POST" => Method::POST,
-            "PUT" => Method::PUT,
-            "PATCH" => Method::PATCH,
-            "DELETE" => Method::DELETE,
-            "HEAD" => Method::HEAD,
-            _ => Method::GET,
-        }
-    }
-}
-
-pub struct Request {
-    name: String,
-    method: Method,
-    url: String,
-    headers: Option<String>,
-    body: Option<Vec<u8>>,
-}
-
-pub struct RequestOption {
-    request_name: String,
-    option_name: String,
-    value: Option<String>,
-    required: bool,
-}
-
-pub struct Variable {
-    pub rowid: u32,
-    pub name: String,
-    pub environment: String,
-    pub value: Option<String>,
-    pub source: Option<String>,
-    pub timestamp: Option<String>,
-}
-
-pub struct Environment {
-    environment: String,
-}
-
-impl Request {
-    pub fn new(name: &str, method: Option<Method>, url: &str) -> Request {
-        Request {
-            name: String::from(name),
-            method: Request::name_to_method(name, method),
-            url: String::from(url),
-            headers: None,
-            body: None,
-        }
-    }
-    pub fn add_header(&mut self, key: &str, value: &str) {
-        let mut headers = {
-            match &self.headers {
-                Some(x) => format!("{}\n", x),
-                None => String::new(),
-            }
-        };
-        headers.push_str(format!("{}: {}", key, value).as_ref());
-        self.headers = Some(headers);
-    }
-    pub fn set_body(&mut self, body: Option<Vec<u8>>) {
-        self.body = body;
-    }
-
-    fn name_to_method(name: &str, method: Option<Method>) -> Method {
-        if let Some(x) = method {
-            return x;
-        }
-        let name = name.to_lowercase();
-        if name.starts_with("create") || name.starts_with("post") {
-            Method::POST
-        } else if name.starts_with("delete") {
-            Method::DELETE
-        } else if name.starts_with("replace") || name.starts_with("put") {
-            Method::PUT
-        } else if name.starts_with("update") || name.starts_with("patch") {
-            Method::PATCH
-        } else if name.starts_with("head") {
-            Method::HEAD
-        } else {
-            Method::GET
-        }
-    }
-    pub fn get_variable_names(&self) -> Result<Vec<String>, DbError> {
-        // find all variables in the request
-        // TODO: lazy static
-        let re = Regex::new(r"\{(.*?)\}").unwrap();
-        let mut names: Vec<String> = re
-            .captures_iter(&self.url)
-            .map(|cap| String::from(cap.get(1).unwrap().as_str()))
-            .collect();
-        if let Some(headers) = &self.headers {
-            let mut headers: Vec<String> = re
-                .captures_iter(&headers)
-                .map(|cap| String::from(cap.get(1).unwrap().as_str()))
-                .collect();
-            names.append(&mut headers);
-        }
-        if let Some(body) = &self.body {
-            let re = regex::bytes::Regex::new(r"\{(.*?)\}").unwrap();
-            let mut body: Vec<String> = re
-                .captures_iter(&body)
-                .map(|cap| String::from_utf8(cap.get(1).unwrap().as_bytes().to_vec()))
-                .filter_map(|x| x.ok())
-                .collect();
-            names.append(&mut body);
-        }
-
-        // TODO: unique names
-        Ok(names)
-    }
-    // TODO: return another type to ensure this does not get saved to the DB
-    //       or used anywhere other than run
-    pub fn substitute_options(&mut self, opts: Vec<RequestOption>) -> bool {
-        // TODO: better replacement for all options
-        //       this could result in some unexpected behavior
-        //       will need to do a two pass approach:
-        //          1. find all start/end indices
-        //          2. iterate backwards to perform replacement
-        // find all variables and replace with values in options
-        for opt in opts {
-            if opt.value.is_none() {
-                if opt.required {
-                    return false;
-                }
-                continue;
-            }
-            let old = format!("{{{}}}", &opt.option_name);
-            let new = opt.value.unwrap();
-            self.url = self.url.replace(&old, &new);
-            if let Some(headers) = &self.headers {
-                self.headers = Some(headers.replace(&old, &new));
-            }
-            if let Some(body) = &self.body {
-                let old = format!(r"\{{{}\}}", &opt.option_name);
-                let re = regex::bytes::Regex::new(&old).unwrap();
-                self.body = Some(re.replace_all(&body, new.as_bytes()).to_vec());
-            }
-        }
-        true
-    }
-    pub fn has_option(&self, opt: &RequestOption) -> bool {
-        self.name == opt.request_name
-    }
-
-    pub fn name(&self) -> &str {
-        self.name.as_ref()
-    }
-    pub fn method(&self) -> &Method {
-        &self.method
-    }
-    pub fn url(&self) -> &str {
-        self.url.as_ref()
-    }
-    pub fn headers(&self) -> &Option<String> {
-        &self.headers
-    }
-    pub fn body(&self) -> &Option<Vec<u8>> {
-        &self.body
-    }
-    pub fn consume_body(&mut self) -> Option<Vec<u8>> {
-        self.body.take()
-    }
-}
-
-impl RequestOption {
-    pub fn new(req_name: &str, opt_name: &str, value: Option<String>) -> RequestOption {
-        RequestOption {
-            request_name: String::from(req_name),
-            option_name: String::from(opt_name),
-            value,
-            required: true,
-        }
-    }
-    pub fn from_variable(req_name: &str, var_name: &str) -> RequestOption {
-        RequestOption::new(req_name, var_name, None)
-    }
-
-    pub fn request_name(&self) -> &str {
-        self.request_name.as_ref()
-    }
-    pub fn option_name(&self) -> &str {
-        self.option_name.as_ref()
-    }
-
-    pub fn update_value(&mut self, val: Option<String>) {
-        self.value = val;
-    }
-}
-
-impl Variable {
-    pub fn name(&self) -> &str {
-        self.name.as_ref()
-    }
-    pub fn environment(&self) -> &str {
-        self.environment.as_ref()
-    }
-    pub fn consume_value(&mut self) -> Option<String> {
-        self.value.take()
-    }
-}
-
 pub enum DbError {
     Rusqlite(rusqlite::Error),
     NotFound,
 }
-
-impl From<rusqlite::Error> for DbError {
-    fn from(err: rusqlite::Error) -> DbError {
-        DbError::Rusqlite(err)
-    }
+pub struct Db {
+    conn: Connection,
 }
-
 impl Db {
     pub fn new(path: &str) -> Result<Db, DbError> {
         let db = Db {
@@ -453,11 +222,232 @@ impl Db {
     }
 }
 
+pub enum Method {
+    GET,
+    POST,
+    PUT,
+    PATCH,
+    DELETE,
+    HEAD,
+}
+impl Method {
+    fn to_string(&self) -> &str {
+        match self {
+            Method::GET => "GET",
+            Method::POST => "POST",
+            Method::PUT => "PUT",
+            Method::PATCH => "PATCH",
+            Method::DELETE => "DELETE",
+            Method::HEAD => "HEAD",
+        }
+    }
+    pub fn new(s: &str) -> Method {
+        match s {
+            "GET" => Method::GET,
+            "POST" => Method::POST,
+            "PUT" => Method::PUT,
+            "PATCH" => Method::PATCH,
+            "DELETE" => Method::DELETE,
+            "HEAD" => Method::HEAD,
+            _ => Method::GET,
+        }
+    }
+}
+
+pub struct Request {
+    name: String,
+    method: Method,
+    url: String,
+    headers: Option<String>,
+    body: Option<Vec<u8>>,
+}
+pub struct RequestOption {
+    request_name: String,
+    option_name: String,
+    value: Option<String>,
+    required: bool,
+}
+pub struct Variable {
+    pub rowid: u32,
+    pub name: String,
+    pub environment: String,
+    pub value: Option<String>,
+    pub source: Option<String>,
+    pub timestamp: Option<String>,
+}
+pub struct Environment {
+    environment: String,
+}
+
+impl Request {
+    pub fn new(name: &str, method: Option<Method>, url: &str) -> Request {
+        Request {
+            name: String::from(name),
+            method: Request::name_to_method(name, method),
+            url: String::from(url),
+            headers: None,
+            body: None,
+        }
+    }
+    pub fn add_header(&mut self, key: &str, value: &str) {
+        let mut headers = {
+            match &self.headers {
+                Some(x) => format!("{}\n", x),
+                None => String::new(),
+            }
+        };
+        headers.push_str(format!("{}: {}", key, value).as_ref());
+        self.headers = Some(headers);
+    }
+    pub fn set_body(&mut self, body: Option<Vec<u8>>) {
+        self.body = body;
+    }
+
+    fn name_to_method(name: &str, method: Option<Method>) -> Method {
+        if let Some(x) = method {
+            return x;
+        }
+        let name = name.to_lowercase();
+        if name.starts_with("create") || name.starts_with("post") {
+            Method::POST
+        } else if name.starts_with("delete") {
+            Method::DELETE
+        } else if name.starts_with("replace") || name.starts_with("put") {
+            Method::PUT
+        } else if name.starts_with("update") || name.starts_with("patch") {
+            Method::PATCH
+        } else if name.starts_with("head") {
+            Method::HEAD
+        } else {
+            Method::GET
+        }
+    }
+    pub fn get_variable_names(&self) -> Result<Vec<String>, DbError> {
+        // find all variables in the request
+        // TODO: lazy static
+        let re = Regex::new(r"\{(.*?)\}").unwrap();
+        let mut names: Vec<String> = re
+            .captures_iter(&self.url)
+            .map(|cap| String::from(cap.get(1).unwrap().as_str()))
+            .collect();
+        if let Some(headers) = &self.headers {
+            let mut headers: Vec<String> = re
+                .captures_iter(&headers)
+                .map(|cap| String::from(cap.get(1).unwrap().as_str()))
+                .collect();
+            names.append(&mut headers);
+        }
+        if let Some(body) = &self.body {
+            let re = regex::bytes::Regex::new(r"\{(.*?)\}").unwrap();
+            let mut body: Vec<String> = re
+                .captures_iter(&body)
+                .map(|cap| String::from_utf8(cap.get(1).unwrap().as_bytes().to_vec()))
+                .filter_map(|x| x.ok())
+                .collect();
+            names.append(&mut body);
+        }
+
+        // TODO: unique names
+        Ok(names)
+    }
+    // TODO: return another type to ensure this does not get saved to the DB
+    //       or used anywhere other than run
+    pub fn substitute_options(&mut self, opts: Vec<RequestOption>) -> bool {
+        // TODO: better replacement for all options
+        //       this could result in some unexpected behavior
+        //       will need to do a two pass approach:
+        //          1. find all start/end indices
+        //          2. iterate backwards to perform replacement
+        // find all variables and replace with values in options
+        for opt in opts {
+            if opt.value.is_none() {
+                if opt.required {
+                    return false;
+                }
+                continue;
+            }
+            let old = format!("{{{}}}", &opt.option_name);
+            let new = opt.value.unwrap();
+            self.url = self.url.replace(&old, &new);
+            if let Some(headers) = &self.headers {
+                self.headers = Some(headers.replace(&old, &new));
+            }
+            if let Some(body) = &self.body {
+                let old = format!(r"\{{{}\}}", &opt.option_name);
+                let re = regex::bytes::Regex::new(&old).unwrap();
+                self.body = Some(re.replace_all(&body, new.as_bytes()).to_vec());
+            }
+        }
+        true
+    }
+    pub fn has_option(&self, opt: &RequestOption) -> bool {
+        self.name == opt.request_name
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+    pub fn method(&self) -> &Method {
+        &self.method
+    }
+    pub fn url(&self) -> &str {
+        self.url.as_ref()
+    }
+    pub fn headers(&self) -> &Option<String> {
+        &self.headers
+    }
+    pub fn body(&self) -> &Option<Vec<u8>> {
+        &self.body
+    }
+    pub fn consume_body(&mut self) -> Option<Vec<u8>> {
+        self.body.take()
+    }
+}
+impl RequestOption {
+    pub fn new(req_name: &str, opt_name: &str, value: Option<String>) -> RequestOption {
+        RequestOption {
+            request_name: String::from(req_name),
+            option_name: String::from(opt_name),
+            value,
+            required: true,
+        }
+    }
+    pub fn from_variable(req_name: &str, var_name: &str) -> RequestOption {
+        RequestOption::new(req_name, var_name, None)
+    }
+
+    pub fn request_name(&self) -> &str {
+        self.request_name.as_ref()
+    }
+    pub fn option_name(&self) -> &str {
+        self.option_name.as_ref()
+    }
+
+    pub fn update_value(&mut self, val: Option<String>) {
+        self.value = val;
+    }
+}
+impl Variable {
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+    pub fn environment(&self) -> &str {
+        self.environment.as_ref()
+    }
+    pub fn consume_value(&mut self) -> Option<String> {
+        self.value.take()
+    }
+}
+
+impl From<rusqlite::Error> for DbError {
+    fn from(err: rusqlite::Error) -> DbError {
+        DbError::Rusqlite(err)
+    }
+}
 pub trait PrintableTable {
     fn column_names(&self) -> prettytable::Row;
     fn rows(&self) -> Vec<prettytable::Row>;
 }
-
 impl PrintableTable for Vec<Request> {
     fn column_names(&self) -> prettytable::Row {
         row!["name", "method", "url", "headers", "body?"]
@@ -483,7 +473,6 @@ impl PrintableTable for Vec<Request> {
             .collect()
     }
 }
-
 impl PrintableTable for Vec<Variable> {
     fn column_names(&self) -> prettytable::Row {
         row![
@@ -510,7 +499,6 @@ impl PrintableTable for Vec<Variable> {
             .collect()
     }
 }
-
 impl PrintableTable for Vec<Environment> {
     fn column_names(&self) -> prettytable::Row {
         row!["environment"]
@@ -519,7 +507,6 @@ impl PrintableTable for Vec<Environment> {
         self.iter().map(|env| row![env.environment,]).collect()
     }
 }
-
 impl PrintableTable for Vec<RequestOption> {
     fn column_names(&self) -> prettytable::Row {
         row!["request_name", "option_name", "value", "required"]
@@ -537,7 +524,6 @@ impl PrintableTable for Vec<RequestOption> {
             .collect()
     }
 }
-
 impl PrintableTable for Vec<String> {
     fn column_names(&self) -> prettytable::Row {
         row![&self[0]]

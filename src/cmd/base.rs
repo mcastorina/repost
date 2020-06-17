@@ -46,7 +46,6 @@ impl Cmd for BaseCommand {
         }
     }
 }
-
 impl BaseCommand {
     fn create_request(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
         // We can unwrap because name and url are required
