@@ -51,7 +51,7 @@ impl Repl {
 
     fn cmds() -> Vec<Box<dyn Cmd>> {
         vec![
-            Box::new(cmd::EnvironmentalCommand {}),
+            Box::new(cmd::ContextualCommand {}),
             Box::new(cmd::BaseCommand {}),
         ]
     }

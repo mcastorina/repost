@@ -5,17 +5,17 @@ use clap_v3::{App, AppSettings, Arg, ArgMatches};
 use colored::*;
 use reqwest::blocking;
 
-pub struct EnvironmentalCommand {}
-impl Cmd for EnvironmentalCommand {
+pub struct ContextualCommand {}
+impl Cmd for ContextualCommand {
     fn execute(&self, repl: &mut Repl, args: &Vec<&str>) -> Result<(), CmdError> {
         let matches = clap_args().try_get_matches_from(args)?;
         match matches.subcommand() {
-            ("run", Some(matches)) => EnvironmentalCommand::execute_run(repl, matches),
+            ("run", Some(matches)) => ContextualCommand::execute_run(repl, matches),
             _ => Err(CmdError::NotFound),
         }
     }
 }
-impl EnvironmentalCommand {
+impl ContextualCommand {
     fn execute_run(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
         let req = matches.value_of("request").unwrap();
         let mut req = repl.db.get_request(req)?;
