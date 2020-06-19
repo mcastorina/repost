@@ -47,7 +47,7 @@ impl Db {
                   request_name    TEXT,
                   option_name     TEXT NOT NULL,
                   value           TEXT,
-                  required        INTEGER,
+                  type            TEXT NOT NULL,
                   FOREIGN KEY(request_name) REFERENCES requests(name)
               )",
             NO_PARAMS,
@@ -108,14 +108,14 @@ impl Db {
     pub fn get_options(&self) -> Result<Vec<RequestOption>, DbError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT request_name, option_name, value, required FROM options;")?;
+            .prepare("SELECT request_name, option_name, value, type FROM options;")?;
 
         let opts = stmt.query_map(NO_PARAMS, |row| {
             Ok(RequestOption {
                 request_name: row.get(0)?,
                 option_name: row.get(1)?,
                 value: row.get(2)?,
-                required: row.get(3)?,
+                option_type: row.get(3)?,
             })
         })?;
 
@@ -188,17 +188,17 @@ impl Db {
     }
     pub fn create_option(&self, opt: RequestOption) -> Result<(), DbError> {
         self.conn.execute(
-            "INSERT INTO options (request_name, option_name, value, required)
+            "INSERT INTO options (request_name, option_name, value, type)
                   VALUES (?1, ?2, ?3, ?4);",
-            params![opt.request_name, opt.option_name, opt.value, opt.required,],
+            params![opt.request_name, opt.option_name, opt.value, opt.option_type,],
         )?;
         Ok(())
     }
 
     pub fn update_option(&self, opt: RequestOption) -> Result<(), DbError> {
         let num = self.conn.execute(
-            "UPDATE options SET value = ?1, required = ?2 WHERE request_name = ?3 AND option_name = ?4;",
-            params![opt.value, opt.required, opt.request_name, opt.option_name])?;
+            "UPDATE options SET value = ?1 WHERE request_name = ?2 AND option_name = ?3 AND type = ?4;",
+            params![opt.value, opt.request_name, opt.option_name, opt.option_type])?;
         if num == 0 {
             return Err(DbError::NotFound);
         }
@@ -265,7 +265,8 @@ pub struct RequestOption {
     request_name: String,
     option_name: String,
     value: Option<String>,
-    required: bool,
+    // TODO: enum
+    option_type: String,
 }
 pub struct Variable {
     pub rowid: u32,
@@ -359,12 +360,10 @@ impl Request {
         //          1. find all start/end indices
         //          2. iterate backwards to perform replacement
         // find all variables and replace with values in options
-        for opt in opts {
+        for opt in opts.into_iter().filter(|opt| opt.option_type == "input") {
             if opt.value.is_none() {
-                if opt.required {
-                    return false;
-                }
-                continue;
+                // All input options are required
+                return false;
             }
             let old = format!("{{{}}}", &opt.option_name);
             let new = opt.value.unwrap();
@@ -404,16 +403,16 @@ impl Request {
     }
 }
 impl RequestOption {
-    pub fn new(req_name: &str, opt_name: &str, value: Option<String>) -> RequestOption {
+    pub fn new(req_name: &str, opt_name: &str, value: Option<String>, opt_type: &str) -> RequestOption {
         RequestOption {
             request_name: String::from(req_name),
             option_name: String::from(opt_name),
             value,
-            required: true,
+            option_type: String::from(opt_type),
         }
     }
     pub fn from_variable(req_name: &str, var_name: &str) -> RequestOption {
-        RequestOption::new(req_name, var_name, None)
+        RequestOption::new(req_name, var_name, None, "input")
     }
 
     pub fn request_name(&self) -> &str {
@@ -509,7 +508,7 @@ impl PrintableTable for Vec<Environment> {
 }
 impl PrintableTable for Vec<RequestOption> {
     fn column_names(&self) -> prettytable::Row {
-        row!["request_name", "option_name", "value", "required"]
+        row!["request_name", "option_name", "value", "type"]
     }
     fn rows(&self) -> Vec<prettytable::Row> {
         self.iter()
@@ -518,7 +517,7 @@ impl PrintableTable for Vec<RequestOption> {
                     opt.request_name,
                     opt.option_name,
                     opt.value.as_ref().unwrap_or(&String::from("")),
-                    opt.required
+                    opt.option_type,
                 ]
             })
             .collect()

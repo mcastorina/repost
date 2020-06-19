@@ -263,7 +263,8 @@ impl Repl {
             Some(x) => Some(String::from(x)),
             None => None,
         };
-        let opt = RequestOption::new(self.request().unwrap(), opt_name, value);
+        // Set option only applies to input options
+        let opt = RequestOption::new(self.request().unwrap(), opt_name, value, "input");
         self.db.update_option(opt)?;
         println!("{} => {}", opt_name, value_ref.unwrap_or("None"));
         Ok(())
