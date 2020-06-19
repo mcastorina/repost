@@ -48,7 +48,8 @@ impl Db {
                   option_name     TEXT NOT NULL,
                   value           TEXT,
                   type            TEXT NOT NULL,
-                  FOREIGN KEY(request_name) REFERENCES requests(name)
+                  FOREIGN KEY(request_name) REFERENCES requests(name),
+                  UNIQUE(request_name, option_name, type)
               )",
             NO_PARAMS,
         )?;
