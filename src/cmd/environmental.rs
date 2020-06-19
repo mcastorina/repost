@@ -1,5 +1,5 @@
 use crate::cmd::{Cmd, CmdError};
-use crate::db::{Method, Request};
+use crate::db::{Method, Request, RequestOption};
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
 use colored::*;
@@ -63,7 +63,15 @@ impl ContextualCommand {
     }
 
     fn extract(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
-        Err(CmdError::NotImplemented)
+        if repl.request().is_none() {
+            return Err(CmdError::ArgsError(String::from("Extract is only available in a request specific context. Try setting a request first.")));
+        }
+        let request = repl.request().unwrap();
+        let path = String::from(matches.value_of("path").unwrap());
+        let var = matches.value_of("variable").unwrap();
+        let opt = RequestOption::new(request, var, Some(path), "output");
+        repl.db.create_option(opt)?;
+        Ok(())
     }
 }
 
