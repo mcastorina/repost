@@ -11,6 +11,7 @@ impl Cmd for ContextualCommand {
         let matches = clap_args().try_get_matches_from(args)?;
         match matches.subcommand() {
             ("run", Some(matches)) => ContextualCommand::execute_run(repl, matches),
+            ("extract", Some(matches)) => ContextualCommand::extract(repl, matches),
             _ => Err(CmdError::NotFound),
         }
     }
@@ -59,6 +60,10 @@ impl ContextualCommand {
             println!("{}", "%".bold().reversed());
         }
         Ok(())
+    }
+
+    fn extract(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
+        Err(CmdError::NotImplemented)
     }
 }
 
@@ -114,6 +119,24 @@ fn clap_args() -> clap_v3::App<'static> {
                         .long("quiet")
                         .takes_value(false)
                         .required(false),
+                ),
+        )
+        .subcommand(
+            App::new("extract")
+                .about("Extract data from the output of a request")
+                .aliases(&["ex"])
+                .arg(
+                    Arg::with_name("path")
+                        .help("Path to extract")
+                        .required(true),
+                )
+                .arg(
+                    Arg::with_name("variable")
+                        .help("Variable to store the extracted data")
+                        .short('t')
+                        .long("to-var")
+                        .takes_value(true)
+                        .required(true),
                 ),
         )
 }
