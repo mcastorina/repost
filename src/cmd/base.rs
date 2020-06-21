@@ -19,7 +19,7 @@ impl Cmd for BaseCommand {
                 ("requests", _) => BaseCommand::print_table(repl.get_requests()?),
                 ("variables", _) => BaseCommand::print_table(repl.get_variables()?),
                 ("environments", _) => BaseCommand::print_table(repl.get_environments()?),
-                ("options", _) => BaseCommand::print_table(repl.get_options()?),
+                ("options", _) => BaseCommand::print_table(repl.get_input_options()?),
                 ("workspaces", _) => BaseCommand::print_table(repl.get_workspaces()?),
                 _ => unreachable!(),
             },

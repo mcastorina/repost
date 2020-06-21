@@ -43,13 +43,24 @@ impl Db {
         )?;
 
         self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS options (
-                  request_name    TEXT,
+            "CREATE TABLE IF NOT EXISTS input_options (
+                  request_name    TEXT NOT NULL,
                   option_name     TEXT NOT NULL,
                   value           TEXT,
-                  type            TEXT NOT NULL,
                   FOREIGN KEY(request_name) REFERENCES requests(name),
-                  UNIQUE(request_name, option_name, type)
+                  UNIQUE(request_name, option_name)
+              )",
+            NO_PARAMS,
+        )?;
+
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS output_options (
+                  request_name      TEXT NOT NULL,
+                  option_name       TEXT NOT NULL,
+                  extraction_source TEXT NOT NULL,
+                  extraction_path   TEXT NOT NULL,
+                  FOREIGN KEY(request_name) REFERENCES requests(name),
+                  UNIQUE(request_name, option_name)
               )",
             NO_PARAMS,
         )?;
@@ -106,17 +117,16 @@ impl Db {
         Ok(vars.filter_map(|var| var.ok()).collect())
     }
 
-    pub fn get_options(&self) -> Result<Vec<RequestOption>, DbError> {
+    pub fn get_input_options(&self) -> Result<Vec<RequestInput>, DbError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT request_name, option_name, value, type FROM options;")?;
+            .prepare("SELECT request_name, option_name, value FROM input_options;")?;
 
         let opts = stmt.query_map(NO_PARAMS, |row| {
-            Ok(RequestOption {
+            Ok(RequestInput {
                 request_name: row.get(0)?,
                 option_name: row.get(1)?,
                 value: row.get(2)?,
-                option_type: row.get(3)?,
             })
         })?;
 
@@ -126,7 +136,7 @@ impl Db {
     pub fn get_unique_request_names_from_options(&self) -> Result<Vec<String>, DbError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT DISTINCT request_name FROM options;")?;
+            .prepare("SELECT DISTINCT request_name FROM input_options;")?;
 
         let req_names = stmt.query_map(NO_PARAMS, |row| Ok(row.get(0)?))?;
 
@@ -169,7 +179,7 @@ impl Db {
             ],
         )?;
         for var_name in req.get_variable_names()?.iter() {
-            self.create_option(RequestOption::from_variable(&req.name, var_name))?;
+            self.create_input_option(RequestInput::from_variable(&req.name, var_name))?;
         }
         Ok(())
     }
@@ -187,24 +197,23 @@ impl Db {
         )?;
         Ok(())
     }
-    pub fn create_option(&self, opt: RequestOption) -> Result<(), DbError> {
+    pub fn create_input_option(&self, opt: RequestInput) -> Result<(), DbError> {
         self.conn.execute(
-            "INSERT INTO options (request_name, option_name, value, type)
-                  VALUES (?1, ?2, ?3, ?4);",
+            "INSERT INTO input_options (request_name, option_name, value)
+                  VALUES (?1, ?2, ?3);",
             params![
                 opt.request_name,
                 opt.option_name,
                 opt.value,
-                opt.option_type,
             ],
         )?;
         Ok(())
     }
 
-    pub fn update_option(&self, opt: RequestOption) -> Result<(), DbError> {
+    pub fn update_input_option(&self, opt: RequestInput) -> Result<(), DbError> {
         let num = self.conn.execute(
-            "UPDATE options SET value = ?1 WHERE request_name = ?2 AND option_name = ?3 AND type = ?4;",
-            params![opt.value, opt.request_name, opt.option_name, opt.option_type])?;
+            "UPDATE input_options SET value = ?1 WHERE request_name = ?2 AND option_name = ?3;",
+            params![opt.value, opt.request_name, opt.option_name])?;
         if num == 0 {
             return Err(DbError::NotFound);
         }
@@ -213,7 +222,7 @@ impl Db {
 
     pub fn delete_request_by_name(&self, request: &str) -> Result<(), DbError> {
         self.conn.execute(
-            "DELETE FROM options WHERE request_name = ?1;",
+            "DELETE FROM input_options WHERE request_name = ?1;",
             params![request],
         )?;
         self.conn
@@ -267,12 +276,10 @@ pub struct Request {
     headers: Option<String>,
     body: Option<Vec<u8>>,
 }
-pub struct RequestOption {
+pub struct RequestInput {
     request_name: String,
     option_name: String,
     value: Option<String>,
-    // TODO: enum
-    option_type: String,
 }
 pub struct Variable {
     pub rowid: u32,
@@ -359,14 +366,14 @@ impl Request {
     }
     // TODO: return another type to ensure this does not get saved to the DB
     //       or used anywhere other than run
-    pub fn substitute_options(&mut self, opts: &Vec<RequestOption>) -> bool {
+    pub fn substitute_options(&mut self, opts: &Vec<RequestInput>) -> bool {
         // TODO: better replacement for all options
         //       this could result in some unexpected behavior
         //       will need to do a two pass approach:
         //          1. find all start/end indices
         //          2. iterate backwards to perform replacement
         // find all variables and replace with values in options
-        for opt in opts.iter().filter(|opt| opt.option_type() == "input") {
+        for opt in opts {
             if opt.value().is_none() {
                 // All input options are required
                 return false;
@@ -385,7 +392,7 @@ impl Request {
         }
         true
     }
-    pub fn has_option(&self, opt: &RequestOption) -> bool {
+    pub fn has_option(&self, opt: &RequestInput) -> bool {
         self.name == opt.request_name
     }
 
@@ -408,22 +415,20 @@ impl Request {
         self.body.take()
     }
 }
-impl RequestOption {
+impl RequestInput {
     pub fn new(
         req_name: &str,
         opt_name: &str,
         value: Option<String>,
-        opt_type: &str,
-    ) -> RequestOption {
-        RequestOption {
+    ) -> RequestInput {
+        RequestInput {
             request_name: String::from(req_name),
             option_name: String::from(opt_name),
             value,
-            option_type: String::from(opt_type),
         }
     }
-    pub fn from_variable(req_name: &str, var_name: &str) -> RequestOption {
-        RequestOption::new(req_name, var_name, None, "input")
+    pub fn from_variable(req_name: &str, var_name: &str) -> RequestInput {
+        RequestInput::new(req_name, var_name, None)
     }
 
     pub fn request_name(&self) -> &str {
@@ -431,9 +436,6 @@ impl RequestOption {
     }
     pub fn option_name(&self) -> &str {
         self.option_name.as_ref()
-    }
-    pub fn option_type(&self) -> &str {
-        self.option_type.as_ref()
     }
     pub fn value(&self) -> Option<&str> {
         match &self.value {
@@ -526,9 +528,9 @@ impl PrintableTable for Vec<Environment> {
         self.iter().map(|env| row![env.environment,]).collect()
     }
 }
-impl PrintableTable for Vec<RequestOption> {
+impl PrintableTable for Vec<RequestInput> {
     fn column_names(&self) -> prettytable::Row {
-        row!["request_name", "option_name", "value", "type"]
+        row!["request_name", "option_name", "value"]
     }
     fn rows(&self) -> Vec<prettytable::Row> {
         self.iter()
@@ -537,7 +539,6 @@ impl PrintableTable for Vec<RequestOption> {
                     opt.request_name,
                     opt.option_name,
                     opt.value.as_ref().unwrap_or(&String::from("")),
-                    opt.option_type,
                 ]
             })
             .collect()

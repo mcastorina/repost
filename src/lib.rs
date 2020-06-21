@@ -6,7 +6,7 @@ extern crate prettytable;
 
 use cmd::{Cmd, CmdError};
 use colored::*;
-use db::{Db, Environment, Request, RequestOption, Variable};
+use db::{Db, Environment, Request, RequestInput, Variable};
 use std::fs;
 use std::io::{self, prelude::*};
 
@@ -138,18 +138,12 @@ impl Repl {
         }
         Ok(())
     }
-    fn update_options(&self, opts: Vec<RequestOption>) -> Result<(), CmdError> {
-        // only input options should be updated
-        let opts: Vec<RequestOption> = opts
-            .into_iter()
-            .filter(|opt| opt.option_type() == "input")
-            .collect();
-
+    fn update_options(&self, opts: Vec<RequestInput>) -> Result<(), CmdError> {
         if self.environment.is_none() {
             // if the current environment is none, clear the value
             for mut opt in opts {
                 opt.update_value(None);
-                self.db.update_option(opt)?;
+                self.db.update_input_option(opt)?;
             }
         } else {
             // else set option.value according to the environment
@@ -171,16 +165,16 @@ impl Repl {
                 } else {
                     unreachable!();
                 }
-                self.db.update_option(opt)?;
+                self.db.update_input_option(opt)?;
             }
         }
         Ok(())
     }
     fn update_options_for_request(&self, request: &str) -> Result<(), CmdError> {
         // get all options for request
-        let opts: Vec<RequestOption> = self
+        let opts: Vec<RequestInput> = self
             .db
-            .get_options()?
+            .get_input_options()?
             .into_iter()
             .filter(|opt| opt.request_name() == request)
             .collect();
@@ -188,9 +182,9 @@ impl Repl {
     }
     fn update_options_for_variable(&self, variable: &str) -> Result<(), CmdError> {
         // get all opts where option_name == variable_name
-        let opts: Vec<RequestOption> = self
+        let opts: Vec<RequestInput> = self
             .db
-            .get_options()?
+            .get_input_options()?
             .into_iter()
             .filter(|opt| opt.option_name() == variable)
             .collect();
@@ -223,8 +217,8 @@ impl Repl {
         }
         Ok(result)
     }
-    fn get_options(&self) -> Result<Vec<RequestOption>, CmdError> {
-        let mut result = self.db.get_options()?;
+    fn get_input_options(&self) -> Result<Vec<RequestInput>, CmdError> {
+        let mut result = self.db.get_input_options()?;
         if let Some(req) = self.request() {
             result = result
                 .into_iter()
@@ -270,8 +264,8 @@ impl Repl {
             None => None,
         };
         // Set option only applies to input options
-        let opt = RequestOption::new(self.request().unwrap(), opt_name, value, "input");
-        self.db.update_option(opt)?;
+        let opt = RequestInput::new(self.request().unwrap(), opt_name, value);
+        self.db.update_input_option(opt)?;
         println!("{} => {}", opt_name, value_ref.unwrap_or("None"));
         Ok(())
     }

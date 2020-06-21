@@ -1,5 +1,5 @@
 use crate::cmd::{Cmd, CmdError};
-use crate::db::{Method, Request, RequestOption};
+use crate::db::{Method, Request, RequestInput};
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
 use colored::*;
@@ -23,7 +23,7 @@ impl ContextualCommand {
         // get options for this request
         let opts = repl
             .db
-            .get_options()?
+            .get_input_options()?
             .into_iter()
             .filter(|x| req.has_option(&x))
             .collect();
@@ -32,10 +32,6 @@ impl ContextualCommand {
         if !req.substitute_options(&opts) {
             return Err(CmdError::MissingOptions);
         }
-
-        let opts: Vec<RequestOption> = opts.into_iter()
-            .filter(|opt| opt.option_type() == "output")
-            .collect();
 
         let req = create_request(req)?;
         let quiet = matches.is_present("quiet");
@@ -81,14 +77,15 @@ impl ContextualCommand {
     }
 
     fn extract(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
-        if repl.request().is_none() {
-            return Err(CmdError::ArgsError(String::from("Extract is only available in a request specific context. Try setting a request first.")));
-        }
-        let request = repl.request().unwrap();
-        let path = String::from(matches.value_of("path").unwrap());
-        let var = matches.value_of("variable").unwrap();
-        let opt = RequestOption::new(request, var, Some(path), "output");
-        repl.db.create_option(opt)?;
+        // TODO
+        // if repl.request().is_none() {
+        //     return Err(CmdError::ArgsError(String::from("Extract is only available in a request specific context. Try setting a request first.")));
+        // }
+        // let request = repl.request().unwrap();
+        // let path = String::from(matches.value_of("path").unwrap());
+        // let var = matches.value_of("variable").unwrap();
+        // let opt = RequestInput::new(request, var, Some(path));
+        // repl.db.create_output_option(opt)?;
         Ok(())
     }
 }
