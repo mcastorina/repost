@@ -29,9 +29,13 @@ impl ContextualCommand {
             .collect();
         // do option substitution
         // TODO: return result with missing options
-        if !req.substitute_options(opts) {
+        if !req.substitute_options(&opts) {
             return Err(CmdError::MissingOptions);
         }
+
+        let opts: Vec<RequestOption> = opts.into_iter()
+            .filter(|opt| opt.option_type() == "output")
+            .collect();
 
         let req = create_request(req)?;
         let quiet = matches.is_present("quiet");
@@ -46,19 +50,33 @@ impl ContextualCommand {
         }
 
         let resp = blocking::Client::new().execute(req)?;
+
+        // output response code and headers
         if !quiet {
-            println!("{}", resp.status());
+            println!("< {}", resp.status());
             for header in resp.headers() {
                 let (name, value) = header;
                 println!("< {}: {}", name, value.to_str().unwrap());
             }
             println!();
         }
+
+        // output body with missing-newline indicator
         let text = resp.text()?;
         print!("{}", text);
         if !(&text).ends_with('\n') {
             println!("{}", "%".bold().reversed());
         }
+
+        // extract options into variables
+        for opt in opts {
+            // TODO: do not fail entire function
+        }
+
+        // output extractions
+        if !quiet {
+        }
+
         Ok(())
     }
 

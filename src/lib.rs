@@ -139,6 +139,12 @@ impl Repl {
         Ok(())
     }
     fn update_options(&self, opts: Vec<RequestOption>) -> Result<(), CmdError> {
+        // only input options should be updated
+        let opts: Vec<RequestOption> = opts
+            .into_iter()
+            .filter(|opt| opt.option_type() == "input")
+            .collect();
+
         if self.environment.is_none() {
             // if the current environment is none, clear the value
             for mut opt in opts {

@@ -191,7 +191,12 @@ impl Db {
         self.conn.execute(
             "INSERT INTO options (request_name, option_name, value, type)
                   VALUES (?1, ?2, ?3, ?4);",
-            params![opt.request_name, opt.option_name, opt.value, opt.option_type,],
+            params![
+                opt.request_name,
+                opt.option_name,
+                opt.value,
+                opt.option_type,
+            ],
         )?;
         Ok(())
     }
@@ -354,20 +359,20 @@ impl Request {
     }
     // TODO: return another type to ensure this does not get saved to the DB
     //       or used anywhere other than run
-    pub fn substitute_options(&mut self, opts: Vec<RequestOption>) -> bool {
+    pub fn substitute_options(&mut self, opts: &Vec<RequestOption>) -> bool {
         // TODO: better replacement for all options
         //       this could result in some unexpected behavior
         //       will need to do a two pass approach:
         //          1. find all start/end indices
         //          2. iterate backwards to perform replacement
         // find all variables and replace with values in options
-        for opt in opts.into_iter().filter(|opt| opt.option_type == "input") {
-            if opt.value.is_none() {
+        for opt in opts.iter().filter(|opt| opt.option_type() == "input") {
+            if opt.value().is_none() {
                 // All input options are required
                 return false;
             }
             let old = format!("{{{}}}", &opt.option_name);
-            let new = opt.value.unwrap();
+            let new = opt.value().unwrap();
             self.url = self.url.replace(&old, &new);
             if let Some(headers) = &self.headers {
                 self.headers = Some(headers.replace(&old, &new));
@@ -404,7 +409,12 @@ impl Request {
     }
 }
 impl RequestOption {
-    pub fn new(req_name: &str, opt_name: &str, value: Option<String>, opt_type: &str) -> RequestOption {
+    pub fn new(
+        req_name: &str,
+        opt_name: &str,
+        value: Option<String>,
+        opt_type: &str,
+    ) -> RequestOption {
         RequestOption {
             request_name: String::from(req_name),
             option_name: String::from(opt_name),
@@ -421,6 +431,15 @@ impl RequestOption {
     }
     pub fn option_name(&self) -> &str {
         self.option_name.as_ref()
+    }
+    pub fn option_type(&self) -> &str {
+        self.option_type.as_ref()
+    }
+    pub fn value(&self) -> Option<&str> {
+        match &self.value {
+            Some(x) => Some(x.as_str()),
+            None => None,
+        }
     }
 
     pub fn update_value(&mut self, val: Option<String>) {
