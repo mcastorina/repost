@@ -43,10 +43,16 @@ impl ContextualCommand {
         let quiet = matches.is_present("quiet");
 
         if !quiet {
-            println!("> {} {}", reqw.method(), reqw.url());
+            println!(
+                "{}",
+                format!("> {} {}", reqw.method(), reqw.url()).bright_black()
+            );
             for header in reqw.headers() {
                 let (name, value) = header;
-                println!("> {}: {}", name, value.to_str().unwrap());
+                println!(
+                    "{}",
+                    format!("> {}: {}", name, value.to_str().unwrap()).bright_black()
+                );
             }
             println!();
         }
@@ -55,10 +61,13 @@ impl ContextualCommand {
 
         // output response code and headers
         if !quiet {
-            println!("< {}", resp.status());
+            println!("{}", format!("< {}", resp.status()).bright_black());
             for header in resp.headers() {
                 let (name, value) = header;
-                println!("< {}: {}", name, value.to_str().unwrap());
+                println!(
+                    "{}",
+                    format!("< {}: {}", name, value.to_str().unwrap()).bright_black()
+                );
             }
             println!();
         }
@@ -71,9 +80,16 @@ impl ContextualCommand {
         // TODO: invoke $PAGER if length > $LINES
         // (note: $LINES and $COLUMNS are not exported by default)
         //       pretty print JSON
-        print!("{}", text);
-        if !(&text).ends_with('\n') {
-            println!("{}", "%".bold().reversed());
+
+        let v: Result<serde_json::Value, serde_json::Error> = serde_json::from_str(&text);
+        if v.is_ok() {
+            let v = v.unwrap();
+            println!("{}", serde_json::to_string_pretty(&v).unwrap());
+        } else {
+            print!("{}", text);
+            if !(&text).ends_with('\n') {
+                println!("{}", "%".bold().reversed());
+            }
         }
         if output_opts.len() > 0 {
             println!();
@@ -92,7 +108,10 @@ impl ContextualCommand {
             };
             var.source = Some(String::from(req.name()));
             if !quiet {
-                println!("{} => {}", var.name(), var.value().unwrap_or(""));
+                println!(
+                    "{}",
+                    format!("{} => {}", var.name(), var.value().unwrap_or("")).bright_black()
+                );
             }
             // TODO upsert
             repl.db.upsert_variable(var)?;

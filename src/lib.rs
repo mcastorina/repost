@@ -266,7 +266,10 @@ impl Repl {
         // Set option only applies to input options
         let opt = RequestInput::new(self.request().unwrap(), opt_name, value);
         self.db.update_input_option(opt)?;
-        println!("{} => {}", opt_name, value_ref.unwrap_or("None"));
+        println!(
+            "{}",
+            format!("{} => {}", opt_name, value_ref.unwrap_or("None")).bright_black()
+        );
         Ok(())
     }
 
