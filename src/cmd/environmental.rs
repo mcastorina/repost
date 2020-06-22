@@ -68,6 +68,8 @@ impl ContextualCommand {
         resp.copy_to(&mut text)?;
         let text = String::from_utf8(text).unwrap();
 
+        // TODO: invoke $PAGER if length > $COLUMNS * 80
+        //       pretty print JSON
         print!("{}", text);
         if !(&text).ends_with('\n') {
             println!("{}", "%".bold().reversed());
@@ -93,7 +95,7 @@ impl ContextualCommand {
             }
             // TODO upsert
             repl.db.create_variable(var)?;
-            repl.update_options_for_request(req.name());
+            repl.update_options_for_variable(opt.option_name())?;
         }
 
         Ok(())
@@ -115,7 +117,7 @@ impl ContextualCommand {
     }
 }
 
-fn create_request(mut req: &mut Request) -> Result<blocking::Request, CmdError> {
+fn create_request(req: &mut Request) -> Result<blocking::Request, CmdError> {
     // TODO: should this be a method of Request?
     let client = blocking::Client::new();
     let mut builder = match req.method() {
