@@ -68,7 +68,8 @@ impl ContextualCommand {
         resp.copy_to(&mut text)?;
         let text = String::from_utf8(text).unwrap();
 
-        // TODO: invoke $PAGER if length > $COLUMNS * 80
+        // TODO: invoke $PAGER if length > $LINES
+        // (note: $LINES and $COLUMNS are not exported by default)
         //       pretty print JSON
         print!("{}", text);
         if !(&text).ends_with('\n') {

@@ -1,9 +1,6 @@
 pub mod cmd;
 pub mod db;
 
-#[macro_use]
-extern crate prettytable;
-
 use cmd::{Cmd, CmdError};
 use colored::*;
 use db::{Db, Environment, Request, RequestInput, RequestOutput, Variable};

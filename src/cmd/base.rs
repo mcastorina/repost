@@ -2,7 +2,8 @@ use crate::cmd::{Cmd, CmdError};
 use crate::db::{Method, PrintableTable, Request, Variable};
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
-use prettytable::{format, Table};
+use comfy_table::{ContentArrangement, Table, TableComponent};
+use terminal_size::{terminal_size, Width};
 
 pub struct BaseCommand {}
 impl Cmd for BaseCommand {
@@ -131,17 +132,27 @@ impl BaseCommand {
     }
 
     fn print_table<T: PrintableTable>(t: T) -> Result<(), CmdError> {
+        // TODO: lazy static
+        let mut width = 80;
+        if let Some((Width(w), _)) = terminal_size() {
+            width = w;
+        }
         let mut table = Table::new();
-        table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-        table.get_format().indent(2);
+        table
+            .set_style(TableComponent::HeaderLines, '-')
+            .set_style(TableComponent::MiddleHeaderIntersections, '+')
+            .remove_style(TableComponent::HorizontalLines)
+            .remove_style(TableComponent::MiddleIntersections)
+            .remove_style(TableComponent::LeftBorderIntersections)
+            .remove_style(TableComponent::RightBorderIntersections)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_table_width(width);
 
-        table.set_titles(t.column_names());
+        table.set_header(t.column_names());
         for row in t.rows() {
             table.add_row(row);
         }
-        println!();
-        table.printstd();
-        println!();
+        println!("\n{}\n", table);
         Ok(())
     }
 }

@@ -1,4 +1,5 @@
 use chrono::Utc;
+use comfy_table::Cell;
 use regex::Regex;
 use rusqlite::{params, Connection, NO_PARAMS};
 
@@ -539,14 +540,21 @@ impl From<rusqlite::Error> for DbError {
     }
 }
 pub trait PrintableTable {
-    fn column_names(&self) -> prettytable::Row;
-    fn rows(&self) -> Vec<prettytable::Row>;
+    fn column_names(&self) -> Vec<Cell>;
+    // TODO: iterator
+    fn rows(&self) -> Vec<Vec<Cell>>;
 }
 impl PrintableTable for Vec<Request> {
-    fn column_names(&self) -> prettytable::Row {
-        row!["name", "method", "url", "headers", "body?"]
+    fn column_names(&self) -> Vec<Cell> {
+        vec![
+            Cell::new("name"),
+            Cell::new("method"),
+            Cell::new("url"),
+            Cell::new("headers"),
+            Cell::new("body?"),
+        ]
     }
-    fn rows(&self) -> Vec<prettytable::Row> {
+    fn rows(&self) -> Vec<Vec<Cell>> {
         self.iter()
             .map(|req| {
                 let has_body = {
@@ -556,74 +564,80 @@ impl PrintableTable for Vec<Request> {
                         "false"
                     }
                 };
-                row![
-                    req.name,
-                    req.method,
-                    req.url,
-                    req.headers.as_ref().unwrap_or(&String::from("")),
-                    has_body,
+                vec![
+                    Cell::new(&req.name),
+                    Cell::new(req.method.to_string()),
+                    Cell::new(&req.url),
+                    Cell::new(req.headers.as_ref().unwrap_or(&String::from(""))),
+                    Cell::new(has_body),
                 ]
             })
             .collect()
     }
 }
 impl PrintableTable for Vec<Variable> {
-    fn column_names(&self) -> prettytable::Row {
-        row![
-            "rowid",
-            "name",
-            "environment",
-            "value",
-            "source",
-            "timestamp"
+    fn column_names(&self) -> Vec<Cell> {
+        vec![
+            Cell::new("rowid"),
+            Cell::new("name"),
+            Cell::new("environment"),
+            Cell::new("value"),
+            Cell::new("source"),
+            Cell::new("timestamp"),
         ]
     }
-    fn rows(&self) -> Vec<prettytable::Row> {
+    fn rows(&self) -> Vec<Vec<Cell>> {
         self.iter()
             .map(|var| {
-                row![
-                    var.rowid,
-                    var.name,
-                    var.environment,
-                    var.value.as_ref().unwrap_or(&String::from("")),
-                    var.source.as_ref().unwrap_or(&String::from("")),
-                    var.timestamp.as_ref().unwrap_or(&String::from("")),
+                vec![
+                    Cell::new(var.rowid),
+                    Cell::new(&var.name),
+                    Cell::new(&var.environment),
+                    Cell::new(var.value.as_ref().unwrap_or(&String::from(""))),
+                    Cell::new(var.source.as_ref().unwrap_or(&String::from(""))),
+                    Cell::new(var.timestamp.as_ref().unwrap_or(&String::from(""))),
                 ]
             })
             .collect()
     }
 }
 impl PrintableTable for Vec<Environment> {
-    fn column_names(&self) -> prettytable::Row {
-        row!["environment"]
+    fn column_names(&self) -> Vec<Cell> {
+        vec![Cell::new("environment")]
     }
-    fn rows(&self) -> Vec<prettytable::Row> {
-        self.iter().map(|env| row![env.environment,]).collect()
+    fn rows(&self) -> Vec<Vec<Cell>> {
+        self.iter()
+            .map(|env| vec![Cell::new(&env.environment)])
+            .collect()
     }
 }
 impl PrintableTable for Vec<RequestInput> {
-    fn column_names(&self) -> prettytable::Row {
-        row!["request_name", "option_name", "value"]
+    fn column_names(&self) -> Vec<Cell> {
+        vec![
+            Cell::new("request_name"),
+            Cell::new("option_name"),
+            Cell::new("value"),
+        ]
     }
-    fn rows(&self) -> Vec<prettytable::Row> {
+    fn rows(&self) -> Vec<Vec<Cell>> {
         self.iter()
             .map(|opt| {
-                row![
-                    opt.request_name,
-                    opt.option_name,
-                    opt.value.as_ref().unwrap_or(&String::from("")),
+                vec![
+                    Cell::new(&opt.request_name),
+                    Cell::new(&opt.option_name),
+                    Cell::new(opt.value.as_ref().unwrap_or(&String::from(""))),
                 ]
             })
             .collect()
     }
 }
 impl PrintableTable for Vec<String> {
-    fn column_names(&self) -> prettytable::Row {
-        row![&self[0]]
+    fn column_names(&self) -> Vec<Cell> {
+        vec![Cell::new(&self[0])]
     }
-    fn rows(&self) -> Vec<prettytable::Row> {
+    fn rows(&self) -> Vec<Vec<Cell>> {
         let mut iter = self.iter();
         iter.next();
-        iter.map(|row| row![row]).collect()
+        iter.map(|row| vec![Cell::new(row)]).collect()
     }
 }
