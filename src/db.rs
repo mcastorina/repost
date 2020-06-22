@@ -215,6 +215,28 @@ impl Db {
         )?;
         Ok(())
     }
+    pub fn upsert_variable(&self, var: Variable) -> Result<(), DbError> {
+        let vars: Vec<Variable> = self
+            .get_variables()?
+            .into_iter()
+            .filter(|x| x == &var)
+            .collect();
+        if vars.len() >= 1 {
+            // update
+            self.conn.execute(
+                "UPDATE variables SET value = ?1, timestamp = ?2 WHERE rowid = ?3;",
+                params![
+                    var.value,
+                    format!("{}", Utc::now().format("%Y-%m-%d %T %Z")),
+                    vars[0].rowid,
+                ],
+            )?;
+        } else {
+            // create
+            self.create_variable(var)?;
+        }
+        Ok(())
+    }
     pub fn create_input_option(&self, opt: RequestInput) -> Result<(), DbError> {
         self.conn.execute(
             "INSERT INTO input_options (request_name, option_name, value)
@@ -639,5 +661,13 @@ impl PrintableTable for Vec<String> {
         let mut iter = self.iter();
         iter.next();
         iter.map(|row| vec![Cell::new(row)]).collect()
+    }
+}
+
+impl std::cmp::PartialEq for Variable {
+    fn eq(&self, other: &Variable) -> bool {
+        self.name == other.name &&
+        self.environment == other.environment &&
+        self.source == other.source
     }
 }

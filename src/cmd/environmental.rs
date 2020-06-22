@@ -95,7 +95,7 @@ impl ContextualCommand {
                 println!("{} => {}", var.name(), var.value().unwrap_or(""));
             }
             // TODO upsert
-            repl.db.create_variable(var)?;
+            repl.db.upsert_variable(var)?;
             repl.update_options_for_variable(opt.option_name())?;
         }
 
