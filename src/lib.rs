@@ -6,7 +6,10 @@ extern crate prettytable;
 
 use cmd::{Cmd, CmdError};
 use colored::*;
-use db::{Db, Environment, Request, RequestInput, Variable};
+use db::{Db, Environment, Request, RequestInput, RequestOutput, Variable};
+use regex::Regex;
+use reqwest::header::HeaderMap;
+use serde_json::Value;
 use std::fs;
 use std::io::{self, prelude::*};
 
@@ -269,4 +272,43 @@ impl Repl {
         println!("{} => {}", opt_name, value_ref.unwrap_or("None"));
         Ok(())
     }
+
+    fn body_to_var(&self, opt: &RequestOutput, body: &str) -> Result<Variable, CmdError> {
+        let value = get_json_value(body, opt.path());
+        Ok(Variable::new(
+            opt.option_name(),
+            self.environment().unwrap_or(""), // TODO: allow None environment for variable
+            value.as_str(),
+            None,
+        ))
+    }
+    fn hader_to_var(&self, opt: &RequestOutput, headers: &HeaderMap) -> Result<Variable, CmdError> {
+        let value = match headers.get(opt.path()) {
+            Some(x) => x.to_str().unwrap(),
+            None => "",
+        };
+        Ok(Variable::new(
+            opt.option_name(),
+            self.environment().unwrap_or(""), // TODO: allow None environment for variable
+            Some(value),
+            None,
+        ))
+    }
+}
+
+fn get_json_value(data: &str, query: &str) -> Value {
+    // TODO: Result
+    let mut v: Value = serde_json::from_str(data).unwrap();
+    let mut result: &mut Value = &mut v;
+
+    let re = Regex::new(r"\[(\d+)\]").unwrap();
+    for token in query.split(".") {
+        let name = token.splitn(2, "[").next().unwrap();
+        result = result.get_mut(name).unwrap();
+        for cap in re.captures_iter(token) {
+            let num: usize = cap[1].parse().unwrap();
+            result = result.get_mut(num).unwrap();
+        }
+    }
+    result.take()
 }

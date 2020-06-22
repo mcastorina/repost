@@ -133,6 +133,23 @@ impl Db {
         // TODO: print a warning for errors
         Ok(opts.filter_map(|opt| opt.ok()).collect())
     }
+    pub fn get_output_options(&self) -> Result<Vec<RequestOutput>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT request_name, option_name, extraction_source, extraction_path FROM output_options;")?;
+
+        let opts = stmt.query_map(NO_PARAMS, |row| {
+            Ok(RequestOutput {
+                request_name: row.get(0)?,
+                option_name: row.get(1)?,
+                extraction_source: row.get(2)?,
+                extraction_path: row.get(3)?,
+            })
+        })?;
+
+        // TODO: print a warning for errors
+        Ok(opts.filter_map(|opt| opt.ok()).collect())
+    }
     pub fn get_unique_request_names_from_options(&self) -> Result<Vec<String>, DbError> {
         let mut stmt = self
             .conn
@@ -201,10 +218,19 @@ impl Db {
         self.conn.execute(
             "INSERT INTO input_options (request_name, option_name, value)
                   VALUES (?1, ?2, ?3);",
+            params![opt.request_name, opt.option_name, opt.value,],
+        )?;
+        Ok(())
+    }
+    pub fn create_output_option(&self, opt: RequestOutput) -> Result<(), DbError> {
+        self.conn.execute(
+            "INSERT INTO output_options (request_name, option_name, extraction_source, extraction_path)
+                  VALUES (?1, ?2, ?3, ?4);",
             params![
                 opt.request_name,
                 opt.option_name,
-                opt.value,
+                opt.extraction_source,
+                opt.extraction_path,
             ],
         )?;
         Ok(())
@@ -213,7 +239,8 @@ impl Db {
     pub fn update_input_option(&self, opt: RequestInput) -> Result<(), DbError> {
         let num = self.conn.execute(
             "UPDATE input_options SET value = ?1 WHERE request_name = ?2 AND option_name = ?3;",
-            params![opt.value, opt.request_name, opt.option_name])?;
+            params![opt.value, opt.request_name, opt.option_name],
+        )?;
         if num == 0 {
             return Err(DbError::NotFound);
         }
@@ -280,6 +307,13 @@ pub struct RequestInput {
     request_name: String,
     option_name: String,
     value: Option<String>,
+}
+pub struct RequestOutput {
+    request_name: String, // get-token
+    option_name: String,  // token
+    // TODO: enum
+    extraction_source: String, // body
+    extraction_path: String,   // .access_token
 }
 pub struct Variable {
     pub rowid: u32,
@@ -392,9 +426,6 @@ impl Request {
         }
         true
     }
-    pub fn has_option(&self, opt: &RequestInput) -> bool {
-        self.name == opt.request_name
-    }
 
     pub fn name(&self) -> &str {
         self.name.as_ref()
@@ -416,11 +447,7 @@ impl Request {
     }
 }
 impl RequestInput {
-    pub fn new(
-        req_name: &str,
-        opt_name: &str,
-        value: Option<String>,
-    ) -> RequestInput {
+    pub fn new(req_name: &str, opt_name: &str, value: Option<String>) -> RequestInput {
         RequestInput {
             request_name: String::from(req_name),
             option_name: String::from(opt_name),
@@ -448,12 +475,58 @@ impl RequestInput {
         self.value = val;
     }
 }
+impl RequestOutput {
+    pub fn new(req_name: &str, opt_name: &str, ext_src: &str, ext_path: &str) -> RequestOutput {
+        RequestOutput {
+            request_name: String::from(req_name),
+            option_name: String::from(opt_name),
+            extraction_source: String::from(ext_src),
+            extraction_path: String::from(ext_path),
+        }
+    }
+    pub fn request_name(&self) -> &str {
+        self.request_name.as_ref()
+    }
+    pub fn option_name(&self) -> &str {
+        self.option_name.as_ref()
+    }
+    pub fn extraction_source(&self) -> &str {
+        self.extraction_source.as_ref()
+    }
+    pub fn path(&self) -> &str {
+        self.extraction_path.as_ref()
+    }
+}
 impl Variable {
+    pub fn new(name: &str, env: &str, value: Option<&str>, source: Option<&str>) -> Variable {
+        let value = match value {
+            Some(x) => Some(String::from(x)),
+            None => None,
+        };
+        let source = match source {
+            Some(x) => Some(String::from(x)),
+            None => None,
+        };
+        Variable {
+            rowid: 0,
+            name: String::from(name),
+            environment: String::from(env),
+            value,
+            source,
+            timestamp: None,
+        }
+    }
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
     pub fn environment(&self) -> &str {
         self.environment.as_ref()
+    }
+    pub fn value(&self) -> Option<&str> {
+        match &self.value {
+            Some(x) => Some(x.as_ref()),
+            None => None,
+        }
     }
     pub fn consume_value(&mut self) -> Option<String> {
         self.value.take()
