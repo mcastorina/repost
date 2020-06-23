@@ -1,5 +1,5 @@
 use crate::cmd::{BaseCommand, Cmd, CmdError};
-use crate::db::{RequestOutput};
+use crate::db::RequestOutput;
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
 

@@ -148,9 +148,9 @@ impl BaseCommand {
 
     fn print_table<T: PrintableTable>(t: T) -> Result<(), CmdError> {
         // TODO: lazy static
-        let mut width = 80;
+        let mut width = 76;
         if let Some((Width(w), _)) = terminal_size() {
-            width = w;
+            width = w - 4;
         }
         let mut table = Table::new();
         table
@@ -167,7 +167,13 @@ impl BaseCommand {
         for row in t.rows() {
             table.add_row(row);
         }
-        println!("\n{}\n", table);
+
+        println!();
+        for line in table.to_string().split('\n') {
+            println!("  {}", line);
+        }
+        println!();
+
         Ok(())
     }
     fn execute_run(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
