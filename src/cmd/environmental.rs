@@ -39,7 +39,7 @@ impl ContextualCommand {
             return Err(CmdError::MissingOptions);
         }
 
-        let reqw = create_request(&mut req)?;
+        let reqw = create_reqwest(&mut req)?;
         let quiet = matches.is_present("quiet");
 
         if !quiet {
@@ -97,7 +97,6 @@ impl ContextualCommand {
 
         // extract options into variables
         for opt in output_opts {
-            // TODO: do not fail entire function
             let mut var = match opt.extraction_source() {
                 "body" => repl.body_to_var(&opt, &text)?,
                 "header" => repl.hader_to_var(&opt, resp.headers())?,
@@ -113,7 +112,6 @@ impl ContextualCommand {
                     format!("{} => {}", var.name(), var.value().unwrap_or("")).bright_black()
                 );
             }
-            // TODO upsert
             repl.db.upsert_variable(var)?;
             repl.update_options_for_variable(opt.option_name())?;
         }
@@ -122,7 +120,6 @@ impl ContextualCommand {
     }
 
     fn extract(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
-        // TODO
         if repl.request().is_none() {
             return Err(CmdError::ArgsError(String::from("Extract is only available in a request specific context. Try setting a request first.")));
         }
@@ -137,7 +134,7 @@ impl ContextualCommand {
     }
 }
 
-fn create_request(req: &mut Request) -> Result<blocking::Request, CmdError> {
+fn create_reqwest(req: &mut Request) -> Result<blocking::Request, CmdError> {
     // TODO: should this be a method of Request?
     let client = blocking::Client::new();
     let mut builder = match req.method() {
