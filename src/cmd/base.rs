@@ -3,6 +3,7 @@ use crate::db::{Method, PrintableTable, Request, Variable};
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
 use comfy_table::{ContentArrangement, Table, TableComponent};
+use std::fs;
 use terminal_size::{terminal_size, Width};
 
 pub struct BaseCommand {}
@@ -54,7 +55,18 @@ impl BaseCommand {
         let url = matches.value_of("url").unwrap();
         let method: Option<Method>;
         // TODO
-        let body = matches.value_of("data").map(|b| b.as_bytes().to_vec());
+        let body = match matches.value_of("data") {
+            Some(x) => {
+                if x.starts_with('@') {
+                    let mut filename = x.chars();
+                    filename.next(); // discard @
+                    Some(fs::read(filename.collect::<String>())?)
+                } else {
+                    Some(x.as_bytes().to_vec())
+                }
+            }
+            None => None,
+        };
         let headers: Vec<(&str, &str)> = matches
             .values_of("headers")
             .unwrap_or_default()
