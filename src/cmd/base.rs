@@ -3,7 +3,7 @@ use crate::db::{Method, PrintableTable, Request, RequestOutput, Variable};
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
 use colored::*;
-use comfy_table::{ContentArrangement, Table, TableComponent};
+use comfy_table::{ContentArrangement, Table};
 use reqwest::blocking;
 use std::fs;
 use terminal_size::{terminal_size, Width};
@@ -154,12 +154,7 @@ impl BaseCommand {
         }
         let mut table = Table::new();
         table
-            .set_style(TableComponent::HeaderLines, '-')
-            .set_style(TableComponent::MiddleHeaderIntersections, '+')
-            .remove_style(TableComponent::HorizontalLines)
-            .remove_style(TableComponent::MiddleIntersections)
-            .remove_style(TableComponent::LeftBorderIntersections)
-            .remove_style(TableComponent::RightBorderIntersections)
+            .load_preset(crate::TABLE_FORMAT)
             .set_content_arrangement(ContentArrangement::Dynamic)
             .set_table_width(width);
 

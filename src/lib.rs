@@ -10,6 +10,8 @@ use serde_json::Value;
 use std::fs;
 use std::io::{self, prelude::*};
 
+const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
+
 pub struct Repl {
     prompt: String,
     workspace: String,

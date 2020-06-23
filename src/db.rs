@@ -296,7 +296,7 @@ pub enum Method {
     HEAD,
 }
 impl Method {
-    fn to_string(&self) -> &str {
+    pub fn to_string(&self) -> &str {
         match self {
             Method::GET => "GET",
             Method::POST => "POST",

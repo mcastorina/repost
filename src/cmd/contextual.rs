@@ -1,7 +1,8 @@
 use crate::cmd::{BaseCommand, Cmd, CmdError};
-use crate::db::RequestOutput;
+use crate::db::{RequestInput, RequestOutput};
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
+use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
 
 pub struct ContextualCommand {}
 impl Cmd for ContextualCommand {
@@ -10,6 +11,7 @@ impl Cmd for ContextualCommand {
         match matches.subcommand() {
             ("run", Some(matches)) => ContextualCommand::execute_run(repl, matches),
             ("extract", Some(matches)) => ContextualCommand::extract(repl, matches),
+            ("info", Some(matches)) => ContextualCommand::info(repl, matches),
             _ => Err(CmdError::NotFound),
         }
     }
@@ -34,6 +36,104 @@ impl ContextualCommand {
 
         let opt = RequestOutput::new(request, var, extraction_source, key);
         repl.db.create_output_option(opt)?;
+        Ok(())
+    }
+
+    fn info(repl: &mut Repl, _matches: &ArgMatches) -> Result<(), CmdError> {
+        if repl.request().is_none() {
+            return Err(CmdError::ArgsError(String::from("Info is only available in a request specific context. Try setting a request first.")));
+        }
+        let req = repl.request().unwrap();
+        // display request, input options, and output options
+        let req = repl.db.get_request(req)?;
+        // get options for this request
+        let input_opts: Vec<RequestInput> = repl
+            .db
+            .get_input_options()?
+            .into_iter()
+            .filter(|x| req.name() == x.request_name())
+            .collect();
+        let output_opts: Vec<RequestOutput> = repl
+            .db
+            .get_output_options()?
+            .into_iter()
+            .filter(|x| req.name() == x.request_name())
+            .collect();
+
+        // print request
+        let mut table = Table::new();
+        table
+            .load_preset("                   ")
+            .set_content_arrangement(ContentArrangement::Dynamic);
+
+        let has_body = {
+            if req.body().is_some() {
+                "true"
+            } else {
+                "false"
+            }
+        };
+
+        table.add_row(vec![
+            Cell::new("Name:").set_alignment(CellAlignment::Right),
+            Cell::new(req.name()),
+        ]);
+        table.add_row(vec![
+            Cell::new("Method:").set_alignment(CellAlignment::Right),
+            Cell::new(req.method().to_string()),
+        ]);
+        table.add_row(vec![
+            Cell::new("URL:").set_alignment(CellAlignment::Right),
+            Cell::new(req.url()),
+        ]);
+        table.add_row(vec![
+            Cell::new("Headers:").set_alignment(CellAlignment::Right),
+            Cell::new(req.headers().as_ref().unwrap_or(&String::from(""))),
+        ]);
+        table.add_row(vec![
+            Cell::new("Body?:").set_alignment(CellAlignment::Right),
+            Cell::new(has_body),
+        ]);
+        println!();
+        for line in table.to_string().split('\n') {
+            println!("  {}", line);
+        }
+        println!();
+
+        // print input options
+        if input_opts.len() > 0 {
+            let mut table = Table::new();
+            table
+                .load_preset(crate::TABLE_FORMAT)
+                .set_content_arrangement(ContentArrangement::Dynamic);
+            println!("  Input Options");
+            table.set_header(vec!["name", "current value"]);
+            for opt in input_opts {
+                table.add_row(vec![opt.option_name(), opt.value().unwrap_or("")]);
+            }
+            for line in table.to_string().split('\n') {
+                println!("  {}", line);
+            }
+            println!();
+        }
+
+        // print output options
+        if output_opts.len() > 0 {
+            let mut table = Table::new();
+            table
+                .load_preset(crate::TABLE_FORMAT)
+                .set_content_arrangement(ContentArrangement::Dynamic);
+            println!("  Output Options");
+            table.set_header(vec!["name", "type", "source"]);
+            for opt in output_opts {
+                table.add_row(vec![opt.option_name(), opt.extraction_source(), opt.path()]);
+            }
+            for line in table.to_string().split('\n') {
+                println!("  {}", line);
+            }
+            println!();
+        }
+
         Ok(())
     }
 }
@@ -87,5 +187,10 @@ fn clap_args() -> clap_v3::App<'static> {
                         .takes_value(true)
                         .required(true),
                 ),
+        )
+        .subcommand(
+            App::new("info")
+                .about("Print information about the current request")
+                .aliases(&["i"]),
         )
 }
