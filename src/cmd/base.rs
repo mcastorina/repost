@@ -47,7 +47,7 @@ impl Cmd for BaseCommand {
                 _ => unreachable!(),
             },
             ("run", Some(matches)) => BaseCommand::execute_run(repl, matches),
-            _ => unreachable!(),
+            _ => Err(CmdError::NotFound),
         }
     }
 }
@@ -341,7 +341,7 @@ fn clap_args() -> clap_v3::App<'static> {
     };
     let create_variable = App::new("variable")
         .about("Create a variable")
-        .aliases(&["var", "v"])
+        .visible_aliases(&["var", "v"])
         .arg("<name> 'Name of the variable'")
         .arg(
             Arg::with_name("environment=value")
@@ -352,7 +352,7 @@ fn clap_args() -> clap_v3::App<'static> {
         );
     let create_request = App::new("request")
         .about("Create an HTTP request")
-        .aliases(&["req", "r"])
+        .visible_aliases(&["req", "r"])
         .arg("<name> 'Name of the request'")
         .arg("<url> 'HTTP request URL'")
         .arg(
@@ -373,31 +373,31 @@ fn clap_args() -> clap_v3::App<'static> {
         .arg("-d, --data=[DATA] 'HTTP request body'");
     let show_requests = App::new("requests")
         .about("Print requests")
-        .aliases(&["request", "reqs", "req", "r"]);
+        .visible_aliases(&["request", "reqs", "req", "r"]);
     let show_variables = App::new("variables")
         .about("Print variables")
-        .aliases(&["variable", "vars", "var", "v"]);
+        .visible_aliases(&["variable", "vars", "var", "v"]);
     let show_environments = App::new("environments")
         .about("Print environments")
-        .aliases(&["environment", "envs", "env", "e"]);
+        .visible_aliases(&["environment", "envs", "env", "e"]);
     let show_options = App::new("options")
         .about("Print options")
-        .aliases(&["option", "opts", "opt", "o"]);
+        .visible_aliases(&["option", "opts", "opt", "o"]);
     let show_workspaces =
         App::new("workspaces")
             .about("Print workspaces")
-            .aliases(&["workspace", "ws", "w"]);
+            .visible_aliases(&["workspace", "ws", "w"]);
     let set_environment = App::new("environment")
         .about("Set the environment as used for variable substitution")
-        .aliases(&["env", "e"])
+        .visible_aliases(&["env", "e"])
         .arg("[environment] 'Environment to use'");
     let set_request = App::new("request")
         .about("Set the request to view and modify specific options")
-        .aliases(&["req", "r"])
+        .visible_aliases(&["req", "r"])
         .arg("[request] 'Request to use'");
     let set_workspace = App::new("workspace")
         .about("Set the workspace where all data is stored")
-        .aliases(&["ws", "w"])
+        .visible_aliases(&["ws", "w"])
         .arg(
             Arg::with_name("workspace")
                 .help("Workspace to use")
@@ -406,7 +406,7 @@ fn clap_args() -> clap_v3::App<'static> {
         );
     let set_option = App::new("option")
         .about("Set the request specific options")
-        .aliases(&["opt", "o"])
+        .visible_aliases(&["opt", "o"])
         .arg(
             Arg::with_name("option")
                 .help("Option to set")
@@ -415,7 +415,7 @@ fn clap_args() -> clap_v3::App<'static> {
         .arg(Arg::with_name("value").help("Option value"));
     let delete_requests = App::new("requests")
         .about("Delete the named HTTP requests")
-        .aliases(&["request", "reqs", "req", "r"])
+        .visible_aliases(&["request", "reqs", "req", "r"])
         .arg(
             Arg::with_name("request")
                 .help("Request to delete")
@@ -424,7 +424,7 @@ fn clap_args() -> clap_v3::App<'static> {
         );
     let delete_variables = App::new("variables")
         .about("Delete the named variables")
-        .aliases(&["variable", "vars", "var", "v"])
+        .visible_aliases(&["variable", "vars", "var", "v"])
         .arg(
             Arg::with_name("variable")
                 .help("Variable to delete")
@@ -434,11 +434,13 @@ fn clap_args() -> clap_v3::App<'static> {
     App::new("repost")
         .setting(AppSettings::NoBinaryName)
         .setting(AppSettings::DisableVersion)
+        .setting(AppSettings::VersionlessSubcommands)
         .subcommand(
             App::new("create")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
+                .setting(AppSettings::VersionlessSubcommands)
                 .about("Create an HTTP request or variable")
-                .aliases(&["new", "c"])
+                .visible_aliases(&["new", "add", "c"])
                 .subcommand(create_request)
                 .subcommand(create_variable),
         )
@@ -446,8 +448,9 @@ fn clap_args() -> clap_v3::App<'static> {
             // TODO: use subcommand for show_requests show_variables show_environments
             App::new("show")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
+                .setting(AppSettings::VersionlessSubcommands)
                 .about("Print resources")
-                .aliases(&["get", "print", "g", "p"])
+                .visible_aliases(&["get", "print", "g", "p"])
                 .subcommand(show_requests)
                 .subcommand(show_variables)
                 .subcommand(show_environments)
@@ -457,8 +460,9 @@ fn clap_args() -> clap_v3::App<'static> {
         .subcommand(
             App::new("set")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
-                .about("Set workspace, environment, or request for environment specific commands")
-                .aliases(&["use", "load", "u"])
+                .setting(AppSettings::VersionlessSubcommands)
+                .about("Set workspace, environment, or request for contextual commands")
+                .visible_aliases(&["use", "load", "u"])
                 .subcommand(set_workspace)
                 .subcommand(set_environment)
                 .subcommand(set_request)
@@ -467,15 +471,16 @@ fn clap_args() -> clap_v3::App<'static> {
         .subcommand(
             App::new("delete")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
+                .setting(AppSettings::VersionlessSubcommands)
                 .about("Delete named requests or variables")
-                .aliases(&["remove", "del", "rm"])
+                .visible_aliases(&["remove", "del", "rm"])
                 .subcommand(delete_requests)
                 .subcommand(delete_variables),
         )
         .subcommand(
             App::new("run")
                 .about("Run a named HTTP request")
-                .aliases(&["r"])
+                .visible_aliases(&["r"])
                 .arg(
                     Arg::with_name("request")
                         .help("Request to run")

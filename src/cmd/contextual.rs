@@ -144,10 +144,12 @@ fn clap_args() -> clap_v3::App<'static> {
         .setting(AppSettings::NoBinaryName)
         .setting(AppSettings::DisableVersion)
         .setting(AppSettings::DisableHelpSubcommand)
+        .setting(AppSettings::VersionlessSubcommands)
+        .setting(AppSettings::AllowExternalSubcommands)
         .subcommand(
             App::new("run")
                 .about("Run a named HTTP request")
-                .aliases(&["r"])
+                .visible_aliases(&["r"])
                 // TODO
                 // .arg(
                 //     Arg::with_name("request")
@@ -167,7 +169,7 @@ fn clap_args() -> clap_v3::App<'static> {
         .subcommand(
             App::new("extract")
                 .about("Extract data from the output of a request")
-                .aliases(&["ex"])
+                .visible_aliases(&["ex"])
                 .arg(
                     Arg::with_name("type")
                         .help("Body or header extraction")
@@ -191,6 +193,6 @@ fn clap_args() -> clap_v3::App<'static> {
         .subcommand(
             App::new("info")
                 .about("Print information about the current request")
-                .aliases(&["i"]),
+                .visible_aliases(&["i"]),
         )
 }
