@@ -39,6 +39,7 @@ impl Cmd for BaseCommand {
                     matches.value_of("option").unwrap(),
                     matches.value_of("value"),
                 ),
+                ("variable", Some(matches)) => BaseCommand::set_variable(repl, matches),
                 _ => unreachable!(),
             },
             ("delete", Some(matches)) => match matches.subcommand() {
@@ -116,6 +117,36 @@ impl BaseCommand {
             // TODO: create a new variable function
             let (environment, value) = env_val;
             repl.db.create_variable(Variable {
+                rowid: 0,
+                name: String::from(name),
+                environment,
+                value: Some(value),
+                source: Some(String::from("user")),
+                timestamp: None,
+            })?;
+        }
+        repl.update_options_for_variable(&name)?;
+        Ok(())
+    }
+    fn set_variable(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
+        let name = matches.value_of("name").unwrap();
+        let env_vals: Vec<(String, String)> = matches
+            .values_of("environment=value")
+            .unwrap()
+            .map(|s| {
+                let mut items = s.splitn(2, "=");
+                // We can unwrap because this argument is guaranteed to have one '='
+                (
+                    String::from(items.next().unwrap()),
+                    String::from(items.next().unwrap()),
+                )
+            })
+            .collect();
+
+        for env_val in env_vals {
+            // TODO: create a new variable function
+            let (environment, value) = env_val;
+            repl.db.upsert_variable(Variable {
                 rowid: 0,
                 name: String::from(name),
                 environment,
@@ -413,6 +444,17 @@ fn clap_args() -> clap_v3::App<'static> {
                 .required(true),
         )
         .arg(Arg::with_name("value").help("Option value"));
+    let set_variable = App::new("variable")
+        .about("Update or create variable values")
+        .visible_aliases(&["var", "v"])
+        .arg("<name> 'Name of the variable'")
+        .arg(
+            Arg::with_name("environment=value")
+                .help("Value for environment")
+                .required(true)
+                .validator(contains_equal)
+                .multiple(true),
+        );
     let delete_requests = App::new("requests")
         .about("Delete the named HTTP requests")
         .visible_aliases(&["request", "reqs", "req", "r"])
@@ -466,7 +508,8 @@ fn clap_args() -> clap_v3::App<'static> {
                 .subcommand(set_workspace)
                 .subcommand(set_environment)
                 .subcommand(set_request)
-                .subcommand(set_option),
+                .subcommand(set_option)
+                .subcommand(set_variable),
         )
         .subcommand(
             App::new("delete")

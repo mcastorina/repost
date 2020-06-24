@@ -224,10 +224,11 @@ impl Db {
         if vars.len() >= 1 {
             // update
             self.conn.execute(
-                "UPDATE variables SET value = ?1, timestamp = ?2 WHERE rowid = ?3;",
+                "UPDATE variables SET value = ?1, timestamp = ?2, source = ?3 WHERE rowid = ?4;",
                 params![
                     var.value,
                     format!("{}", Utc::now().format("%Y-%m-%d %T %Z")),
+                    var.source,
                     vars[0].rowid,
                 ],
             )?;
@@ -273,6 +274,10 @@ impl Db {
     pub fn delete_request_by_name(&self, request: &str) -> Result<(), DbError> {
         self.conn.execute(
             "DELETE FROM input_options WHERE request_name = ?1;",
+            params![request],
+        )?;
+        self.conn.execute(
+            "DELETE FROM output_options WHERE request_name = ?1;",
             params![request],
         )?;
         self.conn
@@ -600,24 +605,24 @@ impl PrintableTable for Vec<Request> {
 impl PrintableTable for Vec<Variable> {
     fn column_names(&self) -> Vec<Cell> {
         vec![
-            Cell::new("rowid"),
+            // Cell::new("rowid"),
             Cell::new("name"),
             Cell::new("environment"),
             Cell::new("value"),
             Cell::new("source"),
-            Cell::new("timestamp"),
+            // Cell::new("timestamp"),
         ]
     }
     fn rows(&self) -> Vec<Vec<Cell>> {
         self.iter()
             .map(|var| {
                 vec![
-                    Cell::new(var.rowid),
+                    // Cell::new(var.rowid),
                     Cell::new(&var.name),
                     Cell::new(&var.environment),
                     Cell::new(var.value.as_ref().unwrap_or(&String::from(""))),
                     Cell::new(var.source.as_ref().unwrap_or(&String::from(""))),
-                    Cell::new(var.timestamp.as_ref().unwrap_or(&String::from(""))),
+                    // Cell::new(var.timestamp.as_ref().unwrap_or(&String::from(""))),
                 ]
             })
             .collect()
@@ -668,6 +673,6 @@ impl std::cmp::PartialEq for Variable {
     fn eq(&self, other: &Variable) -> bool {
         self.name == other.name
             && self.environment == other.environment
-            && self.source == other.source
+            // && self.source == other.source
     }
 }

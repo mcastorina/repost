@@ -3,6 +3,7 @@ use crate::db::{RequestInput, RequestOutput};
 use crate::Repl;
 use clap_v3::{App, AppSettings, Arg, ArgMatches};
 use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
+use terminal_size::{terminal_size, Width};
 
 pub struct ContextualCommand {}
 impl Cmd for ContextualCommand {
@@ -60,11 +61,16 @@ impl ContextualCommand {
             .filter(|x| req.name() == x.request_name())
             .collect();
 
+        let mut width = 76;
+        if let Some((Width(w), _)) = terminal_size() {
+            width = w - 4;
+        }
         // print request
         let mut table = Table::new();
         table
             .load_preset("                   ")
-            .set_content_arrangement(ContentArrangement::Dynamic);
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_table_width(width);
 
         let has_body = {
             if req.body().is_some() {
@@ -105,7 +111,8 @@ impl ContextualCommand {
             let mut table = Table::new();
             table
                 .load_preset(crate::TABLE_FORMAT)
-                .set_content_arrangement(ContentArrangement::Dynamic);
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_table_width(width);
             println!("  Input Options");
             table.set_header(vec!["name", "current value"]);
             for opt in input_opts {
@@ -122,7 +129,8 @@ impl ContextualCommand {
             let mut table = Table::new();
             table
                 .load_preset(crate::TABLE_FORMAT)
-                .set_content_arrangement(ContentArrangement::Dynamic);
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_table_width(width);
             println!("  Output Options");
             table.set_header(vec!["output variable", "type", "source"]);
             for opt in output_opts {
