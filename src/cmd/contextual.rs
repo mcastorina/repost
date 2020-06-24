@@ -124,7 +124,7 @@ impl ContextualCommand {
                 .load_preset(crate::TABLE_FORMAT)
                 .set_content_arrangement(ContentArrangement::Dynamic);
             println!("  Output Options");
-            table.set_header(vec!["name", "type", "source"]);
+            table.set_header(vec!["output variable", "type", "source"]);
             for opt in output_opts {
                 table.add_row(vec![opt.option_name(), opt.extraction_source(), opt.path()]);
             }
