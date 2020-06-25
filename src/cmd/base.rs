@@ -287,7 +287,7 @@ impl BaseCommand {
         for opt in output_opts {
             let var = match opt.extraction_source() {
                 "body" => repl.body_to_var(&opt, &text),
-                "header" => repl.hader_to_var(&opt, resp.headers()),
+                "header" => repl.header_to_var(&opt, resp.headers()),
                 x => {
                     println!("Encountered unexpected source: {}", x);
                     continue;

@@ -284,13 +284,13 @@ impl Repl {
             None,
         ))
     }
-    fn hader_to_var(&self, opt: &RequestOutput, headers: &HeaderMap) -> Result<Variable, CmdError> {
+    fn header_to_var(&self, opt: &RequestOutput, headers: &HeaderMap) -> Result<Variable, CmdError> {
         let value = match headers.get(opt.path()) {
             Some(x) => Some(x.to_str().unwrap()),
             None => None,
         };
         if value.is_none() {
-            return Err(CmdError::NotFound);
+            return Err(CmdError::ParseError);
         }
         Ok(Variable::new(
             opt.option_name(),
