@@ -671,8 +671,7 @@ impl PrintableTable for Vec<String> {
 
 impl std::cmp::PartialEq for Variable {
     fn eq(&self, other: &Variable) -> bool {
-        self.name == other.name
-            && self.environment == other.environment
-            // && self.source == other.source
+        self.name == other.name && self.environment == other.environment
+        // && self.source == other.source
     }
 }

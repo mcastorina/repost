@@ -285,14 +285,19 @@ impl BaseCommand {
 
         // extract options into variables
         for opt in output_opts {
-            let mut var = match opt.extraction_source() {
-                "body" => repl.body_to_var(&opt, &text)?,
-                "header" => repl.hader_to_var(&opt, resp.headers())?,
+            let var = match opt.extraction_source() {
+                "body" => repl.body_to_var(&opt, &text),
+                "header" => repl.hader_to_var(&opt, resp.headers()),
                 x => {
                     println!("Encountered unexpected source: {}", x);
                     continue;
                 }
             };
+            if let Err(x) = var {
+                println!("[!] {}", x);
+                continue;
+            }
+            let mut var = var.unwrap_or_else(|_| unreachable!());
             var.source = Some(String::from(req.name()));
             if !quiet {
                 println!(
@@ -414,10 +419,9 @@ fn clap_args() -> clap_v3::App<'static> {
     let show_options = App::new("options")
         .about("Print options")
         .visible_aliases(&["option", "opts", "opt", "o"]);
-    let show_workspaces =
-        App::new("workspaces")
-            .about("Print workspaces")
-            .visible_aliases(&["workspace", "ws", "w"]);
+    let show_workspaces = App::new("workspaces")
+        .about("Print workspaces")
+        .visible_aliases(&["workspace", "ws", "w"]);
     let set_environment = App::new("environment")
         .about("Set the environment as used for variable substitution")
         .visible_aliases(&["env", "e"])

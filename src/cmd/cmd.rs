@@ -11,6 +11,7 @@ pub enum CmdError {
     NotFound,
     NotImplemented,
     MissingOptions,
+    ParseError,
 }
 
 pub trait Cmd {
@@ -34,6 +35,7 @@ impl std::fmt::Display for CmdError {
                 f,
                 "Could not send the request due to missing input options."
             ),
+            CmdError::ParseError => write!(f, "There was an error during parsing."),
         }
     }
 }
@@ -53,6 +55,7 @@ impl From<CmdError> for String {
             CmdError::MissingOptions => {
                 String::from("Could not send the request due to missing input options.")
             }
+            CmdError::ParseError => String::from("There was an error during parsing."),
         }
     }
 }

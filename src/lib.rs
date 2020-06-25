@@ -276,7 +276,7 @@ impl Repl {
     }
 
     fn body_to_var(&self, opt: &RequestOutput, body: &str) -> Result<Variable, CmdError> {
-        let value = get_json_value(body, opt.path());
+        let value = get_json_value(body, opt.path())?;
         Ok(Variable::new(
             opt.option_name(),
             self.environment().unwrap_or(""), // TODO: allow None environment for variable
@@ -286,31 +286,58 @@ impl Repl {
     }
     fn hader_to_var(&self, opt: &RequestOutput, headers: &HeaderMap) -> Result<Variable, CmdError> {
         let value = match headers.get(opt.path()) {
-            Some(x) => x.to_str().unwrap(),
-            None => "",
+            Some(x) => Some(x.to_str().unwrap()),
+            None => None,
         };
+        if value.is_none() {
+            return Err(CmdError::NotFound);
+        }
         Ok(Variable::new(
             opt.option_name(),
             self.environment().unwrap_or(""), // TODO: allow None environment for variable
-            Some(value),
+            value,
             None,
         ))
     }
 }
 
-fn get_json_value(data: &str, query: &str) -> Value {
+fn get_json_value(data: &str, query: &str) -> Result<Value, CmdError> {
     // TODO: Result
-    let mut v: Value = serde_json::from_str(data).unwrap();
+    let mut v: Value = serde_json::from_str(data)?;
     let mut result: &mut Value = &mut v;
 
-    let re = Regex::new(r"\[(\d+)\]").unwrap();
+    let re = Regex::new(r"\[(\d+)\]")?;
     for token in query.split(".") {
         let name = token.splitn(2, "[").next().unwrap();
-        result = result.get_mut(name).unwrap();
+        let mr = result.get_mut(name);
+        if mr.is_none() {
+            return Err(CmdError::ParseError);
+        }
+        result = mr.unwrap();
         for cap in re.captures_iter(token) {
-            let num: usize = cap[1].parse().unwrap();
-            result = result.get_mut(num).unwrap();
+            let num: usize = cap[1].parse()?;
+            let mr = result.get_mut(num);
+            if mr.is_none() {
+                return Err(CmdError::ParseError);
+            }
+            result = mr.unwrap();
         }
     }
-    result.take()
+    Ok(result.take())
+}
+
+impl From<serde_json::Error> for CmdError {
+    fn from(_err: serde_json::Error) -> CmdError {
+        CmdError::ParseError
+    }
+}
+impl From<regex::Error> for CmdError {
+    fn from(_err: regex::Error) -> CmdError {
+        CmdError::ParseError
+    }
+}
+impl From<std::num::ParseIntError> for CmdError {
+    fn from(_err: std::num::ParseIntError) -> CmdError {
+        CmdError::ParseError
+    }
 }
