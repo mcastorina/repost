@@ -10,6 +10,7 @@ pub enum DbError {
 pub struct Db {
     conn: Connection,
 }
+// TODO: organize this code
 impl Db {
     pub fn new(path: &str) -> Result<Db, DbError> {
         let db = Db {
@@ -288,6 +289,16 @@ impl Db {
     pub fn delete_variable_by_name(&self, variable: &str) -> Result<(), DbError> {
         self.conn
             .execute("DELETE FROM variables WHERE name = ?1;", params![variable])?;
+        Ok(())
+    }
+    pub fn delete_input_option_by_name(&self, request_name: &str, option_name: &str) -> Result<(), DbError> {
+        self.conn
+            .execute("DELETE FROM input_options WHERE request_name = ?1 AND option_name = ?2;", params![request_name, option_name])?;
+        Ok(())
+    }
+    pub fn delete_output_option_by_name(&self, request_name: &str, option_name: &str) -> Result<(), DbError> {
+        self.conn
+            .execute("DELETE FROM output_options WHERE request_name = ?1 AND option_name = ?2;", params![request_name, option_name])?;
         Ok(())
     }
 }

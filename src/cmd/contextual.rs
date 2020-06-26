@@ -13,6 +13,10 @@ impl Cmd for ContextualCommand {
             ("run", Some(matches)) => ContextualCommand::execute_run(repl, matches),
             ("extract", Some(matches)) => ContextualCommand::extract(repl, matches),
             ("info", Some(matches)) => ContextualCommand::info(repl, matches),
+            ("delete", Some(matches)) => match matches.subcommand() {
+                ("options", Some(matches)) => ContextualCommand::delete_options(repl, matches),
+                _ => Err(CmdError::NotFound)
+            },
             _ => Err(CmdError::NotFound),
         }
     }
@@ -144,10 +148,38 @@ impl ContextualCommand {
 
         Ok(())
     }
+
+    fn delete_options(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
+        if repl.request().is_none() {
+            return Err(CmdError::ArgsError(String::from("Delete option is only available in a request specific context. Try setting a request first.")));
+        }
+        let request = repl.request().unwrap();
+        let options: Vec<&str> = matches.values_of("option").unwrap().collect();
+        for option in options {
+            // TODO: notify when not found
+            // TODO: flag for input or output option
+            repl.db.delete_input_option_by_name(request, option)?;
+            repl.db.delete_output_option_by_name(request, option)?;
+        }
+        Ok(())
+    }
 }
 
 fn clap_args() -> clap_v3::App<'static> {
     // TODO: can this be a sinlge static clap_v3::App variable?
+    let delete_options = App::new("options")
+        .setting(AppSettings::DisableVersion)
+        .setting(AppSettings::DisableHelpSubcommand)
+        .setting(AppSettings::VersionlessSubcommands)
+        .setting(AppSettings::AllowExternalSubcommands)
+        .about("Delete input or output options")
+        .visible_aliases(&["option", "opts", "opt", "o"])
+        .arg(
+            Arg::with_name("option")
+                .help("Option to delete")
+                .required(true)
+                .multiple(true),
+        );
     App::new("repost")
         .setting(AppSettings::NoBinaryName)
         .setting(AppSettings::DisableVersion)
@@ -202,5 +234,14 @@ fn clap_args() -> clap_v3::App<'static> {
             App::new("info")
                 .about("Print information about the current request")
                 .visible_aliases(&["i"]),
+        )
+        .subcommand(
+            App::new("delete")
+                .setting(AppSettings::VersionlessSubcommands)
+                .setting(AppSettings::DisableHelpSubcommand)
+                .setting(AppSettings::NoAutoHelp)
+                .about("Delete named requests or variables")
+                .visible_aliases(&["remove", "del", "rm"])
+                .subcommand(delete_options),
         )
 }
