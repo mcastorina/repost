@@ -32,6 +32,7 @@ impl Db {
             NO_PARAMS,
         )?;
 
+        // TODO: multiple of the same variable name / environment
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS variables (
                   rowid           INTEGER PRIMARY KEY,
@@ -39,7 +40,8 @@ impl Db {
                   environment     TEXT NOT NULL,
                   value           TEXT,
                   source          TEXT,
-                  timestamp       TEXT
+                  timestamp       TEXT,
+                  UNIQUE(name, environment)
               )",
             NO_PARAMS,
         )?;
