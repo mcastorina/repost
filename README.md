@@ -1,10 +1,10 @@
 # repost
-`repost` is a tool to easily define and send HTTP requests.
+`repost` is an interpreter to easily define and send HTTP requests for multiple environments.
 
 ## Usage
 Repost utilizes an interpreter environment to make creating and
-sending requests easier. Repost has context specific commands and
-you can always see which environment or request you are editing
+sending requests easier. Repost has context specific commands, and
+you can always see which environment or request you are using
 from the command prompt.
 
 Execute `repost` to start the session. All information is saved in
@@ -122,40 +122,47 @@ id => abcde
 ```
 
 ## Design
-There are two main resources managed in `repost`: **requests** and **variables**.
+In general, repost simplifies this flow:
+```
+(modify input) -> (send request) -> (extract output)
+```
 
-### Requests
-A "request" is referring to a single named HTTP request. It has the following attributes:
+Each request has **input options** and **output options**. Input
+options are defined when creating the request by using `{name}` -- they
+can be used anywhere in the url, headers, or body. The name inside
+the `{}` correlates to a variable, and the option will automatically be
+populated if the variable exists for the current environment. Output options
+are added as **extractors**. Extractors will extract a header value
+or a part of a JSON body and save it in a variable.
 
-* **Name:** The name of the request
-* **Method:** HTTP method (GET, POST, etc.)
-* **URL:** The target of the HTTP request
-* **Headers:** HTTP request headers
-* **Body:** HTTP request body (optional)
-* **Variables:** Internally managed list of variables used in this request
 
-The most interesting here is **variables**. Variables can be used
-in any part of the request (except name and method) and are denoted using
-`{variable_name}` (e.g. **URL:** `{host}/health`).
+## Features
 
-### Variables
-A "variable" is a way to parameterize a request. It has the following attributes:
+| Status             | Feature description                              |
+|:------------------:|--------------------------------------------------|
+| :white_check_mark: | create request / variable                        |
+| :white_check_mark: | show tables with formatting                      |
+| :white_check_mark: | run request                                      |
+| :white_check_mark: | input option substitution                        |
+| :white_check_mark: | output option extraction                         |
+| :white_check_mark: | automatically set input option to variable value |
+| :white_check_mark: | edit variable                                    |
+| :soon:             | edit request                                     |
+| :soon:             | tab completion                                   |
+|                    | extract from all items in an array               |
+|                    | extract from other data formats                  |
+|                    | option to hide variable values                   |
+|                    | run flags                                        |
+|                    | clipboard integration                            |
+|                    | create request from curl command                 |
+|                    | save responses                                   |
+|                    | search command                                   |
+| :question:         | variable generation                              |
+| :question:         | dependency graph                                 |
+|                    | global environment                               |
+|                    | color requests that have all options satisfied   |
 
-* **Name:** The name of the variable
-* **Value:** A list of possible values to pull from (see below for explanation)
-* **Generator:** The way to generate the value for this variable
-
-As stated above, **values** are a list of possible values to use.
-One of the key features of `repost` is to easily send the same
-requests to different environments. This is done using variables
-with environment specific values. Environments are user defined,
-and `repost` aims to provide tools to clearly see what variables
-are required for requests and whether they are satisfied for certain
-environments.
-
-The **generator** defines how to generate the value for the variable.
-There are three types of generators:
-
-* **Constant Generator:** Constant, environment specific values
-* **Script Generator:** Generated via shell script
-* **Request Generator:** Generated via another `repost` request (in the same environment)
+* :white_check_mark: -- In master
+* :soon: -- In progress
+* :question: -- Might not happen
+* Blank -- Rough idea
