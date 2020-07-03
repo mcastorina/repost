@@ -1,6 +1,6 @@
 RM := rm -f
 
-RS_FILES := $(shell find src -name '*.rs')
+RS_FILES := $(shell find src -type f)
 .DEFAULT_GOAL := build
 
 .PHONY: check
