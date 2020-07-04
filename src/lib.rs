@@ -28,45 +28,16 @@ pub struct Repl {
     db: Db,
     environment: Option<String>,
     request: Option<String>,
+    line_reader: Editor<ReplHelper>,
 }
 
 impl Repl {
     pub fn new() -> Result<Repl, CmdError> {
-        let mut repl = Repl {
-            prompt: String::from("[repost]"),
-            workspace: String::from("repost"),
-            db: Db::new("repost.db")?,
-            environment: None,
-            request: None,
-        };
-        repl.update_all_options()?;
-        repl.update_prompt();
-        Ok(repl)
-    }
-
-    pub fn get_input(&self, mut input: &mut String) -> Option<()> {
-        let stdin = io::stdin();
-
-        print!("{} > ", self.prompt);
-        io::stdout().flush().unwrap();
-        input.clear();
-
-        // read line and exit on EOF
-        if stdin.read_line(&mut input).unwrap() == 0 {
-            println!("goodbye");
-            return None;
-        }
-        // remove trailing newline
-        input.pop();
-        Some(())
-    }
-
-    pub fn run(&mut self) {
         // setup rustyline
         let config = Config::builder()
             .history_ignore_space(true)
             .completion_type(CompletionType::List)
-            .edit_mode(EditMode::Emacs)
+            .edit_mode(EditMode::Vi)
             .output_stream(OutputStreamType::Stdout)
             .build();
         let h = ReplHelper {
@@ -79,29 +50,47 @@ impl Repl {
         let mut rl = Editor::with_config(config);
         rl.set_helper(Some(h));
         rl.load_history("history.txt").unwrap_or(());
-        loop {
-            let prompt = format!("{} > ", self.prompt);
-            rl.helper_mut().unwrap().colored_prompt = prompt.clone();
-            let readline = rl.readline(&prompt);
-            match readline {
-                Ok(line) => {
-                    rl.add_history_entry(line.as_str());
-                    if let Err(x) = self.execute(line.as_str()) {
-                        eprintln!("[!] {}", x);
-                    }
-                }
-                Err(ReadlineError::Interrupted) => {
-                    continue;
-                }
-                Err(ReadlineError::Eof) => {
-                    break;
-                }
-                Err(_) => {
-                    break;
-                }
+
+        let mut repl = Repl {
+            prompt: String::from("[repost]"),
+            workspace: String::from("repost"),
+            db: Db::new("repost.db")?,
+            environment: None,
+            request: None,
+            line_reader: rl,
+        };
+        repl.update_all_options()?;
+        repl.update_prompt();
+        Ok(repl)
+    }
+
+    pub fn get_input(&mut self, mut input: &mut String) -> Option<()> {
+        // set the prompt and completer
+        let prompt = format!("{} > ", self.prompt);
+        self.line_reader.helper_mut().unwrap().colored_prompt = prompt.clone();
+        // set completer based on current state of repl
+        self.line_reader.helper_mut().unwrap().completer = CmdCompleter {};
+
+        // read the line
+        let readline = self.line_reader.readline(&prompt);
+        match readline {
+            Ok(line) => {
+                self.line_reader.add_history_entry(line.as_str());
+                *input = line;
+                Some(())
+            }
+            Err(ReadlineError::Interrupted) => {
+                Some(())
+            }
+            Err(ReadlineError::Eof) => {
+                self.line_reader.save_history("history.txt").unwrap_or(());
+                None
+            }
+            Err(_) => {
+                self.line_reader.save_history("history.txt").unwrap_or(());
+                None
             }
         }
-        rl.save_history("history.txt").unwrap_or(());
     }
 
     fn cmds() -> Vec<Box<dyn Cmd>> {
