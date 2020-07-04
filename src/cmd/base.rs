@@ -29,7 +29,7 @@ impl Cmd for BaseCommand {
             },
             ("set", Some(matches)) => match matches.subcommand() {
                 ("workspace", Some(matches)) => {
-                    // TODO: use regex validator is YAML when available
+                    // TODO: use regex validator in YAML when available
                     //       https://github.com/clap-rs/clap/issues/1968
                     let ws = matches.value_of("workspace").unwrap();
                     if !ws.chars().all(char::is_alphanumeric) {
@@ -79,7 +79,7 @@ impl BaseCommand {
             }
             None => None,
         };
-        // TODO: use regex validator is YAML when available
+        // TODO: use regex validator in YAML when available
         //       https://github.com/clap-rs/clap/issues/1968
         for h in matches.values_of("headers").unwrap_or_default() {
             if !h.contains(':') {
@@ -119,7 +119,7 @@ impl BaseCommand {
     fn create_variable(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
         let name = matches.value_of("name").unwrap();
         // verify all arguments contain an equal
-        // TODO: use regex validator is YAML when available
+        // TODO: use regex validator in YAML when available
         //       https://github.com/clap-rs/clap/issues/1968
         for ev in matches.values_of("environment=value").unwrap() {
             if !ev.contains('=') {
@@ -159,7 +159,7 @@ impl BaseCommand {
     }
     fn set_variable(repl: &mut Repl, matches: &ArgMatches) -> Result<(), CmdError> {
         let name = matches.value_of("name").unwrap();
-        // TODO: use regex validator is YAML when available
+        // TODO: use regex validator in YAML when available
         //       https://github.com/clap-rs/clap/issues/1968
         for ev in matches.values_of("environment=value").unwrap() {
             if !ev.contains('=') {

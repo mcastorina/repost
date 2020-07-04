@@ -89,7 +89,7 @@ subcommands:
                 about: Set the environment as used for variable substitution
                 visible_aliases: ["env", "e"]
                 args:
-                    - enviroment:
+                    - environment:
                         help: Environment to use
             - request:
                 about: Set the request to view and modify specific options
@@ -140,3 +140,17 @@ subcommands:
                         help: Variable to delete
                         required: true
                         multiple: true
+    - run:
+        about: Run a named HTTP request
+        visible_aliases: ["r"]
+        args:
+            - request:
+                help: Request to run
+                required: true
+                multiple: false # TODO run multiple in a row
+            - quiet:
+                help: Print only the response body
+                short: q
+                long: quiet
+                takes_value: false
+                required: false

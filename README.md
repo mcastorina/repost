@@ -153,6 +153,7 @@ or a part of a JSON body and save it in a variable.
 |                    | extract from other data formats                  |
 |                    | option to hide variable values                   |
 |                    | run flags                                        |
+|                    | run flag for each input option                   |
 |                    | clipboard integration                            |
 |                    | create request from curl command                 |
 |                    | save responses                                   |
@@ -162,7 +163,7 @@ or a part of a JSON body and save it in a variable.
 |                    | global environment                               |
 |                    | color requests that have all options satisfied   |
 
-* :white_check_mark: -- In master
-* :soon: -- In progress
-* :question: -- Might not happen
-* Blank -- Rough idea
+* :white_check_mark: - In master
+* :soon: - In progress
+* :question: - Might not happen
+* Blank - Rough idea

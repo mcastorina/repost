@@ -15,7 +15,7 @@ use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, Validator};
-use rustyline::{CompletionType, Config, Context, EditMode, Editor, Helper, KeyPress};
+use rustyline::{CompletionType, Config, Context, EditMode, Editor, Helper};
 use std::collections::HashMap;
 
 use std::borrow::Cow::{self, Borrowed, Owned};
@@ -78,7 +78,7 @@ impl Repl {
         };
         let mut rl = Editor::with_config(config);
         rl.set_helper(Some(h));
-        rl.load_history("history.txt");
+        rl.load_history("history.txt").unwrap_or(());
         loop {
             let prompt = format!("{} > ", self.prompt);
             rl.helper_mut().unwrap().colored_prompt = prompt.clone();
@@ -96,12 +96,12 @@ impl Repl {
                 Err(ReadlineError::Eof) => {
                     break;
                 }
-                Err(err) => {
+                Err(_) => {
                     break;
                 }
             }
         }
-        rl.save_history("history.txt");
+        rl.save_history("history.txt").unwrap_or(());
     }
 
     fn cmds() -> Vec<Box<dyn Cmd>> {
@@ -422,7 +422,7 @@ impl Completer for ReplHelper {
 }
 
 impl Hinter for ReplHelper {
-    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
         // self.hinter.hint(line, pos, ctx)
         None
     }
@@ -476,7 +476,7 @@ impl Completer for CmdCompleter {
         &self,
         line: &str,
         pos: usize,
-        ctx: &Context,
+        _ctx: &Context,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         let line = format!("{}_", line);
         let cmds = get_cmd_lut();
@@ -540,7 +540,7 @@ fn build_lut_r(root: &serde_yaml::Value, prefix: &str) -> HashMap<String, Vec<St
             for alias in aliases {
                 let p = match prefix {
                     "" => String::from(alias),
-                    x => format!("{} {}", prefix, alias),
+                    _ => format!("{} {}", prefix, alias),
                 };
                 map.insert(
                     String::from(&p),
@@ -580,7 +580,7 @@ fn get_aliases(cmd: &serde_yaml::Value) -> Vec<&str> {
 fn get_name(cmd: &serde_yaml::Value) -> Option<&str> {
     if let serde_yaml::Value::Mapping(m) = cmd {
         for kv in m.iter() {
-            let (k, v) = kv;
+            let (k, _) = kv;
             // should only be one mapping
             return k.as_str();
         }
