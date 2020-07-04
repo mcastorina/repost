@@ -15,7 +15,7 @@ impl Cmd for ContextualCommand {
             ("info", Some(matches)) => ContextualCommand::info(repl, matches),
             ("delete", Some(matches)) => match matches.subcommand() {
                 ("options", Some(matches)) => ContextualCommand::delete_options(repl, matches),
-                _ => Err(CmdError::NotFound)
+                _ => Err(CmdError::NotFound),
             },
             _ => Err(CmdError::NotFound),
         }

@@ -1,7 +1,7 @@
 use crate::cmd::{Cmd, CmdError};
 use crate::db::{Method, PrintableTable, Request, RequestOutput, Variable};
 use crate::Repl;
-use clap_v3::{App, ArgMatches, load_yaml};
+use clap_v3::{load_yaml, App, ArgMatches};
 use colored::*;
 use comfy_table::{ContentArrangement, Table};
 use reqwest::blocking;
@@ -35,7 +35,7 @@ impl Cmd for BaseCommand {
                     if !ws.chars().all(char::is_alphanumeric) {
                         return Err(CmdError::ArgsError(String::from(
                             "only alphanumeric characters allowed",
-                        )))
+                        )));
                     }
                     repl.update_workspace(matches.value_of("workspace").unwrap())
                 }
@@ -86,7 +86,7 @@ impl BaseCommand {
                 return Err(CmdError::ArgsError(format!(
                     "missing ':' in argument: {}",
                     h,
-                )))
+                )));
             }
         }
         let headers: Vec<(&str, &str)> = matches
@@ -126,7 +126,7 @@ impl BaseCommand {
                 return Err(CmdError::ArgsError(format!(
                     "missing '=' in argument: {}",
                     ev,
-                )))
+                )));
             }
         }
         let env_vals: Vec<(String, String)> = matches
@@ -166,7 +166,7 @@ impl BaseCommand {
                 return Err(CmdError::ArgsError(format!(
                     "missing '=' in argument: {}",
                     ev,
-                )))
+                )));
             }
         }
         let env_vals: Vec<(String, String)> = matches

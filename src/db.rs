@@ -293,14 +293,26 @@ impl Db {
             .execute("DELETE FROM variables WHERE name = ?1;", params![variable])?;
         Ok(())
     }
-    pub fn delete_input_option_by_name(&self, request_name: &str, option_name: &str) -> Result<(), DbError> {
-        self.conn
-            .execute("DELETE FROM input_options WHERE request_name = ?1 AND option_name = ?2;", params![request_name, option_name])?;
+    pub fn delete_input_option_by_name(
+        &self,
+        request_name: &str,
+        option_name: &str,
+    ) -> Result<(), DbError> {
+        self.conn.execute(
+            "DELETE FROM input_options WHERE request_name = ?1 AND option_name = ?2;",
+            params![request_name, option_name],
+        )?;
         Ok(())
     }
-    pub fn delete_output_option_by_name(&self, request_name: &str, option_name: &str) -> Result<(), DbError> {
-        self.conn
-            .execute("DELETE FROM output_options WHERE request_name = ?1 AND option_name = ?2;", params![request_name, option_name])?;
+    pub fn delete_output_option_by_name(
+        &self,
+        request_name: &str,
+        option_name: &str,
+    ) -> Result<(), DbError> {
+        self.conn.execute(
+            "DELETE FROM output_options WHERE request_name = ?1 AND option_name = ?2;",
+            params![request_name, option_name],
+        )?;
         Ok(())
     }
 }

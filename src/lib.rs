@@ -6,9 +6,19 @@ use colored::*;
 use db::{Db, Environment, Request, RequestInput, RequestOutput, Variable};
 use regex::Regex;
 use reqwest::header::HeaderMap;
-use serde_json::Value;
 use std::fs;
 use std::io::{self, prelude::*};
+
+use rustyline::completion::{Completer, Pair};
+use rustyline::config::OutputStreamType;
+use rustyline::error::ReadlineError;
+use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
+use rustyline::hint::{Hinter, HistoryHinter};
+use rustyline::validate::{self, MatchingBracketValidator, Validator};
+use rustyline::{CompletionType, Config, Context, EditMode, Editor, Helper, KeyPress};
+use std::collections::HashMap;
+
+use std::borrow::Cow::{self, Borrowed, Owned};
 
 const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
 
@@ -49,6 +59,49 @@ impl Repl {
         // remove trailing newline
         input.pop();
         Some(())
+    }
+
+    pub fn run(&mut self) {
+        // setup rustyline
+        let config = Config::builder()
+            .history_ignore_space(true)
+            .completion_type(CompletionType::List)
+            .edit_mode(EditMode::Emacs)
+            .output_stream(OutputStreamType::Stdout)
+            .build();
+        let h = ReplHelper {
+            completer: CmdCompleter {},
+            highlighter: MatchingBracketHighlighter::new(),
+            hinter: HistoryHinter {},
+            colored_prompt: "".to_owned(),
+            validator: MatchingBracketValidator::new(),
+        };
+        let mut rl = Editor::with_config(config);
+        rl.set_helper(Some(h));
+        rl.load_history("history.txt");
+        loop {
+            let prompt = format!("{} > ", self.prompt);
+            rl.helper_mut().unwrap().colored_prompt = prompt.clone();
+            let readline = rl.readline(&prompt);
+            match readline {
+                Ok(line) => {
+                    rl.add_history_entry(line.as_str());
+                    if let Err(x) = self.execute(line.as_str()) {
+                        eprintln!("[!] {}", x);
+                    }
+                }
+                Err(ReadlineError::Interrupted) => {
+                    continue;
+                }
+                Err(ReadlineError::Eof) => {
+                    break;
+                }
+                Err(err) => {
+                    break;
+                }
+            }
+        }
+        rl.save_history("history.txt");
     }
 
     fn cmds() -> Vec<Box<dyn Cmd>> {
@@ -284,7 +337,11 @@ impl Repl {
             None,
         ))
     }
-    fn header_to_var(&self, opt: &RequestOutput, headers: &HeaderMap) -> Result<Variable, CmdError> {
+    fn header_to_var(
+        &self,
+        opt: &RequestOutput,
+        headers: &HeaderMap,
+    ) -> Result<Variable, CmdError> {
         let value = match headers.get(opt.path()) {
             Some(x) => Some(x.to_str().unwrap()),
             None => None,
@@ -301,10 +358,10 @@ impl Repl {
     }
 }
 
-fn get_json_value(data: &str, query: &str) -> Result<Value, CmdError> {
+fn get_json_value(data: &str, query: &str) -> Result<serde_json::Value, CmdError> {
     // TODO: Result
-    let mut v: Value = serde_json::from_str(data)?;
-    let mut result: &mut Value = &mut v;
+    let mut v: serde_json::Value = serde_json::from_str(data)?;
+    let mut result: &mut serde_json::Value = &mut v;
 
     let re = Regex::new(r"\[(\d+)\]")?;
     for token in query.split(".") {
@@ -340,4 +397,210 @@ impl From<std::num::ParseIntError> for CmdError {
     fn from(_err: std::num::ParseIntError) -> CmdError {
         CmdError::ParseError
     }
+}
+
+struct ReplHelper {
+    completer: CmdCompleter,
+    highlighter: MatchingBracketHighlighter,
+    validator: MatchingBracketValidator,
+    hinter: HistoryHinter,
+    colored_prompt: String,
+}
+impl Helper for ReplHelper {}
+
+impl Completer for ReplHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        self.completer.complete(line, pos, ctx)
+    }
+}
+
+impl Hinter for ReplHelper {
+    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
+        // self.hinter.hint(line, pos, ctx)
+        None
+    }
+}
+
+impl Highlighter for ReplHelper {
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        default: bool,
+    ) -> Cow<'b, str> {
+        if default {
+            Borrowed(&self.colored_prompt)
+        } else {
+            Borrowed(prompt)
+        }
+    }
+
+    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+        Owned("\x1b[1m".to_owned() + hint + "\x1b[m")
+    }
+
+    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
+        self.highlighter.highlight(line, pos)
+    }
+
+    fn highlight_char(&self, line: &str, pos: usize) -> bool {
+        self.highlighter.highlight_char(line, pos)
+    }
+}
+
+impl Validator for ReplHelper {
+    fn validate(
+        &self,
+        ctx: &mut validate::ValidationContext,
+    ) -> rustyline::Result<validate::ValidationResult> {
+        self.validator.validate(ctx)
+    }
+
+    fn validate_while_typing(&self) -> bool {
+        self.validator.validate_while_typing()
+    }
+}
+
+struct CmdCompleter {}
+
+impl Completer for CmdCompleter {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context,
+    ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+        let line = format!("{}_", line);
+        let cmds = get_cmd_lut();
+        // split line
+        let mut tokens = line.split_whitespace();
+        let mut last_token = String::from(tokens.next_back().unwrap());
+        last_token.pop();
+        let key = tokens
+            .map(|x| String::from(x))
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        let candidates = cmds.get(&key);
+        if candidates.is_none() {
+            return Ok((pos, vec![]));
+        }
+        let candidates = candidates.unwrap().to_vec();
+        let candidates: Vec<String> = candidates
+            .into_iter()
+            .filter(|x| x.starts_with(&last_token))
+            .collect();
+        Ok((
+            line.len() - last_token.len() - 1,
+            candidates
+                .iter()
+                .map(|cmd| Pair {
+                    display: String::from(cmd),
+                    replacement: format!("{} ", cmd),
+                })
+                .collect(),
+        ))
+    }
+}
+// TODO: refactor
+fn get_cmd_lut() -> HashMap<String, Vec<String>> {
+    let yaml: serde_yaml::Value = serde_yaml::from_str(include_str!("cmd/cli.yml")).unwrap();
+    let mut map = build_lut_r(&yaml, "");
+    // base commands
+    map.insert(
+        String::from(""),
+        get_sub_names(&yaml)
+            .into_iter()
+            .map(|x| String::from(x))
+            .collect(),
+    );
+    map
+}
+fn build_lut_r(root: &serde_yaml::Value, prefix: &str) -> HashMap<String, Vec<String>> {
+    let mut map = HashMap::new();
+    let subcommands = root.get("subcommands");
+    if subcommands.is_none() {
+        return map;
+    }
+    let subcommands = subcommands.unwrap();
+    if let serde_yaml::Value::Sequence(cmds) = subcommands {
+        for cmd in cmds {
+            let (name, cmd) = get_map(cmd);
+            let mut aliases = get_aliases(cmd);
+            aliases.push(name);
+            let sub_names = get_sub_names(cmd);
+            for alias in aliases {
+                let p = match prefix {
+                    "" => String::from(alias),
+                    x => format!("{} {}", prefix, alias),
+                };
+                map.insert(
+                    String::from(&p),
+                    sub_names.iter().map(|&x| String::from(x)).collect(),
+                );
+                let child = build_lut_r(cmd, &p);
+                map.extend(child);
+            }
+        }
+    }
+    map
+}
+fn get_map(cmd: &serde_yaml::Value) -> (&str, &serde_yaml::Value) {
+    let name = get_name(cmd).unwrap();
+    (name, cmd.get(name).unwrap())
+}
+
+fn get_aliases(cmd: &serde_yaml::Value) -> Vec<&str> {
+    let mut names = vec![];
+    if let serde_yaml::Value::Mapping(m) = cmd {
+        for kv in m.iter() {
+            let (k, v) = kv;
+            match k.as_str().unwrap() {
+                "aliases" | "visible_aliases" => {
+                    if let serde_yaml::Value::Sequence(aliases) = v {
+                        for alias in aliases {
+                            names.push(alias.as_str().unwrap());
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+    names
+}
+fn get_name(cmd: &serde_yaml::Value) -> Option<&str> {
+    if let serde_yaml::Value::Mapping(m) = cmd {
+        for kv in m.iter() {
+            let (k, v) = kv;
+            // should only be one mapping
+            return k.as_str();
+        }
+    }
+    None
+}
+fn get_sub_names(cmd: &serde_yaml::Value) -> Vec<&str> {
+    let mut names = vec![];
+    let subcommands = cmd.get("subcommands");
+    if subcommands.is_none() {
+        return names;
+    }
+    let subcommands = subcommands.unwrap();
+    if let serde_yaml::Value::Sequence(cmds) = subcommands {
+        for cmd in cmds {
+            let name = get_name(cmd);
+            if name.is_some() {
+                names.push(name.unwrap());
+            }
+        }
+    }
+    names
 }
