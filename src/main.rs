@@ -1,6 +1,7 @@
+use repost::error::Error;
 use repost::Repl;
 
-fn main() -> Result<(), String> {
+fn main() -> Result<(), Error> {
     let mut input = String::new();
     let mut repl = Repl::new()?;
 

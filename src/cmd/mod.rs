@@ -1,7 +1,6 @@
-pub mod base;
 pub mod cmd;
-pub mod contextual;
-
-pub use base::BaseCommand;
-pub use cmd::{Cmd, CmdError};
-pub use contextual::ContextualCommand;
+pub mod create;
+pub mod delete;
+pub mod run;
+pub mod set;
+pub mod show;

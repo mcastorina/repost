@@ -1,0 +1,73 @@
+name: repost
+version: "0.1.0"
+
+settings:
+    - NoBinaryName
+    - DisableVersion
+    - DisableHelpSubcommand
+    - VersionlessSubcommands
+    - AllowExternalSubcommands
+
+subcommands:
+    - run:
+        about: Run a named HTTP request
+        visible_aliases: ["r"]
+        args:
+            - quiet:
+                help: Print only the response body
+                short: q
+                long: quiet
+                takes_value: false
+                required: false
+    - extract:
+        about: Extract data from the output of a request
+        visible_aliases: ["ex"]
+        args:
+            - type:
+                help: Body or head extraction
+                possible_values: ["body", "header"]
+                required: true
+            - key:
+                help: Key to extract - header name or JSON body path
+                required: true
+
+            - variable:
+                help: Variable to store the extracted data
+                short: t
+                long: to-var
+                takes_value: true
+                required: true
+    - info:
+        about: Print information about the current request
+        visible_aliases: ["i"]
+    - delete:
+        settings:
+            - SubcommandRequiredElseHelp
+            - VersionlessSubcommands
+        about: Delete named requests or variables
+        visible_aliases: ["remove", "del", "rm"]
+        subcommands:
+            - requests:
+                about: Delete the named HTTP requests
+                visible_aliases: ["request", "reqs", "req", "r"]
+                args:
+                    - request:
+                        help: Request to delete
+                        required: true
+                        multiple: true
+            - variables:
+                about: Delete the named variables
+                visible_aliases: ["variable", "vars", "var", "v"]
+                args:
+                    - variable:
+                        help: Variable to delete
+                        required: true
+                        multiple: true
+            - options:
+                about: Delete input or output options
+                visible_aliases: ["option", "opts", "opt", "o"]
+                args:
+                    - option:
+                        help: Option to delete
+                        required: true
+                        multiple: true
