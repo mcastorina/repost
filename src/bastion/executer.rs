@@ -50,9 +50,9 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             ("workspace", Some(matches)) => {
                 b.set_workspace(matches.value_of("workspace").unwrap())
             }
-            // ("environment", Some(matches)) => {
-            //     b.set_environment(matches.value_of("environment"))
-            // }
+            ("environment", Some(matches)) => {
+                b.set_environment(matches.value_of("environment"))
+            }
             // ("request", Some(matches)) => b.set_request(matches.value_of("request")),
             // ("option", Some(matches)) => set_option(
             //     matches.value_of("option").unwrap(),

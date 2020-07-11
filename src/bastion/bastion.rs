@@ -1,8 +1,9 @@
 use super::completer::LineReader;
 use crate::db::{self, Db, DbObject, Environment, InputOption, OutputOption, Request, Variable};
-use crate::error::Result;
+use crate::error::{Result, Error, ErrorKind};
 use colored::*;
 use std::fs;
+use rusqlite::Connection;
 
 pub struct Bastion {
     state: ReplState,
@@ -110,6 +111,13 @@ impl Bastion {
         // TODO: update options
         Ok(())
     }
+    pub fn set_environment(&mut self, env: Option<&str>) -> Result<()> {
+        if env.is_some() && !Environment::exists(self.db.conn(), env.unwrap())? {
+            return Err(Error::new(ErrorKind::NotFound));
+        }
+        self.state.set_environment(env)?;
+        Ok(())
+    }
 }
 
 pub enum ReplState {
@@ -134,5 +142,29 @@ impl ReplState {
                 req.bold().green()
             ),
         }
+    }
+    fn set_environment(&mut self, env: Option<&str>) -> Result<()> {
+        if env.is_none() {
+            match self {
+                ReplState::Environment(ws, _) => {
+                    *self = ReplState::Base(ws.clone());
+                }
+                ReplState::EnvironmentRequest(ws, _, req) => {
+                    *self = ReplState::Request(ws.clone(), req.clone());
+                }
+                _ => (),
+            };
+            return Ok(());
+        }
+        let env = String::from(env.unwrap());
+        match self {
+            ReplState::Base(ws) | ReplState::Environment(ws, _) => {
+                *self = ReplState::Environment(ws.clone(), env);
+            }
+            ReplState::Request(ws, req) | ReplState::EnvironmentRequest(ws, _, req) => {
+                *self = ReplState::EnvironmentRequest(ws.clone(), env, req.clone());
+            }
+        }
+        Ok(())
     }
 }
