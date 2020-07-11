@@ -2,6 +2,7 @@ use crate::error::Result;
 use super::PrintableTable;
 use super::{Db, db::DbObject};
 use rusqlite::{Connection, NO_PARAMS, params};
+use comfy_table::Cell;
 
 pub struct Request {
     name: String,
@@ -154,7 +155,7 @@ impl DbObject for Request {
         )?;
         Ok(())
     }
-    fn get_all(&self, conn: &Connection) -> Result<Vec<Request>> {
+    fn get_all(conn: &Connection) -> Result<Vec<Request>> {
         let mut stmt = conn
             .prepare("SELECT name, method, url, headers, body FROM requests;")?;
 
@@ -177,16 +178,16 @@ impl DbObject for Request {
 }
 
 impl PrintableTable for Request {
-    fn get_header() -> Vec<String> {
+    fn get_header() -> Vec<Cell> {
         vec![
-            String::from("name"),
-            String::from("method"),
-            String::from("url"),
-            String::from("headers"),
-            String::from("body?"),
+            Cell::new("name"),
+            Cell::new("method"),
+            Cell::new("url"),
+            Cell::new("headers"),
+            Cell::new("body?"),
         ]
     }
-    fn get_rows(&self) -> Vec<Vec<String>> {
+    fn get_rows(&self) -> Vec<Vec<Cell>> {
         let has_body = {
             if self.body.is_some() {
                 "true"
@@ -195,11 +196,11 @@ impl PrintableTable for Request {
             }
         };
         vec![vec![
-            String::from(&self.name),
-            String::from(self.method.to_string()),
-            String::from(&self.url),
-            String::from(self.headers.as_ref().unwrap_or(&String::from(""))),
-            String::from(has_body),
+            Cell::new(&self.name),
+            Cell::new(self.method.to_string()),
+            Cell::new(&self.url),
+            Cell::new(self.headers.as_ref().unwrap_or(&String::from(""))),
+            Cell::new(has_body),
         ]]
     }
 }
