@@ -1,5 +1,5 @@
 use super::completer::LineReader;
-use crate::db::Db;
+use crate::db::{self, Db};
 use crate::error::Result;
 use colored::*;
 
@@ -25,12 +25,34 @@ impl Bastion {
     }
 
     pub fn execute(&mut self, command: &str) -> Result<()> {
-        // set the prompt and completer
-        Ok(())
+        super::executer::execute(self, command)
+    }
+
+    pub fn state(&self) -> &ReplState {
+        &self.state
+    }
+
+    pub fn get_requests(&self) -> Result<Vec<db::Request>> {
+        Ok(vec![])
+    }
+    pub fn get_variables(&self) -> Result<Vec<String>> {
+        Ok(vec![])
+    }
+    pub fn get_environments(&self) -> Result<Vec<String>> {
+        Ok(vec![])
+    }
+    pub fn get_input_options(&self) -> Result<Vec<String>> {
+        Ok(vec![])
+    }
+    pub fn get_output_options(&self) -> Result<Vec<String>> {
+        Ok(vec![])
+    }
+    pub fn get_workspaces(&self) -> Result<Vec<String>> {
+        Ok(vec![])
     }
 }
 
-enum ReplState {
+pub enum ReplState {
     Base(String),
     Environment(String, String),
     Request(String, String),
