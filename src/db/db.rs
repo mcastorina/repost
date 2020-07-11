@@ -94,4 +94,11 @@ pub trait DbObject {
             _ => Ok(()),
         }
     }
+    fn exists(conn: &Connection, name: &str) -> Result<bool>
+    where
+        Self: std::marker::Sized,
+    {
+        // default implementation: get_by_name
+        Ok(Self::get_by_name(conn, name)?.len() > 0)
+    }
 }

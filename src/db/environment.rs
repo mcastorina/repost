@@ -5,11 +5,50 @@ use chrono::Utc;
 use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
 
-pub fn get_all(conn: &Connection) -> Result<Vec<String>> {
-    let mut stmt = conn.prepare("SELECT DISTINCT environment FROM variables;")?;
+pub struct Environment {
+    name: String
+}
 
-    let envs = stmt.query_map(NO_PARAMS, |row| Ok(row.get(0)?))?;
+impl Environment {
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+}
 
-    // TODO: print a warning for errors
-    Ok(envs.filter_map(|env| env.ok()).collect())
+impl DbObject for Environment {
+    fn create(&self, conn: &Connection) -> Result<()> {
+        // TODO: return an error, but these should never be called
+        Ok(())
+    }
+    fn delete(&self, conn: &Connection) -> Result<()> {
+        Ok(())
+    }
+    fn update(&self, conn: &Connection) -> Result<usize> {
+        Ok(0)
+    }
+    fn get_all(conn: &Connection) -> Result<Vec<Environment>> {
+        let mut stmt = conn.prepare("SELECT DISTINCT environment FROM variables;")?;
+        let envs = stmt.query_map(NO_PARAMS, |row|
+            Ok(Environment{ name: row.get(0)? })
+        )?;
+
+        // TODO: print a warning for errors
+        Ok(envs.filter_map(|env| env.ok()).collect())
+    }
+    fn name(&self) -> Option<&str> {
+        Some(self.name())
+    }
+}
+
+impl PrintableTableStruct for Environment {
+    fn get_header() -> Vec<Cell> {
+        vec![
+            Cell::new("environment"),
+        ]
+    }
+    fn get_rows(&self) -> Vec<Vec<Cell>> {
+        vec![vec![
+            Cell::new(&self.name),
+        ]]
+    }
 }

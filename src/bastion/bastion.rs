@@ -1,5 +1,5 @@
 use super::completer::LineReader;
-use crate::db::{self, Db, DbObject, InputOption, OutputOption, Request, Variable};
+use crate::db::{self, Db, DbObject, Environment, InputOption, OutputOption, Request, Variable};
 use crate::error::Result;
 use colored::*;
 use std::fs;
@@ -39,8 +39,8 @@ impl Bastion {
     pub fn get_variables(&self) -> Result<Vec<Variable>> {
         Variable::get_all(self.db.conn())
     }
-    pub fn get_environments(&self) -> Result<Vec<String>> {
-        db::environment::get_all(self.db.conn())
+    pub fn get_environments(&self) -> Result<Vec<Environment>> {
+        Environment::get_all(self.db.conn())
     }
     pub fn get_input_options(&self) -> Result<Vec<InputOption>> {
         InputOption::get_all(self.db.conn())
@@ -69,6 +69,46 @@ impl Bastion {
             }
         }
         Ok(result)
+    }
+
+    pub fn set_workspace(&mut self, workspace: &str) -> Result<()> {
+        let ws = String::from(workspace);
+
+        self.db = Db::new(format!("{}.db", workspace).as_ref())?;
+        self.state = match &self.state {
+            ReplState::Base(_) => ReplState::Base(ws),
+            ReplState::Environment(_, env) => {
+                let env = String::from(env);
+                if Environment::exists(self.db.conn(), env.as_ref())? {
+                    ReplState::Environment(ws, env)
+                } else {
+                    ReplState::Base(ws)
+                }
+            }
+            ReplState::Request(_, req) => {
+                let req = String::from(req);
+                if Request::exists(self.db.conn(), req.as_ref())? {
+                    ReplState::Request(ws, req)
+                } else {
+                    ReplState::Base(ws)
+                }
+            }
+            ReplState::EnvironmentRequest(_, env, req) => {
+                let env = String::from(env);
+                let req = String::from(req);
+                match (
+                    Environment::exists(self.db.conn(), env.as_ref())?,
+                    Request::exists(self.db.conn(), req.as_ref())?,
+                ) {
+                    (true, true) => ReplState::EnvironmentRequest(ws, env, req),
+                    (true, false) => ReplState::Environment(ws, env),
+                    (false, true) => ReplState::Request(ws, req),
+                    (false, false) => ReplState::Base(ws),
+                }
+            }
+        };
+        // TODO: update options
+        Ok(())
     }
 }
 

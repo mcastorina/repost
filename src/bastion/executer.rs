@@ -34,7 +34,7 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             ("variables", Some(matches)) => show::print_table(matches, b.get_variables()?),
             ("environments", Some(matches)) => show::print_table(
                 matches,
-                (String::from("environment"), b.get_environments()?),
+                b.get_environments()?,
             ),
             ("options", Some(matches)) => {
                 show::print_table(matches, b.get_input_options()?)?;
@@ -46,21 +46,21 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             }
             _ => unreachable!(),
         },
-        //     ("set", Some(matches)) => match matches.subcommand() {
-        //         ("workspace", Some(matches)) => {
-        //             b.set_workspace(matches.value_of("workspace").unwrap())
-        //         }
-        //         ("environment", Some(matches)) => {
-        //             b.set_environment(matches.value_of("environment"))
-        //         }
-        //         ("request", Some(matches)) => b.set_request(matches.value_of("request")),
-        //         ("option", Some(matches)) => set_option(
-        //             matches.value_of("option").unwrap(),
-        //             matches.value_of("value"),
-        //         ),
-        //         ("variable", Some(matches)) => set_variable(b, matches),
-        //         _ => unreachable!(),
-        //     },
+        ("set", Some(matches)) => match matches.subcommand() {
+            ("workspace", Some(matches)) => {
+                b.set_workspace(matches.value_of("workspace").unwrap())
+            }
+            // ("environment", Some(matches)) => {
+            //     b.set_environment(matches.value_of("environment"))
+            // }
+            // ("request", Some(matches)) => b.set_request(matches.value_of("request")),
+            // ("option", Some(matches)) => set_option(
+            //     matches.value_of("option").unwrap(),
+            //     matches.value_of("value"),
+            // ),
+            // ("variable", Some(matches)) => set_variable(b, matches),
+            _ => unreachable!(),
+        },
         //     ("delete", Some(matches)) => match matches.subcommand() {
         //         ("requests", Some(matches)) => delete_requests(b, matches),
         //         ("variables", Some(matches)) => delete_variables(b, matches),

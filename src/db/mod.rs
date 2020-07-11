@@ -11,3 +11,4 @@ pub use option::InputOption;
 pub use option::OutputOption;
 pub use request::Request;
 pub use variable::Variable;
+pub use environment::Environment;
