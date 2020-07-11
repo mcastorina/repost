@@ -106,7 +106,7 @@ pub struct OutputOption {
     option_name: String,
     // TODO: enum
     extraction_type: String,
-    extraction_path: String,
+    extraction_source: String,
 }
 
 impl OutputOption {
@@ -115,7 +115,7 @@ impl OutputOption {
             request_name: String::from(req_name),
             option_name: String::from(opt_name),
             extraction_type: String::from(typ),
-            extraction_path: String::from(path),
+            extraction_source: String::from(path),
         }
     }
     pub fn create_table(conn: &Connection) -> Result<()> {
@@ -124,7 +124,7 @@ impl OutputOption {
                   request_name      TEXT NOT NULL,
                   option_name       TEXT NOT NULL,
                   extraction_type   TEXT NOT NULL,
-                  extraction_path   TEXT NOT NULL,
+                  extraction_source TEXT NOT NULL,
                   FOREIGN KEY(request_name) REFERENCES requests(name),
                   UNIQUE(request_name, option_name)
               )",
@@ -142,13 +142,13 @@ impl DbObject for OutputOption {
     fn create(&self, conn: &Connection) -> Result<()> {
         conn.execute(
             "INSERT INTO output_options
-                (request_name, option_name, extraction_type, extraction_path)
+                (request_name, option_name, extraction_type, extraction_source)
                 VALUES (?1, ?2, ?3, ?4);",
             params![
                 self.request_name,
                 self.option_name,
                 self.extraction_type,
-                self.extraction_path,
+                self.extraction_source,
             ],
         )?;
         Ok(())
@@ -164,11 +164,11 @@ impl DbObject for OutputOption {
     fn update(&self, conn: &Connection) -> Result<usize> {
         let num = conn.execute(
             "UPDATE output_options SET
-                extraction_type = ?1, extraction_path = ?2
+                extraction_type = ?1, extraction_source = ?2
             WHERE request_name = ?3 AND option_name = ?4;",
             params![
                 self.extraction_type,
-                self.extraction_path,
+                self.extraction_source,
                 self.request_name,
                 self.option_name
             ],
@@ -178,7 +178,7 @@ impl DbObject for OutputOption {
     fn get_all(conn: &Connection) -> Result<Vec<OutputOption>> {
         let mut stmt = conn.prepare(
             "SELECT
-                request_name, option_name, extraction_type, extraction_path
+                request_name, option_name, extraction_type, extraction_source
             FROM output_options;",
         )?;
 
@@ -187,7 +187,7 @@ impl DbObject for OutputOption {
                 request_name: row.get(0)?,
                 option_name: row.get(1)?,
                 extraction_type: row.get(2)?,
-                extraction_path: row.get(3)?,
+                extraction_source: row.get(3)?,
             })
         })?;
 
@@ -201,9 +201,19 @@ impl DbObject for OutputOption {
 
 impl PrintableTableStruct for OutputOption {
     fn get_header() -> Vec<Cell> {
-        vec![]
+        vec![
+            Cell::new("request_name"),
+            Cell::new("output_variable"),
+            Cell::new("extraction_type"),
+            Cell::new("extraction_source"),
+        ]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
-        vec![vec![]]
+        vec![vec![
+            Cell::new(&self.request_name),
+            Cell::new(&self.option_name),
+            Cell::new(&self.extraction_type),
+            Cell::new(&self.extraction_source),
+        ]]
     }
 }
