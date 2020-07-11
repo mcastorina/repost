@@ -118,6 +118,17 @@ impl Bastion {
         self.state.set_environment(env)?;
         Ok(())
     }
+    pub fn set_request(&mut self, req: Option<&str>) -> Result<()> {
+        if req.is_some() && !Request::exists(self.db.conn(), req.unwrap())? {
+            return Err(Error::new(ErrorKind::NotFound));
+        }
+        self.state.set_request(req)?;
+        match req {
+            Some(_) => self.line_reader.set_request(),
+            None => self.line_reader.set_base(),
+        };
+        Ok(())
+    }
 }
 
 pub enum ReplState {
@@ -163,6 +174,30 @@ impl ReplState {
             }
             ReplState::Request(ws, req) | ReplState::EnvironmentRequest(ws, _, req) => {
                 *self = ReplState::EnvironmentRequest(ws.clone(), env, req.clone());
+            }
+        }
+        Ok(())
+    }
+    fn set_request(&mut self, req: Option<&str>) -> Result<()> {
+        if req.is_none() {
+            match self {
+                ReplState::Request(ws, _) => {
+                    *self = ReplState::Base(ws.clone());
+                }
+                ReplState::EnvironmentRequest(ws, env, _) => {
+                    *self = ReplState::Environment(ws.clone(), env.clone());
+                }
+                _ => (),
+            };
+            return Ok(());
+        }
+        let req = String::from(req.unwrap());
+        match self {
+            ReplState::Base(ws) | ReplState::Request(ws, _) => {
+                *self = ReplState::Request(ws.clone(), req);
+            }
+            ReplState::Environment(ws, env) | ReplState::EnvironmentRequest(ws, env, _) => {
+                *self = ReplState::EnvironmentRequest(ws.clone(), env.clone(), req);
             }
         }
         Ok(())
