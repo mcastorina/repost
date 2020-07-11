@@ -1,7 +1,6 @@
 use crate::error::Result;
 use rusqlite::{Connection, NO_PARAMS};
-use super::Request;
-use super::Variable;
+use super::{Request, Variable, InputOption, OutputOption};
 use comfy_table::Cell;
 
 pub struct Db {
@@ -22,30 +21,8 @@ impl Db {
     fn create_tables(&self) -> Result<()> {
         Request::create_table(&self.conn)?;
         Variable::create_table(&self.conn)?;
-
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS input_options (
-                  request_name    TEXT NOT NULL,
-                  option_name     TEXT NOT NULL,
-                  value           TEXT,
-                  FOREIGN KEY(request_name) REFERENCES requests(name),
-                  UNIQUE(request_name, option_name)
-              )",
-            NO_PARAMS,
-        )?;
-
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS output_options (
-                  request_name      TEXT NOT NULL,
-                  option_name       TEXT NOT NULL,
-                  extraction_source TEXT NOT NULL,
-                  extraction_path   TEXT NOT NULL,
-                  FOREIGN KEY(request_name) REFERENCES requests(name),
-                  UNIQUE(request_name, option_name)
-              )",
-            NO_PARAMS,
-        )?;
-
+        InputOption::create_table(&self.conn)?;
+        OutputOption::create_table(&self.conn)?;
         self.conn.execute("PRAGMA foreign_keys = ON", NO_PARAMS)?;
 
         Ok(())
@@ -76,7 +53,7 @@ impl PrintableTable for String {
 pub trait DbObject {
     fn create(&self, conn: &Connection) -> Result<()>;
     fn delete(&self, conn: &Connection) -> Result<()>;
-    fn update(&self, conn: &Connection) -> Result<()>;
+    fn update(&self, conn: &Connection) -> Result<usize>;
     fn get_all(conn: &Connection) -> Result<Vec<Self>>
         where Self: std::marker::Sized;
     fn name(&self) -> Option<&str> {
@@ -106,7 +83,7 @@ pub trait DbObject {
     fn upsert(&self, conn: &Connection) -> Result<()> {
         // default implementation: try to update, then try to create
         match self.update(conn) {
-            Err(_) => self.create(conn),
+            Err(_) | Ok(0) => self.create(conn),
             _ => Ok(()),
         }
     }

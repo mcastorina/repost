@@ -142,8 +142,8 @@ impl DbObject for Request {
         conn.execute("DELETE FROM requests WHERE name = ?1;", params![self.name])?;
         Ok(())
     }
-    fn update(&self, conn: &Connection) -> Result<()> {
-        conn.execute(
+    fn update(&self, conn: &Connection) -> Result<usize> {
+        let num = conn.execute(
             "UPDATE requests SET method = ?2, url = ?3, headers = ?4, body = ?5 WHERE name = ?1;",
             params![
                 self.name,
@@ -153,7 +153,7 @@ impl DbObject for Request {
                 self.body
             ],
         )?;
-        Ok(())
+        Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<Request>> {
         let mut stmt = conn

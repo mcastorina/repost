@@ -6,12 +6,12 @@ use comfy_table::Cell;
 use chrono::Utc;
 
 pub struct Variable {
-    pub rowid: u32,
-    pub name: String,
-    pub environment: String,
-    pub value: Option<String>,
-    pub source: Option<String>,
-    pub timestamp: Option<String>,
+    rowid: u32,
+    name: String,
+    environment: String,
+    value: Option<String>,
+    source: Option<String>,
+    timestamp: Option<String>,
 }
 
 impl Variable {
@@ -83,8 +83,8 @@ impl DbObject for Variable {
         conn.execute("DELETE FROM variables WHERE rowid = ?1;", params![self.rowid])?;
         Ok(())
     }
-    fn update(&self, conn: &Connection) -> Result<()> {
-        conn.execute(
+    fn update(&self, conn: &Connection) -> Result<usize> {
+        let num = conn.execute(
             "UPDATE variables SET
                 name = ?1,
                 environment = ?2,
@@ -101,7 +101,7 @@ impl DbObject for Variable {
                 self.rowid,
             ],
         )?;
-        Ok(())
+        Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<Variable>> {
         let mut stmt = conn
