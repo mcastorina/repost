@@ -7,3 +7,4 @@ pub use db::Db;
 pub use db::DbObject;
 pub use db::PrintableTable;
 pub use request::Request;
+pub use variable::Variable;

@@ -1,6 +1,7 @@
 use crate::error::Result;
 use rusqlite::{Connection, NO_PARAMS};
-use super::request::Request;
+use super::Request;
+use super::Variable;
 use comfy_table::Cell;
 
 pub struct Db {
@@ -20,20 +21,7 @@ impl Db {
     }
     fn create_tables(&self) -> Result<()> {
         Request::create_table(&self.conn)?;
-
-        // TODO: multiple of the same variable name / environment
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS variables (
-                  rowid           INTEGER PRIMARY KEY,
-                  name            TEXT NOT NULL,
-                  environment     TEXT NOT NULL,
-                  value           TEXT,
-                  source          TEXT,
-                  timestamp       TEXT,
-                  UNIQUE(name, environment)
-              )",
-            NO_PARAMS,
-        )?;
+        Variable::create_table(&self.conn)?;
 
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS input_options (

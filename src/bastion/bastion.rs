@@ -1,5 +1,5 @@
 use super::completer::LineReader;
-use crate::db::{self, Db, DbObject, Request};
+use crate::db::{self, Db, DbObject, Request, Variable};
 use crate::error::Result;
 use colored::*;
 
@@ -32,11 +32,11 @@ impl Bastion {
         &self.state
     }
 
-    pub fn get_requests(&self) -> Result<Vec<db::Request>> {
+    pub fn get_requests(&self) -> Result<Vec<Request>> {
         Request::get_all(self.db.conn())
     }
-    pub fn get_variables(&self) -> Result<Vec<String>> {
-        Ok(vec![])
+    pub fn get_variables(&self) -> Result<Vec<Variable>> {
+        Variable::get_all(self.db.conn())
     }
     pub fn get_environments(&self) -> Result<Vec<String>> {
         Ok(vec![])
