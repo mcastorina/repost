@@ -1,7 +1,8 @@
 use super::completer::LineReader;
-use crate::db::{self, Db, DbObject, Request, Variable, InputOption, OutputOption, Environment};
+use crate::db::{self, Db, DbObject, InputOption, OutputOption, Request, Variable};
 use crate::error::Result;
 use colored::*;
+use std::fs;
 
 pub struct Bastion {
     state: ReplState,
@@ -38,8 +39,8 @@ impl Bastion {
     pub fn get_variables(&self) -> Result<Vec<Variable>> {
         Variable::get_all(self.db.conn())
     }
-    pub fn get_environments(&self) -> Result<Vec<Environment>> {
-        Environment::get_all(self.db.conn())
+    pub fn get_environments(&self) -> Result<Vec<String>> {
+        db::environment::get_all(self.db.conn())
     }
     pub fn get_input_options(&self) -> Result<Vec<InputOption>> {
         InputOption::get_all(self.db.conn())
@@ -48,7 +49,26 @@ impl Bastion {
         OutputOption::get_all(self.db.conn())
     }
     pub fn get_workspaces(&self) -> Result<Vec<String>> {
-        Ok(vec![])
+        // TODO: option for config directory; set default to $XDG_CONFIG_DIR/repost
+        let mut result = vec![];
+        let paths = fs::read_dir("./")?;
+        for path in paths {
+            let path = path?.path();
+            // filter out .db extensions
+            match path.extension() {
+                Some(x) => {
+                    if x != "db" {
+                        continue;
+                    }
+                }
+                _ => continue,
+            }
+            let ws = path.file_stem().unwrap();
+            if let Some(x) = ws.to_str() {
+                result.push(String::from(x));
+            }
+        }
+        Ok(result)
     }
 }
 

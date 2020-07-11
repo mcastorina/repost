@@ -1,9 +1,9 @@
+use super::PrintableTableStruct;
+use super::{db::DbObject, Db};
 use crate::error::Result;
-use super::PrintableTable;
-use super::{Db, db::DbObject};
-use rusqlite::{Connection, NO_PARAMS, params};
-use comfy_table::Cell;
 use chrono::Utc;
+use comfy_table::Cell;
+use rusqlite::{params, Connection, NO_PARAMS};
 
 pub struct Variable {
     rowid: u32,
@@ -80,7 +80,10 @@ impl DbObject for Variable {
         Ok(())
     }
     fn delete(&self, conn: &Connection) -> Result<()> {
-        conn.execute("DELETE FROM variables WHERE rowid = ?1;", params![self.rowid])?;
+        conn.execute(
+            "DELETE FROM variables WHERE rowid = ?1;",
+            params![self.rowid],
+        )?;
         Ok(())
     }
     fn update(&self, conn: &Connection) -> Result<usize> {
@@ -104,9 +107,10 @@ impl DbObject for Variable {
         Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<Variable>> {
-        let mut stmt = conn
-            .prepare("SELECT rowid, name, environment, value, source, timestamp
-                FROM variables ORDER BY timestamp ASC;")?;
+        let mut stmt = conn.prepare(
+            "SELECT rowid, name, environment, value, source, timestamp
+                FROM variables ORDER BY timestamp ASC;",
+        )?;
 
         let vars = stmt.query_map(NO_PARAMS, |row| {
             Ok(Variable {
@@ -127,7 +131,7 @@ impl DbObject for Variable {
     }
 }
 
-impl PrintableTable for Variable {
+impl PrintableTableStruct for Variable {
     fn get_header() -> Vec<Cell> {
         vec![
             Cell::new("name"),

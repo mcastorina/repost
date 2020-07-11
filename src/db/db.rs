@@ -1,7 +1,7 @@
+use super::{InputOption, OutputOption, Request, Variable};
 use crate::error::Result;
-use rusqlite::{Connection, NO_PARAMS};
-use super::{Request, Variable, InputOption, OutputOption};
 use comfy_table::Cell;
+use rusqlite::{Connection, NO_PARAMS};
 
 pub struct Db {
     conn: Connection,
@@ -29,24 +29,30 @@ impl Db {
     }
 }
 
-pub trait PrintableTable {
+pub trait PrintableTableStruct {
     fn get_header() -> Vec<Cell>;
     fn get_rows(&self) -> Vec<Vec<Cell>>;
 }
-impl <T: PrintableTable>PrintableTable for Vec<T> {
-    fn get_header() -> Vec<Cell> {
+pub trait PrintableTable {
+    fn get_header(&self) -> Vec<Cell>;
+    fn get_rows(&self) -> Vec<Vec<Cell>>;
+}
+impl<T: PrintableTableStruct> PrintableTable for Vec<T> {
+    fn get_header(&self) -> Vec<Cell> {
         T::get_header()
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
-        self.iter().map(|x| x.get_rows().concat()).collect::<Vec<Vec<Cell>>>()
+        self.iter()
+            .map(|x| x.get_rows().concat())
+            .collect::<Vec<Vec<Cell>>>()
     }
 }
-impl PrintableTable for String {
-    fn get_header() -> Vec<Cell> {
-        vec![Cell::new("string")]
+impl PrintableTable for (String, Vec<String>) {
+    fn get_header(&self) -> Vec<Cell> {
+        vec![Cell::new(&self.0)]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
-        vec![vec![Cell::new(self)]]
+        self.1.iter().map(|x| vec![Cell::new(x)]).collect()
     }
 }
 
@@ -55,26 +61,27 @@ pub trait DbObject {
     fn delete(&self, conn: &Connection) -> Result<()>;
     fn update(&self, conn: &Connection) -> Result<usize>;
     fn get_all(conn: &Connection) -> Result<Vec<Self>>
-        where Self: std::marker::Sized;
+    where
+        Self: std::marker::Sized;
     fn name(&self) -> Option<&str> {
         None
     }
     fn get_by_name(conn: &Connection, name: &str) -> Result<Vec<Self>>
-        where Self: std::marker::Sized {
-        Ok(
-            Self::get_all(conn)?
+    where
+        Self: std::marker::Sized,
+    {
+        Ok(Self::get_all(conn)?
             .into_iter()
-            .filter(|x|
-                match x.name() {
-                    Some(x) => x == name,
-                    None => false,
-                }
-             )
-            .collect()
-        )
+            .filter(|x| match x.name() {
+                Some(x) => x == name,
+                None => false,
+            })
+            .collect())
     }
     fn delete_by_name(conn: &Connection, name: &str) -> Result<()>
-        where Self: std::marker::Sized {
+    where
+        Self: std::marker::Sized,
+    {
         for x in Self::get_by_name(conn, name)? {
             x.delete(conn)?;
         }

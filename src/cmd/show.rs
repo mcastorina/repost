@@ -1,8 +1,8 @@
-use crate::error::Result;
 use crate::db::PrintableTable;
+use crate::error::Result;
+use clap_v3::ArgMatches;
 use comfy_table::{ContentArrangement, Table};
 use terminal_size::{terminal_size, Width};
-use clap_v3::ArgMatches;
 
 const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
 
@@ -17,7 +17,7 @@ pub fn print_table<T: PrintableTable>(matches: &ArgMatches, t: T) -> Result<()> 
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_table_width(width);
 
-    table.set_header(T::get_header());
+    table.set_header(t.get_header());
     for row in t.get_rows() {
         table.add_row(row);
     }

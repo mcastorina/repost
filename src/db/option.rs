@@ -1,9 +1,9 @@
+use super::PrintableTableStruct;
+use super::{db::DbObject, Db};
 use crate::error::Result;
-use super::PrintableTable;
-use super::{Db, db::DbObject};
-use rusqlite::{Connection, NO_PARAMS, params};
-use comfy_table::Cell;
 use chrono::Utc;
+use comfy_table::Cell;
+use rusqlite::{params, Connection, NO_PARAMS};
 
 pub struct InputOption {
     request_name: String,
@@ -65,8 +65,8 @@ impl DbObject for InputOption {
         Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<InputOption>> {
-        let mut stmt = conn
-            .prepare("SELECT request_name, option_name, value FROM input_options;")?;
+        let mut stmt =
+            conn.prepare("SELECT request_name, option_name, value FROM input_options;")?;
 
         let opts = stmt.query_map(NO_PARAMS, |row| {
             Ok(InputOption {
@@ -84,7 +84,7 @@ impl DbObject for InputOption {
     }
 }
 
-impl PrintableTable for InputOption {
+impl PrintableTableStruct for InputOption {
     fn get_header() -> Vec<Cell> {
         vec![
             Cell::new("request_name"),
@@ -154,10 +154,11 @@ impl DbObject for OutputOption {
         Ok(())
     }
     fn delete(&self, conn: &Connection) -> Result<()> {
-        conn
-            .execute("DELETE FROM output_options
+        conn.execute(
+            "DELETE FROM output_options
                 WHERE request_name = ?1 AND option_name = ?2;",
-                params![self.request_name, self.option_name])?;
+            params![self.request_name, self.option_name],
+        )?;
         Ok(())
     }
     fn update(&self, conn: &Connection) -> Result<usize> {
@@ -175,10 +176,11 @@ impl DbObject for OutputOption {
         Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<OutputOption>> {
-        let mut stmt = conn
-            .prepare("SELECT
+        let mut stmt = conn.prepare(
+            "SELECT
                 request_name, option_name, extraction_type, extraction_path
-            FROM output_options;")?;
+            FROM output_options;",
+        )?;
 
         let opts = stmt.query_map(NO_PARAMS, |row| {
             Ok(OutputOption {
@@ -197,14 +199,11 @@ impl DbObject for OutputOption {
     }
 }
 
-impl PrintableTable for OutputOption {
+impl PrintableTableStruct for OutputOption {
     fn get_header() -> Vec<Cell> {
-        vec![
-        ]
+        vec![]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
-        vec![vec![
-        ]]
+        vec![vec![]]
     }
 }
-

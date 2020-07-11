@@ -1,6 +1,6 @@
-pub mod bastion;
-pub mod cmd;
-pub mod db;
+mod bastion;
+mod cmd;
+mod db;
 pub mod error;
 
 use bastion::Bastion;

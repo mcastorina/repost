@@ -6,6 +6,7 @@ pub struct Error {
 pub enum ErrorKind {
     DbError(rusqlite::Error),
     ClapError(clap_v3::Error),
+    IOError(std::io::Error),
     NotFound,
 }
 
@@ -20,6 +21,7 @@ impl std::fmt::Display for Error {
         match &self.kind {
             ErrorKind::DbError(x) => write!(f, "{}", x),
             ErrorKind::ClapError(x) => write!(f, "{}", x),
+            ErrorKind::IOError(x) => write!(f, "{}", x),
             ErrorKind::NotFound => write!(f, "Not found"),
         }
     }
@@ -29,6 +31,7 @@ impl std::fmt::Debug for Error {
         match &self.kind {
             ErrorKind::DbError(x) => write!(f, "DbError({})", x),
             ErrorKind::ClapError(x) => write!(f, "DbError({})", x),
+            ErrorKind::IOError(x) => write!(f, "{}", x),
             ErrorKind::NotFound => write!(f, "Not found"),
         }
     }
@@ -45,6 +48,13 @@ impl From<clap_v3::Error> for Error {
     fn from(err: clap_v3::Error) -> Error {
         Error {
             kind: ErrorKind::ClapError(err),
+        }
+    }
+}
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error {
+            kind: ErrorKind::IOError(err),
         }
     }
 }

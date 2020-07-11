@@ -1,8 +1,8 @@
+use super::PrintableTableStruct;
+use super::{db::DbObject, Db};
 use crate::error::Result;
-use super::PrintableTable;
-use super::{Db, db::DbObject};
-use rusqlite::{Connection, NO_PARAMS, params};
 use comfy_table::Cell;
+use rusqlite::{params, Connection, NO_PARAMS};
 
 pub struct Request {
     name: String,
@@ -156,8 +156,7 @@ impl DbObject for Request {
         Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<Request>> {
-        let mut stmt = conn
-            .prepare("SELECT name, method, url, headers, body FROM requests;")?;
+        let mut stmt = conn.prepare("SELECT name, method, url, headers, body FROM requests;")?;
 
         let requests = stmt.query_map(NO_PARAMS, |row| {
             let s: String = row.get(1)?;
@@ -178,7 +177,7 @@ impl DbObject for Request {
     }
 }
 
-impl PrintableTable for Request {
+impl PrintableTableStruct for Request {
     fn get_header() -> Vec<Cell> {
         vec![
             Cell::new("name"),
