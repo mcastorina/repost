@@ -23,6 +23,7 @@ impl LineReader {
             .output_stream(OutputStreamType::Stdout)
             .build();
         let base_yaml: Value = serde_yaml::from_str(include_str!("clap/base.yml")).unwrap();
+        let request_yaml: Value = serde_yaml::from_str(include_str!("clap/request.yml")).unwrap();
         let h = LineReaderHelper {
             root_yaml: base_yaml.clone(),
         };
@@ -34,7 +35,7 @@ impl LineReader {
             editor: rl,
             base_yaml,
             // TODO: add set difference of (base - request) subcommands to request_yaml
-            request_yaml: serde_yaml::from_str(include_str!("clap/request.yml")).unwrap(),
+            request_yaml,
         }
     }
 

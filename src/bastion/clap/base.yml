@@ -79,12 +79,6 @@ subcommands:
         about: Set workspace, environment, or request for contextual commands
         visible_aliases: ["use", "load", "u"]
         subcommands:
-            - workspace:
-                about: Set the workspace where all data is stored
-                visible_aliases: ["ws", "w"]
-                args:
-                    - workspace:
-                        help: Workspace to use
             - environment:
                 about: Set the environment as used for variable substitution
                 visible_aliases: ["env", "e"]
@@ -97,15 +91,13 @@ subcommands:
                 args:
                     - request:
                         help: Request to use
-            - option:
-                about: Set the request specific options
-                visible_aliases: ["opt", "o"]
+            - workspace:
+                about: Set the workspace where all data is stored
+                visible_aliases: ["ws", "w"]
                 args:
-                    - option:
-                        help: Option to set
+                    - workspace:
+                        help: Workspace to use
                         required: true
-                    - value:
-                        help: Option value
             - variable:
                 about: Update or create variable values
                 visible_aliases: ["var", "v"]

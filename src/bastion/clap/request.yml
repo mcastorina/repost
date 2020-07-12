@@ -70,3 +70,115 @@ subcommands:
                         help: Option to delete
                         required: true
                         multiple: true
+    # TODO: automatically merge base into here instead of keeping the two files in sync
+    - create:
+        settings:
+            - SubcommandRequiredElseHelp
+            - VersionlessSubcommands
+        about: Create an HTTP request or variable
+        visible_aliases: ["new", "add", "c"]
+        subcommands:
+            - request:
+                about: Create an HTTP request
+                visible_aliases: ["req", "r"]
+                args:
+                    - name:
+                        help: Name of the request
+                        required: true
+                    - url:
+                        help: HTTP request URL
+                        required: true
+                    - method:
+                        help: HTTP request method
+                        short: m
+                        long: method
+                        takes_value: true
+                        possible_values: ["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"]
+                    - headers:
+                        help: HTTP request headers
+                        short: H
+                        takes_value: true
+                        multiple: true
+                    - data:
+                        help: HTTP request body
+                        short: d
+                        takes_value: true
+            - variable:
+                about: Create a variable
+                visible_aliases: ["var", "v"]
+                args:
+                    - name:
+                        help: Name of the variable
+                        required: true
+                    - environment=value:
+                        help: Value for environment
+                        required: true
+                        multiple: true
+    - show:
+        settings:
+            - SubcommandRequiredElseHelp
+            - VersionlessSubcommands
+        about: Print resources
+        visible_aliases: ["get", "print", "g", "p"]
+        subcommands:
+            - requests:
+                about: Print requests
+                visible_aliases: ["request", "reqs", "req", "r"]
+            - variables:
+                about: Print variables
+                visible_aliases: ["variable", "vars", "var", "v"]
+            - environments:
+                about: Print environments
+                visible_aliases: ["environment", "envs", "env", "e"]
+            - options:
+                about: Print options
+                visible_aliases: ["option", "opts", "opt", "o"]
+            - workspaces:
+                about: Print workspaces
+                visible_aliases: ["workspace", "ws", "w"]
+    - set:
+        settings:
+            - SubcommandRequiredElseHelp
+            - VersionlessSubcommands
+        about: Set workspace, environment, or request for contextual commands
+        visible_aliases: ["use", "load", "u"]
+        subcommands:
+            - option:
+                about: Set the request specific options
+                visible_aliases: ["opt", "o"]
+                args:
+                    - option:
+                        help: Option to set
+                        required: true
+                    - value:
+                        help: Option value
+            - environment:
+                about: Set the environment as used for variable substitution
+                visible_aliases: ["env", "e"]
+                args:
+                    - environment:
+                        help: Environment to use
+            - request:
+                about: Set the request to view and modify specific options
+                visible_aliases: ["req", "r"]
+                args:
+                    - request:
+                        help: Request to use
+            - workspace:
+                about: Set the workspace where all data is stored
+                visible_aliases: ["ws", "w"]
+                args:
+                    - workspace:
+                        help: Workspace to use
+                        required: true
+            - variable:
+                about: Update or create variable values
+                visible_aliases: ["var", "v"]
+                args:
+                    - name:
+                        help: Name of the variable
+                        required: true
+                    - environment=value:
+                        help: Value for environment
+                        required: true
+                        multiple: true
