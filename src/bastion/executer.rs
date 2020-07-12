@@ -32,10 +32,7 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
         ("show", Some(matches)) => match matches.subcommand() {
             ("requests", Some(matches)) => show::print_table(matches, b.get_requests()?),
             ("variables", Some(matches)) => show::print_table(matches, b.get_variables()?),
-            ("environments", Some(matches)) => show::print_table(
-                matches,
-                b.get_environments()?,
-            ),
+            ("environments", Some(matches)) => show::print_table(matches, b.get_environments()?),
             ("options", Some(matches)) => {
                 show::print_table(matches, b.get_input_options()?)?;
                 show::print_table(matches, b.get_output_options()?)?;
@@ -47,12 +44,8 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             _ => unreachable!(),
         },
         ("set", Some(matches)) => match matches.subcommand() {
-            ("workspace", Some(matches)) => {
-                b.set_workspace(matches.value_of("workspace").unwrap())
-            }
-            ("environment", Some(matches)) => {
-                b.set_environment(matches.value_of("environment"))
-            }
+            ("workspace", Some(matches)) => b.set_workspace(matches.value_of("workspace").unwrap()),
+            ("environment", Some(matches)) => b.set_environment(matches.value_of("environment")),
             ("request", Some(matches)) => b.set_request(matches.value_of("request")),
             // ("option", Some(matches)) => set_option(
             //     matches.value_of("option").unwrap(),

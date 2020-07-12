@@ -1,9 +1,9 @@
 use super::completer::LineReader;
 use crate::db::{self, Db, DbObject, Environment, InputOption, OutputOption, Request, Variable};
-use crate::error::{Result, Error, ErrorKind};
+use crate::error::{Error, ErrorKind, Result};
 use colored::*;
-use std::fs;
 use rusqlite::Connection;
+use std::fs;
 
 pub struct Bastion {
     state: ReplState,

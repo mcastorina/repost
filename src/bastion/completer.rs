@@ -84,22 +84,27 @@ impl Completer for LineReaderHelper {
         _ctx: &Context,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         let line = format!("{}_", line);
-        let cmds = get_cmd_lut(&self.root_yaml);
+        let mut cmd = CommandStructure::from(&self.root_yaml);
+        // cmd.get_child_mut(vec!["set", "environment"])
+        //     .unwrap()
+        //     .completions = self.environments.clone();
+        let mut cmd = &cmd;
         // split line
         let mut tokens = line.split_whitespace();
         let mut last_token = String::from(tokens.next_back().unwrap());
         last_token.pop();
-        let key = tokens
-            .map(|x| String::from(x))
-            .collect::<Vec<String>>()
-            .join(" ");
 
-        let candidates = cmds.get(&key);
-        if candidates.is_none() {
-            return Ok((pos, vec![]));
+        for tok in tokens {
+            let next_cmd = cmd.get_child(tok);
+            if next_cmd.is_none() {
+                return Ok((pos, vec![]));
+            }
+            cmd = next_cmd.unwrap();
         }
-        let candidates = candidates.unwrap().to_vec();
-        let candidates: Vec<String> = candidates
+
+        let candidates: Vec<String> = cmd
+            .completions
+            .to_vec()
             .into_iter()
             .filter(|x| x.starts_with(&last_token))
             .collect();
@@ -116,51 +121,84 @@ impl Completer for LineReaderHelper {
     }
 }
 
-// TODO: refactor
-fn get_cmd_lut(yaml: &Value) -> HashMap<String, Vec<String>> {
-    let mut map = build_lut_r(yaml, "");
-    // base commands
-    map.insert(
-        String::from(""),
-        get_sub_names(&yaml)
-            .into_iter()
-            .map(|x| String::from(x))
-            .collect(),
-    );
-    map
+struct CommandStructure {
+    name: String,                         // command name
+    aliases: Vec<String>,                 // possible aliases for name
+    completions: Vec<String>,             // subcommand names
+    children: Vec<Box<CommandStructure>>, // list of commands (name should match a completion)
 }
-fn build_lut_r(root: &Value, prefix: &str) -> HashMap<String, Vec<String>> {
-    let mut map = HashMap::new();
-    let subcommands = root.get("subcommands");
-    if subcommands.is_none() {
-        return map;
-    }
-    let subcommands = subcommands.unwrap();
-    if let Value::Sequence(cmds) = subcommands {
-        for cmd in cmds {
-            let (name, cmd) = get_map(cmd);
-            let mut aliases = get_aliases(cmd);
-            aliases.push(name);
-            let sub_names = get_sub_names(cmd);
-            for alias in aliases {
-                let p = match prefix {
-                    "" => String::from(alias),
-                    _ => format!("{} {}", prefix, alias),
-                };
-                map.insert(
-                    String::from(&p),
-                    sub_names.iter().map(|&x| String::from(x)).collect(),
-                );
-                let child = build_lut_r(cmd, &p);
-                map.extend(child);
-            }
+
+impl CommandStructure {
+    fn new(name: &str) -> CommandStructure {
+        CommandStructure {
+            name: String::from(name),
+            aliases: vec![],
+            completions: vec![],
+            children: vec![],
         }
     }
-    map
+    fn get_child<'a>(&'a self, name_or_alias: &str) -> Option<&'a CommandStructure> {
+        for cs in self.children.iter() {
+            if cs.name == name_or_alias || cs.aliases.iter().any(|e| e == name_or_alias) {
+                return Some(cs);
+            }
+        }
+        None
+    }
+    fn get_child_mut<'a>(
+        &'a mut self,
+        names_or_aliases: Vec<&str>,
+    ) -> Option<&'a mut CommandStructure> {
+        let mut cs = self;
+        for name_or_alias in names_or_aliases {
+            let child = |cs: &'a mut CommandStructure| -> Option<&'a mut CommandStructure> {
+                for child in cs.children.iter_mut() {
+                    if child.name == name_or_alias
+                        || child.aliases.iter().any(|e| e == name_or_alias)
+                    {
+                        return Some(child);
+                    }
+                }
+                None
+            }(cs);
+            if child.is_none() {
+                return None;
+            }
+            cs = child.unwrap();
+        }
+        Some(cs)
+    }
+}
+
+impl From<&serde_yaml::Value> for CommandStructure {
+    fn from(value: &serde_yaml::Value) -> CommandStructure {
+        let (name, value) = get_map(value);
+        let mut cs = CommandStructure::new(name);
+        cs.aliases = get_aliases(&value)
+            .into_iter()
+            .map(|x| String::from(x))
+            .collect();
+        cs.completions = get_sub_names(&value)
+            .into_iter()
+            .map(|x| String::from(x))
+            .collect();
+
+        let subcommands = value.get("subcommands");
+        if subcommands.is_none() {
+            return cs;
+        }
+        let subcommands = subcommands.unwrap();
+        if let Value::Sequence(cmds) = subcommands {
+            for cmd in cmds {
+                cs.children.push(Box::new(CommandStructure::from(cmd)));
+            }
+        }
+        cs
+    }
 }
 fn get_map(cmd: &Value) -> (&str, &Value) {
     let name = get_name(cmd).unwrap();
-    (name, cmd.get(name).unwrap())
+    (name, cmd.get(name).unwrap_or(cmd))
 }
 fn get_aliases(cmd: &Value) -> Vec<&str> {
     let mut names = vec![];
@@ -182,6 +220,11 @@ fn get_aliases(cmd: &Value) -> Vec<&str> {
     names
 }
 fn get_name(cmd: &Value) -> Option<&str> {
+    if let Some(v) = cmd.get("name") {
+        if v.is_string() {
+            return Some(v.as_str().unwrap());
+        }
+    }
     if let Value::Mapping(m) = cmd {
         for kv in m.iter() {
             let (k, _) = kv;

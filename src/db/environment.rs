@@ -6,7 +6,7 @@ use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
 
 pub struct Environment {
-    name: String
+    name: String,
 }
 
 impl Environment {
@@ -28,9 +28,7 @@ impl DbObject for Environment {
     }
     fn get_all(conn: &Connection) -> Result<Vec<Environment>> {
         let mut stmt = conn.prepare("SELECT DISTINCT environment FROM variables;")?;
-        let envs = stmt.query_map(NO_PARAMS, |row|
-            Ok(Environment{ name: row.get(0)? })
-        )?;
+        let envs = stmt.query_map(NO_PARAMS, |row| Ok(Environment { name: row.get(0)? }))?;
 
         // TODO: print a warning for errors
         Ok(envs.filter_map(|env| env.ok()).collect())
@@ -42,13 +40,9 @@ impl DbObject for Environment {
 
 impl PrintableTableStruct for Environment {
     fn get_header() -> Vec<Cell> {
-        vec![
-            Cell::new("environment"),
-        ]
+        vec![Cell::new("environment")]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
-        vec![vec![
-            Cell::new(&self.name),
-        ]]
+        vec![vec![Cell::new(&self.name)]]
     }
 }
