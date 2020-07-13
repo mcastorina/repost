@@ -10,5 +10,6 @@ pub use db::{PrintableTable, PrintableTableStruct};
 pub use environment::Environment;
 pub use option::InputOption;
 pub use option::OutputOption;
+pub use request::Method;
 pub use request::Request;
 pub use variable::Variable;

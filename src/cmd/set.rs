@@ -1,7 +1,7 @@
 use crate::bastion::Bastion;
+use crate::db::{DbObject, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
-use crate::db::{DbObject, Variable};
 
 pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     let name = matches.value_of("name").unwrap();
@@ -30,9 +30,12 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     for env_val in env_vals {
         // TODO: create a new variable function
         let (environment, value) = env_val;
-        let mut var = var.remove(&environment).unwrap_or(
-            Variable::new(name, &environment, Some(&value), Some("user"))
-        );
+        let mut var = var.remove(&environment).unwrap_or(Variable::new(
+            name,
+            &environment,
+            Some(&value),
+            Some("user"),
+        ));
         var.set_value(Some(&value));
         var.upsert(b.conn())?;
     }

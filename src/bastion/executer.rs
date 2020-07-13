@@ -1,8 +1,7 @@
 use super::bastion::{Bastion, ReplState};
+use crate::cmd::{create, set, show};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::{load_yaml, App};
-
-use crate::cmd::{set, show};
 
 pub fn execute(b: &mut Bastion, command: &str) -> Result<()> {
     let args: Vec<String> = shlex::split(command).unwrap_or(vec![]);
@@ -24,11 +23,11 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
     };
     let matches = app.try_get_matches_from(args)?;
     match matches.subcommand() {
-        //     ("create", Some(matches)) => match matches.subcommand() {
-        //         ("request", Some(matches)) => create_request(b, matches),
-        //         ("variable", Some(matches)) => create_variable(b, matches),
-        //         _ => unreachable!(),
-        //     },
+        ("create", Some(matches)) => match matches.subcommand() {
+            ("request", Some(matches)) => create::request(b, matches),
+            ("variable", Some(matches)) => create::variable(b, matches),
+            _ => unreachable!(),
+        },
         ("show", Some(matches)) => match matches.subcommand() {
             ("requests", Some(matches)) => show::print_table(matches, b.get_requests()?),
             ("variables", Some(matches)) => show::print_table(matches, b.get_variables()?),
