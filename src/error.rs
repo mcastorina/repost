@@ -7,6 +7,7 @@ pub enum ErrorKind {
     DbError(rusqlite::Error),
     ClapError(clap_v3::Error),
     IOError(std::io::Error),
+    ArgumentError(&'static str),
     NotFound,
 }
 
@@ -22,6 +23,7 @@ impl std::fmt::Display for Error {
             ErrorKind::DbError(x) => write!(f, "{}", x),
             ErrorKind::ClapError(x) => write!(f, "{}", x),
             ErrorKind::IOError(x) => write!(f, "{}", x),
+            ErrorKind::ArgumentError(x) => write!(f, "{}", x),
             ErrorKind::NotFound => write!(f, "Not found"),
         }
     }
@@ -32,6 +34,7 @@ impl std::fmt::Debug for Error {
             ErrorKind::DbError(x) => write!(f, "DbError({})", x),
             ErrorKind::ClapError(x) => write!(f, "DbError({})", x),
             ErrorKind::IOError(x) => write!(f, "{}", x),
+            ErrorKind::ArgumentError(x) => write!(f, "{}", x),
             ErrorKind::NotFound => write!(f, "Not found"),
         }
     }

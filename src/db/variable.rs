@@ -16,14 +16,8 @@ pub struct Variable {
 
 impl Variable {
     pub fn new(name: &str, env: &str, value: Option<&str>, source: Option<&str>) -> Variable {
-        let value = match value {
-            Some(x) => Some(String::from(x)),
-            None => None,
-        };
-        let source = match source {
-            Some(x) => Some(String::from(x)),
-            None => None,
-        };
+        let value = value.map(|x| String::from(x));
+        let source = source.map(|x| String::from(x));
         Variable {
             rowid: 0,
             name: String::from(name),
@@ -61,6 +55,9 @@ impl Variable {
     }
     pub fn consume_value(&mut self) -> Option<String> {
         self.value.take()
+    }
+    pub fn set_value(&mut self, value: Option<&str>) {
+        self.value = value.map(|x| String::from(x));
     }
 }
 

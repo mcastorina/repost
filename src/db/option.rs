@@ -43,14 +43,6 @@ impl InputOption {
     pub fn set_value(&mut self, value: Option<&str>) {
         self.value = value.map(|x| String::from(x));
     }
-    pub fn get_by_request(conn: &Connection, req: &str) -> Result<HashMap<String, Self>> {
-        let v = Self::get_by_name(conn, req)?;
-        let mut m = HashMap::new();
-        for e in v.into_iter() {
-            m.insert(String::from(e.name()), e);
-        }
-        Ok(m)
-    }
 }
 
 impl DbObject for InputOption {

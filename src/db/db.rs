@@ -2,6 +2,7 @@ use super::{InputOption, OutputOption, Request, Variable};
 use crate::error::Result;
 use comfy_table::Cell;
 use rusqlite::{Connection, NO_PARAMS};
+use std::collections::HashMap;
 
 pub struct Db {
     conn: Connection,
@@ -96,5 +97,31 @@ pub trait DbObject {
     {
         // default implementation: get_by_name
         Ok(Self::get_by_name(conn, name)?.len() > 0)
+    }
+    fn get_all_map<F, T>(conn: &Connection, f: F) -> Result<HashMap<T, Self>>
+    where
+        Self: std::marker::Sized,
+        F: Fn(&Self) -> T,
+        T: std::cmp::Eq + std::hash::Hash,
+    {
+        let v = Self::get_all(conn)?;
+        let mut m = HashMap::new();
+        for e in v.into_iter() {
+            m.insert(f(&e), e);
+        }
+        Ok(m)
+    }
+    fn get_by_name_map<F, T>(conn: &Connection, name: &str, f: F) -> Result<HashMap<T, Self>>
+    where
+        Self: std::marker::Sized,
+        F: Fn(&Self) -> T,
+        T: std::cmp::Eq + std::hash::Hash,
+    {
+        let v = Self::get_by_name(conn, name)?;
+        let mut m = HashMap::new();
+        for e in v.into_iter() {
+            m.insert(f(&e), e);
+        }
+        Ok(m)
     }
 }

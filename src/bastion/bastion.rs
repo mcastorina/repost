@@ -37,6 +37,9 @@ impl Bastion {
             .workspace_completions(bastion.get_workspaces()?);
         Ok(bastion)
     }
+    pub fn conn(&self) -> &Connection {
+        self.db.conn()
+    }
 
     pub fn get_input(&mut self, input: &mut String) -> Option<()> {
         // read the line
@@ -51,6 +54,7 @@ impl Bastion {
         &self.state
     }
 
+    // TODO: filter these results based on state
     pub fn get_requests(&self) -> Result<Vec<Request>> {
         Request::get_all(self.db.conn())
     }
@@ -149,7 +153,10 @@ impl Bastion {
     pub fn set_option(&self, option_name: &str, value: Option<&str>) -> Result<()> {
         match &self.state {
             ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
-                let opt = InputOption::get_by_request(self.db.conn(), &req)?.remove(option_name);
+                // TODO: maybe this is confusing -- rename name() to option_name()
+                let opt =
+                    InputOption::get_by_name_map(self.db.conn(), &req, |e| String::from(e.name()))?
+                        .remove(option_name);
                 if opt.is_none() {
                     Err(Error::new(ErrorKind::NotFound))
                 } else {

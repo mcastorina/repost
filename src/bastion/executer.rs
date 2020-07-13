@@ -2,7 +2,7 @@ use super::bastion::{Bastion, ReplState};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::{load_yaml, App};
 
-use crate::cmd::show;
+use crate::cmd::{set, show};
 
 pub fn execute(b: &mut Bastion, command: &str) -> Result<()> {
     let args: Vec<String> = shlex::split(command).unwrap_or(vec![]);
@@ -51,7 +51,7 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
                 matches.value_of("option").unwrap(),
                 matches.value_of("value"),
             ),
-            // ("variable", Some(matches)) => set_variable(b, matches),
+            ("variable", Some(matches)) => set::variable(b, matches),
             _ => unreachable!(),
         },
         //     ("delete", Some(matches)) => match matches.subcommand() {
