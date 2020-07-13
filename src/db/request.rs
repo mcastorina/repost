@@ -172,8 +172,8 @@ impl DbObject for Request {
         // TODO: print a warning for errors
         Ok(requests.filter_map(|req| req.ok()).collect())
     }
-    fn name(&self) -> Option<&str> {
-        Some(self.name())
+    fn name(&self) -> &str {
+        self.name()
     }
 }
 

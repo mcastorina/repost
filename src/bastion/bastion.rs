@@ -146,6 +146,22 @@ impl Bastion {
         };
         Ok(())
     }
+    pub fn set_option(&self, option_name: &str, value: Option<&str>) -> Result<()> {
+        match &self.state {
+            ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
+                let opt = InputOption::get_by_request(self.db.conn(), &req)?.remove(option_name);
+                if opt.is_none() {
+                    Err(Error::new(ErrorKind::NotFound))
+                } else {
+                    let mut opt = opt.unwrap();
+                    opt.set_value(value);
+                    opt.update(self.db.conn())?;
+                    Ok(())
+                }
+            }
+            _ => Err(Error::new(ErrorKind::NotFound)),
+        }
+    }
 }
 
 pub enum ReplState {

@@ -4,6 +4,7 @@ use crate::error::Result;
 use chrono::Utc;
 use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
+use std::collections::HashMap;
 
 pub struct InputOption {
     request_name: String,
@@ -35,6 +36,20 @@ impl InputOption {
 
     pub fn name(&self) -> &str {
         self.option_name.as_ref()
+    }
+    pub fn request_name(&self) -> &str {
+        self.request_name.as_ref()
+    }
+    pub fn set_value(&mut self, value: Option<&str>) {
+        self.value = value.map(|x| String::from(x));
+    }
+    pub fn get_by_request(conn: &Connection, req: &str) -> Result<HashMap<String, Self>> {
+        let v = Self::get_by_name(conn, req)?;
+        let mut m = HashMap::new();
+        for e in v.into_iter() {
+            m.insert(String::from(e.name()), e);
+        }
+        Ok(m)
     }
 }
 
@@ -79,8 +94,8 @@ impl DbObject for InputOption {
         // TODO: print a warning for errors
         Ok(opts.filter_map(|opt| opt.ok()).collect())
     }
-    fn name(&self) -> Option<&str> {
-        Some(self.name())
+    fn name(&self) -> &str {
+        self.request_name()
     }
 }
 
@@ -135,6 +150,9 @@ impl OutputOption {
 
     pub fn name(&self) -> &str {
         self.option_name.as_ref()
+    }
+    pub fn request_name(&self) -> &str {
+        self.request_name.as_ref()
     }
 }
 
@@ -194,8 +212,8 @@ impl DbObject for OutputOption {
         // TODO: print a warning for errors
         Ok(opts.filter_map(|opt| opt.ok()).collect())
     }
-    fn name(&self) -> Option<&str> {
-        Some(self.name())
+    fn name(&self) -> &str {
+        self.request_name()
     }
 }
 

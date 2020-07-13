@@ -63,19 +63,15 @@ pub trait DbObject {
     fn get_all(conn: &Connection) -> Result<Vec<Self>>
     where
         Self: std::marker::Sized;
-    fn name(&self) -> Option<&str> {
-        None
-    }
+    fn name(&self) -> &str;
+
     fn get_by_name(conn: &Connection, name: &str) -> Result<Vec<Self>>
     where
         Self: std::marker::Sized,
     {
         Ok(Self::get_all(conn)?
             .into_iter()
-            .filter(|x| match x.name() {
-                Some(x) => x == name,
-                None => false,
-            })
+            .filter(|x| x.name() == name)
             .collect())
     }
     fn delete_by_name(conn: &Connection, name: &str) -> Result<()>

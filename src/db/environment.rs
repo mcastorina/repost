@@ -33,8 +33,8 @@ impl DbObject for Environment {
         // TODO: print a warning for errors
         Ok(envs.filter_map(|env| env.ok()).collect())
     }
-    fn name(&self) -> Option<&str> {
-        Some(self.name())
+    fn name(&self) -> &str {
+        self.name()
     }
 }
 

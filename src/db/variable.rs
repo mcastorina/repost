@@ -126,8 +126,8 @@ impl DbObject for Variable {
         // TODO: print a warning for errors
         Ok(vars.filter_map(|var| var.ok()).collect())
     }
-    fn name(&self) -> Option<&str> {
-        Some(self.name())
+    fn name(&self) -> &str {
+        self.name()
     }
 }
 
