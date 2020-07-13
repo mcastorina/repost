@@ -109,6 +109,9 @@ impl Completer for LineReaderHelper {
         if let Some(cmd) = cmd.get_child_mut(vec!["set", "request"]) {
             cmd.completions = self.requests.clone();
         }
+        if let Some(cmd) = cmd.get_child_mut(vec!["delete", "request"]) {
+            cmd.completions = self.requests.clone();
+        }
         if let Some(cmd) = cmd.get_child_mut(vec!["set", "workspace"]) {
             cmd.completions = self.workspaces.clone();
         }

@@ -1,5 +1,5 @@
 use super::bastion::{Bastion, ReplState};
-use crate::cmd::{create, set, show};
+use crate::cmd::{create, delete, set, show};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::{load_yaml, App};
 
@@ -53,11 +53,11 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             ("variable", Some(matches)) => set::variable(b, matches),
             _ => unreachable!(),
         },
-        //     ("delete", Some(matches)) => match matches.subcommand() {
-        //         ("requests", Some(matches)) => delete_requests(b, matches),
-        //         ("variables", Some(matches)) => delete_variables(b, matches),
-        //         _ => unreachable!(),
-        //     },
+        ("delete", Some(matches)) => match matches.subcommand() {
+            ("requests", Some(matches)) => delete::requests(b, matches),
+            ("variables", Some(matches)) => delete::variables(b, matches),
+            _ => unreachable!(),
+        },
         //     ("run", Some(matches)) => execute_run(b, matches),
         _ => Err(Error::new(ErrorKind::NotFound)),
     }
