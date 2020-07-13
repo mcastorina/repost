@@ -26,6 +26,9 @@ impl LineReader {
         let request_yaml: Value = serde_yaml::from_str(include_str!("clap/request.yml")).unwrap();
         let h = LineReaderHelper {
             root_yaml: base_yaml.clone(),
+            environments: vec![],
+            requests: vec![],
+            workspaces: vec![],
         };
         let mut rl = Editor::with_config(config);
         rl.set_helper(Some(h));
@@ -65,10 +68,23 @@ impl LineReader {
     pub fn set_request(&mut self) {
         self.editor.helper_mut().unwrap().root_yaml = self.request_yaml.clone();
     }
+
+    pub fn environment_completions(&mut self, env: Vec<String>) {
+        self.editor.helper_mut().unwrap().environments = env;
+    }
+    pub fn request_completions(&mut self, reqs: Vec<String>) {
+        self.editor.helper_mut().unwrap().requests = reqs;
+    }
+    pub fn workspace_completions(&mut self, ws: Vec<String>) {
+        self.editor.helper_mut().unwrap().workspaces = ws;
+    }
 }
 
 pub struct LineReaderHelper {
     root_yaml: Value,
+    environments: Vec<String>,
+    requests: Vec<String>,
+    workspaces: Vec<String>,
 }
 
 impl Helper for LineReaderHelper {}
@@ -84,10 +100,21 @@ impl Completer for LineReaderHelper {
         _ctx: &Context,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         let line = format!("{}_", line);
+        // TODO: store CommandStructure instead of YAML
         let mut cmd = CommandStructure::from(&self.root_yaml);
-        // cmd.get_child_mut(vec!["set", "environment"])
-        //     .unwrap()
-        //     .completions = self.environments.clone();
+        // TODO: automatically detect where to use these completions from arg
+        if let Some(cmd) = cmd.get_child_mut(vec!["set", "environment"]) {
+            cmd.completions = self.environments.clone();
+        }
+        if let Some(cmd) = cmd.get_child_mut(vec!["set", "request"]) {
+            cmd.completions = self.requests.clone();
+        }
+        if let Some(cmd) = cmd.get_child_mut(vec!["set", "workspace"]) {
+            cmd.completions = self.workspaces.clone();
+        }
+        if let Some(cmd) = cmd.get_child_mut(vec!["run"]) {
+            cmd.completions = self.requests.clone();
+        }
         let mut cmd = &cmd;
         // split line
         let mut tokens = line.split_whitespace();

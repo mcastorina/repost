@@ -18,6 +18,23 @@ impl Bastion {
             db: Db::new("repost.db")?,
             line_reader: LineReader::new(),
         };
+        bastion.line_reader.environment_completions(
+            bastion
+                .get_environments()?
+                .iter()
+                .map(|x| String::from(x.name()))
+                .collect(),
+        );
+        bastion.line_reader.request_completions(
+            bastion
+                .get_requests()?
+                .iter()
+                .map(|x| String::from(x.name()))
+                .collect(),
+        );
+        bastion
+            .line_reader
+            .workspace_completions(bastion.get_workspaces()?);
         Ok(bastion)
     }
 
