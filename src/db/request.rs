@@ -1,8 +1,9 @@
 use super::PrintableTableStruct;
-use super::{db::DbObject, Db};
-use crate::error::Result;
+use super::{db::DbObject, Db, InputOption};
+use crate::error::{Error, ErrorKind, Result};
 use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
+use regex::Regex;
 
 pub struct Request {
     name: String,
@@ -119,6 +120,58 @@ impl Request {
     pub fn consume_body(&mut self) -> Option<Vec<u8>> {
         self.body.take()
     }
+    pub fn variable_names(&self) -> Vec<String> {
+        // find all variables in the request
+        // TODO: lazy static
+        let re = Regex::new(r"\{(.*?)\}").unwrap();
+        let mut names: Vec<String> = re
+            .captures_iter(&self.url)
+            .map(|cap| String::from(cap.get(1).unwrap().as_str()))
+            .collect();
+        if let Some(headers) = &self.headers {
+            let mut headers: Vec<String> = re
+                .captures_iter(&headers)
+                .map(|cap| String::from(cap.get(1).unwrap().as_str()))
+                .collect();
+            names.append(&mut headers);
+        }
+        if let Some(body) = &self.body {
+            let re = regex::bytes::Regex::new(r"\{(.*?)\}").unwrap();
+            let mut body: Vec<String> = re
+                .captures_iter(&body)
+                .map(|cap| String::from_utf8(cap.get(1).unwrap().as_bytes().to_vec()))
+                .filter_map(|x| x.ok())
+                .collect();
+            names.append(&mut body);
+        }
+
+        // TODO: unique names
+        names
+    }
+    pub fn replace_input_options(&mut self, options: &Vec<InputOption>) -> Result<()> {
+        // TODO: better replacement for all options
+        //       this could result in some unexpected behavior
+        //       will need to do a two pass approach:
+        //          1. find all start/end indices
+        //          2. iterate backwards to perform replacement
+        // find all variables and replace with values in options
+        for opt in options {
+            if opt.value().is_none() {
+                // All input options are required
+                return Err(Error::new(ErrorKind::MissingOption(String::from(opt.name()))));
+            }
+            let old = format!("{{{}}}", opt.name());
+            let new = opt.value().unwrap();
+            self.url = self.url.replace(&old, &new);
+            self.headers = self.headers.as_ref().map(|h| h.replace(&old, &new));
+            if let Some(body) = &self.body {
+                let old = format!(r"\{{{}\}}", opt.name());
+                let re = regex::bytes::Regex::new(&old).unwrap();
+                self.body = Some(re.replace_all(&body, new.as_bytes()).to_vec());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl DbObject for Request {
@@ -134,15 +187,28 @@ impl DbObject for Request {
                 self.body
             ],
         )?;
-        // TODO: create input options
+        // create input options
+        for var_name in self.variable_names().iter() {
+            InputOption::new(self.name(), var_name, None).create(conn)?;
+        }
         Ok(())
     }
     fn delete(&self, conn: &Connection) -> Result<()> {
-        // TODO: delete input / output options
+        // TODO: should this get the options for the request, then call delete()
+        //       on the objects?
+        conn.execute(
+            "DELETE FROM input_options WHERE request_name = ?1;",
+            params![self.name],
+        )?;
+        conn.execute(
+            "DELETE FROM output_options WHERE request_name = ?1;",
+            params![self.name],
+        )?;
         conn.execute("DELETE FROM requests WHERE name = ?1;", params![self.name])?;
         Ok(())
     }
     fn update(&self, conn: &Connection) -> Result<usize> {
+        // TODO: update input/output options
         let num = conn.execute(
             "UPDATE requests SET method = ?2, url = ?3, headers = ?4, body = ?5 WHERE name = ?1;",
             params![

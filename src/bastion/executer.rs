@@ -1,5 +1,5 @@
 use super::bastion::{Bastion, ReplState};
-use crate::cmd::{create, delete, set, show};
+use crate::cmd::{create, delete, run, set, show};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::{load_yaml, App};
 
@@ -58,7 +58,8 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             ("variables", Some(matches)) => delete::variables(b, matches),
             _ => unreachable!(),
         },
-        //     ("run", Some(matches)) => execute_run(b, matches),
+        // TODO: run in request state
+        ("run", Some(matches)) => run::execute(b, matches, matches.value_of("request").unwrap()),
         _ => Err(Error::new(ErrorKind::NotFound)),
     }
 }

@@ -46,6 +46,7 @@ pub fn request(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     request.set_body(body);
     request.create(b.conn())?;
     // TODO: update options for request
+    b.set_completions()?;
     Ok(())
 }
 
@@ -75,5 +76,6 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         Variable::new(name, &environment, Some(&value), Some("user")).create(b.conn())?;
     }
     // TODO update options for variable
+    b.set_completions()?;
     Ok(())
 }

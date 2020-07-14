@@ -40,6 +40,9 @@ impl InputOption {
     pub fn request_name(&self) -> &str {
         self.request_name.as_ref()
     }
+    pub fn value(&self) -> Option<&str> {
+        self.value.as_deref()
+    }
     pub fn set_value(&mut self, value: Option<&str>) {
         self.value = value.map(|x| String::from(x));
     }
@@ -145,6 +148,9 @@ impl OutputOption {
     }
     pub fn request_name(&self) -> &str {
         self.request_name.as_ref()
+    }
+    pub fn extraction_source(&self) -> &str {
+        self.extraction_source.as_ref()
     }
 }
 

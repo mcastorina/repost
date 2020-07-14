@@ -16,6 +16,7 @@ pub fn requests(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         }
         // TODO: update options for request
     }
+    b.set_completions()?;
     Ok(())
 }
 
@@ -32,5 +33,6 @@ pub fn variables(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         }
         // TODO: update options for variable
     }
+    b.set_completions()?;
     Ok(())
 }
