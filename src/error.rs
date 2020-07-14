@@ -27,7 +27,7 @@ impl std::fmt::Display for Error {
             ErrorKind::ClapError(x) => write!(f, "{}", x),
             ErrorKind::IOError(x) => write!(f, "{}", x),
             ErrorKind::ArgumentError(x) => write!(f, "{}", x),
-            ErrorKind::MissingOption(x) => write!(f, "{}", x),
+            ErrorKind::MissingOption(x) => write!(f, "The following option is missing: {}", x),
             ErrorKind::ReqwestError(x) => write!(f, "{}", x),
             ErrorKind::NotFound => write!(f, "Not found."),
             ErrorKind::ParseError => write!(f, "Parse error."),

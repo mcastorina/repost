@@ -59,7 +59,7 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             _ => unreachable!(),
         },
         // TODO: run in request state
-        ("run", Some(matches)) => run::execute(b, matches, matches.value_of("request").unwrap()),
+        ("run", Some(matches)) => run::execute(b, matches, matches.value_of("request")),
         _ => Err(Error::new(ErrorKind::NotFound)),
     }
 }

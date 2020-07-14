@@ -34,7 +34,7 @@ impl InputOption {
         Ok(())
     }
 
-    pub fn name(&self) -> &str {
+    pub fn option_name(&self) -> &str {
         self.option_name.as_ref()
     }
     pub fn request_name(&self) -> &str {
@@ -143,7 +143,7 @@ impl OutputOption {
         Ok(())
     }
 
-    pub fn name(&self) -> &str {
+    pub fn option_name(&self) -> &str {
         self.option_name.as_ref()
     }
     pub fn request_name(&self) -> &str {

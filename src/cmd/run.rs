@@ -1,16 +1,20 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, Method, Request, Variable, InputOption, OutputOption};
+use crate::db::{DbObject, InputOption, Method, OutputOption, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
-use reqwest::blocking;
 use colored::*;
-use serde_json::Value;
 use regex::Regex;
+use reqwest::blocking;
 use reqwest::header::HeaderMap;
+use serde_json::Value;
 
-pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: &str) -> Result<()> {
+pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Result<()> {
+    let req = req.or(b.current_request());
+    if req.is_none() {
+        return Err(Error::new(ErrorKind::NotFound));
+    }
     // get the request object
-    let mut req = Request::get_by_name(b.conn(), req)?;
+    let mut req = Request::get_by_name(b.conn(), req.unwrap())?;
     match req.len() {
         0 => return Err(Error::new(ErrorKind::NotFound)),
         1 => (),
@@ -147,7 +151,9 @@ fn body_to_var(opt: &OutputOption, body: &str) -> Result<Variable> {
     ))
 }
 fn header_to_var(opt: &OutputOption, headers: &HeaderMap) -> Result<Variable> {
-    let value = headers.get(opt.extraction_source()).map(|x| x.to_str().unwrap());
+    let value = headers
+        .get(opt.extraction_source())
+        .map(|x| x.to_str().unwrap());
     if value.is_none() {
         return Err(Error::new(ErrorKind::ParseError));
     }

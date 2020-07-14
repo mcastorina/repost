@@ -25,22 +25,33 @@ impl Bastion {
         self.db.conn()
     }
     pub fn set_completions(&mut self) -> Result<()> {
-        self.line_reader.environment_completions(
-            self
-                .get_environments()?
-                .iter()
-                .map(|x| String::from(x.name()))
-                .collect(),
-        );
-        self.line_reader.request_completions(
-            self
-                .get_requests()?
-                .iter()
-                .map(|x| String::from(x.name()))
-                .collect(),
-        );
+        self.line_reader
+            .environment_completions(Environment::collect_all(self.conn(), |x| {
+                String::from(x.name())
+            })?);
+        self.line_reader
+            .request_completions(Request::collect_all(self.conn(), |x| {
+                String::from(x.name())
+            })?);
+        self.line_reader
+            .variable_completions(Variable::collect_all(self.conn(), |x| {
+                String::from(x.name())
+            })?);
         self.line_reader
             .workspace_completions(self.get_workspaces()?);
+
+        let input_options = match &self.state {
+            ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
+                InputOption::get_by_name(self.conn(), req)?
+            }
+            _ => vec![],
+        };
+        self.line_reader.input_option_completions(
+            input_options
+                .into_iter()
+                .map(|x| String::from(x.option_name()))
+                .collect(),
+        );
         Ok(())
     }
 
@@ -56,22 +67,30 @@ impl Bastion {
     pub fn state(&self) -> &ReplState {
         &self.state
     }
+    pub fn current_request(&self) -> Option<&str> {
+        match &self.state {
+            ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
+                Some(req.as_ref())
+            }
+            _ => None,
+        }
+    }
 
     // TODO: filter these results based on state
     pub fn get_requests(&self) -> Result<Vec<Request>> {
-        Request::get_all(self.db.conn())
+        Request::get_all(self.conn())
     }
     pub fn get_variables(&self) -> Result<Vec<Variable>> {
-        Variable::get_all(self.db.conn())
+        Variable::get_all(self.conn())
     }
     pub fn get_environments(&self) -> Result<Vec<Environment>> {
-        Environment::get_all(self.db.conn())
+        Environment::get_all(self.conn())
     }
     pub fn get_input_options(&self) -> Result<Vec<InputOption>> {
-        InputOption::get_all(self.db.conn())
+        InputOption::get_all(self.conn())
     }
     pub fn get_output_options(&self) -> Result<Vec<OutputOption>> {
-        OutputOption::get_all(self.db.conn())
+        OutputOption::get_all(self.conn())
     }
     pub fn get_workspaces(&self) -> Result<Vec<String>> {
         // TODO: option for config directory; set default to $XDG_CONFIG_DIR/repost
@@ -133,7 +152,7 @@ impl Bastion {
             }
         };
         // update completions
-        self.set_completions();
+        self.set_completions()?;
         // TODO: update options
         Ok(())
     }
@@ -153,15 +172,16 @@ impl Bastion {
             Some(_) => self.line_reader.set_request(),
             None => self.line_reader.set_base(),
         };
+        self.set_completions()?;
         Ok(())
     }
     pub fn set_option(&self, option_name: &str, value: Option<&str>) -> Result<()> {
         match &self.state {
             ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
-                // TODO: maybe this is confusing -- rename name() to option_name()
-                let opt =
-                    InputOption::get_by_name_map(self.db.conn(), &req, |e| String::from(e.name()))?
-                        .remove(option_name);
+                let opt = InputOption::get_by_name_map(self.db.conn(), &req, |e| {
+                    String::from(e.option_name())
+                })?
+                .remove(option_name);
                 if opt.is_none() {
                     Err(Error::new(ErrorKind::NotFound))
                 } else {

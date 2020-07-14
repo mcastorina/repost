@@ -2,8 +2,8 @@ use super::PrintableTableStruct;
 use super::{db::DbObject, Db, InputOption};
 use crate::error::{Error, ErrorKind, Result};
 use comfy_table::Cell;
-use rusqlite::{params, Connection, NO_PARAMS};
 use regex::Regex;
+use rusqlite::{params, Connection, NO_PARAMS};
 
 pub struct Request {
     name: String,
@@ -158,14 +158,16 @@ impl Request {
         for opt in options {
             if opt.value().is_none() {
                 // All input options are required
-                return Err(Error::new(ErrorKind::MissingOption(String::from(opt.name()))));
+                return Err(Error::new(ErrorKind::MissingOption(String::from(
+                    opt.option_name(),
+                ))));
             }
-            let old = format!("{{{}}}", opt.name());
+            let old = format!("{{{}}}", opt.option_name());
             let new = opt.value().unwrap();
             self.url = self.url.replace(&old, &new);
             self.headers = self.headers.as_ref().map(|h| h.replace(&old, &new));
             if let Some(body) = &self.body {
-                let old = format!(r"\{{{}\}}", opt.name());
+                let old = format!(r"\{{{}\}}", opt.option_name());
                 let re = regex::bytes::Regex::new(&old).unwrap();
                 self.body = Some(re.replace_all(&body, new.as_bytes()).to_vec());
             }

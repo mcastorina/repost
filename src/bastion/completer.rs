@@ -24,12 +24,7 @@ impl LineReader {
             .build();
         let base_yaml: Value = serde_yaml::from_str(include_str!("clap/base.yml")).unwrap();
         let request_yaml: Value = serde_yaml::from_str(include_str!("clap/request.yml")).unwrap();
-        let h = LineReaderHelper {
-            root_yaml: base_yaml.clone(),
-            environments: vec![],
-            requests: vec![],
-            workspaces: vec![],
-        };
+        let h = LineReaderHelper::new(&base_yaml);
         let mut rl = Editor::with_config(config);
         rl.set_helper(Some(h));
         rl.load_history("history.txt").unwrap_or(());
@@ -75,6 +70,12 @@ impl LineReader {
     pub fn request_completions(&mut self, reqs: Vec<String>) {
         self.editor.helper_mut().unwrap().requests = reqs;
     }
+    pub fn variable_completions(&mut self, vars: Vec<String>) {
+        self.editor.helper_mut().unwrap().variables = vars;
+    }
+    pub fn input_option_completions(&mut self, opts: Vec<String>) {
+        self.editor.helper_mut().unwrap().input_options = opts;
+    }
     pub fn workspace_completions(&mut self, ws: Vec<String>) {
         self.editor.helper_mut().unwrap().workspaces = ws;
     }
@@ -84,7 +85,21 @@ pub struct LineReaderHelper {
     root_yaml: Value,
     environments: Vec<String>,
     requests: Vec<String>,
+    variables: Vec<String>,
+    input_options: Vec<String>,
     workspaces: Vec<String>,
+}
+impl LineReaderHelper {
+    fn new(base_yaml: &Value) -> LineReaderHelper {
+        LineReaderHelper {
+            root_yaml: base_yaml.clone(),
+            environments: vec![],
+            requests: vec![],
+            variables: vec![],
+            input_options: vec![],
+            workspaces: vec![],
+        }
+    }
 }
 
 impl Helper for LineReaderHelper {}
@@ -109,11 +124,20 @@ impl Completer for LineReaderHelper {
         if let Some(cmd) = cmd.get_child_mut(vec!["set", "request"]) {
             cmd.completions = self.requests.clone();
         }
-        if let Some(cmd) = cmd.get_child_mut(vec!["delete", "request"]) {
-            cmd.completions = self.requests.clone();
+        if let Some(cmd) = cmd.get_child_mut(vec!["set", "variable"]) {
+            cmd.completions = self.variables.clone();
         }
         if let Some(cmd) = cmd.get_child_mut(vec!["set", "workspace"]) {
             cmd.completions = self.workspaces.clone();
+        }
+        if let Some(cmd) = cmd.get_child_mut(vec!["set", "option"]) {
+            cmd.completions = self.input_options.clone();
+        }
+        if let Some(cmd) = cmd.get_child_mut(vec!["delete", "requests"]) {
+            cmd.completions = self.requests.clone();
+        }
+        if let Some(cmd) = cmd.get_child_mut(vec!["delete", "variables"]) {
+            cmd.completions = self.variables.clone();
         }
         if let Some(cmd) = cmd.get_child_mut(vec!["run"]) {
             cmd.completions = self.requests.clone();

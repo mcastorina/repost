@@ -12,6 +12,10 @@ subcommands:
         about: Run a named HTTP request
         visible_aliases: ["r"]
         args:
+            - request:
+                help: Request to run
+                required: false
+                multiple: false # TODO run multiple in a row
             - quiet:
                 help: Print only the response body
                 short: q

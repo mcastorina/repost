@@ -124,4 +124,23 @@ pub trait DbObject {
         }
         Ok(m)
     }
+    fn collect_all<F, T>(conn: &Connection, f: F) -> Result<Vec<T>>
+    where
+        Self: std::marker::Sized,
+        F: Fn(&Self) -> T,
+    {
+        // TODO: unique values
+        Ok(Self::get_all(conn)?.into_iter().map(|x| f(&x)).collect())
+    }
+    fn collect_by<F, T>(conn: &Connection, f: F) -> Result<Vec<T>>
+    where
+        Self: std::marker::Sized,
+        F: Fn(&Self) -> Option<T>,
+    {
+        // TODO: unique values
+        Ok(Self::get_all(conn)?
+            .into_iter()
+            .filter_map(|x| f(&x))
+            .collect())
+    }
 }
