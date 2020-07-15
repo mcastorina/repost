@@ -98,7 +98,7 @@ impl Bastion {
     }
     pub fn current_environment(&self) -> Option<&str> {
         match &self.state {
-            ReplState::Environment(_, env) | ReplState::EnvironmentRequest(_, _, env) => {
+            ReplState::Environment(_, env) | ReplState::EnvironmentRequest(_, env, _) => {
                 Some(env.as_ref())
             }
             _ => None,
