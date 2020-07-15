@@ -119,7 +119,7 @@ id => 1
   +------+-------------+---------------------------+-------------+
   | host | local       | http://localhost:8080     | user        |
   | host | stage       | https://stage.example.com | user        |
-  | id   |             | 1                         | get-example |
+  | id   | local       | 1                         | get-example |
   +------+-------------+---------------------------+-------------+
 
 ```

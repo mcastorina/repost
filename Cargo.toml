@@ -16,6 +16,6 @@ regex = "1"
 colored = "1.9"
 serde_json = "1.0"
 comfy-table = "0.1.1"
-terminal_size = "0.1.12" # TODO: get terminal size from rustyline
+terminal_size = "0.1.12"
 rustyline = "6.2.0"
 serde_yaml = "0.8"

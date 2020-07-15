@@ -71,7 +71,6 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         .collect();
 
     for env_val in env_vals {
-        // TODO: create a new variable function
         let (environment, value) = env_val;
         Variable::new(name, &environment, Some(&value), Some("user")).create(b.conn())?;
     }

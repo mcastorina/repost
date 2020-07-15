@@ -86,8 +86,8 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     // extract options into variables
     for opt in output_opts {
         let var = match opt.extraction_type() {
-            "body" => body_to_var(&opt, &text),
-            "header" => header_to_var(&opt, resp.headers()),
+            "body" => body_to_var(&opt, &text, b.current_environment()),
+            "header" => header_to_var(&opt, resp.headers(), b.current_environment()),
             x => {
                 println!("Encountered unexpected source: {}", x);
                 continue;
@@ -144,16 +144,16 @@ fn create_reqwest(req: &mut Request) -> Result<blocking::Request> {
 
     Ok(builder.build()?)
 }
-fn body_to_var(opt: &OutputOption, body: &str) -> Result<Variable> {
+fn body_to_var(opt: &OutputOption, body: &str, env: Option<&str>) -> Result<Variable> {
     let value = get_json_value(body, opt.extraction_source())?;
     Ok(Variable::new(
         opt.option_name(),
-        "", // TODO use current environment
+        env.unwrap_or(""), // TODO: allow None for environment
         value.as_str(),
         None,
     ))
 }
-fn header_to_var(opt: &OutputOption, headers: &HeaderMap) -> Result<Variable> {
+fn header_to_var(opt: &OutputOption, headers: &HeaderMap, env: Option<&str>) -> Result<Variable> {
     let value = headers
         .get(opt.extraction_source())
         .map(|x| x.to_str().unwrap());
@@ -162,13 +162,12 @@ fn header_to_var(opt: &OutputOption, headers: &HeaderMap) -> Result<Variable> {
     }
     Ok(Variable::new(
         opt.option_name(),
-        "", // TODO use current environment
+        env.unwrap_or(""), // TODO: allow None for environment
         value,
         None,
     ))
 }
 fn get_json_value(data: &str, query: &str) -> Result<Value> {
-    // TODO: Result
     let mut v: Value = serde_json::from_str(data)?;
     let mut result: &mut Value = &mut v;
 
