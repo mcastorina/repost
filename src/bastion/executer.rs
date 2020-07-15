@@ -34,7 +34,7 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             ("environments", Some(matches)) => show::print_table(matches, b.get_environments()?),
             ("options", Some(matches)) => {
                 show::print_table(matches, b.get_input_options()?)?;
-                show::print_table(matches, b.get_output_options()?)?;
+                // show::print_table(matches, b.get_output_options()?)?;
                 Ok(())
             }
             ("workspaces", Some(matches)) => {

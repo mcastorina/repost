@@ -15,7 +15,7 @@ This section shows how to create a request, define variables, and
 add extractors.
 
 ```
-[repost] > use workspace example
+[repost] > set workspace example
 [example] > create request get-example {host}/data.json
 [example] > create variable host local=http://localhost:8080 stage=https://stage.example.com
 [example] > use environment stage
@@ -28,6 +28,8 @@ add extractors.
   | get-example  | host        | https://stage.example.com |
   +--------------+-------------+---------------------------+
 
+[example][stage][get-example] > show
+requests      variables     environments  options       workspaces
 [example][stage][get-example] > use environment local
 [example][local][get-example] > show options
 
@@ -41,8 +43,8 @@ add extractors.
 > GET http://localhost:8080/data.json
 
 < 200 OK
-< server: SimpleHTTP/0.6 Python/3.7.6
-< date: Tue, 23 Jun 2020 16:19:51 GMT
+< server: SimpleHTTP/0.6 Python/3.6.7
+< date: Wed, 15 Jul 2020 17:27:11 GMT
 < content-type: application/json
 < content-length: 101
 < last-modified: Tue, 23 Jun 2020 16:19:42 GMT
@@ -61,7 +63,7 @@ add extractors.
     }
   ]
 }
-[example][local][get-example] > extract body id --to-var id
+[example][local][get-example] > extract body samples[0].id --to-var id
 [example][local][get-example] > info
 
       Name:  get-example
@@ -78,18 +80,18 @@ add extractors.
   +------+-----------------------+
 
   Output Options
-  +-----------------+------+--------+
-  | output variable | type | source |
-  +-----------------+------+--------+
-  | id              | body | id     |
-  +-----------------+------+--------+
+  +-----------------+------+---------------+
+  | output variable | type | source        |
+  +-----------------+------+---------------+
+  | id              | body | samples[0].id |
+  +-----------------+------+---------------+
 
 [example][local][get-example] > run
 > GET http://localhost:8080/data.json
 
 < 200 OK
-< server: SimpleHTTP/0.6 Python/3.7.6
-< date: Tue, 23 Jun 2020 16:20:34 GMT
+< server: SimpleHTTP/0.6 Python/3.6.7
+< date: Wed, 15 Jul 2020 17:28:42 GMT
 < content-type: application/json
 < content-length: 101
 < last-modified: Tue, 23 Jun 2020 16:19:42 GMT
@@ -109,15 +111,16 @@ add extractors.
   ]
 }
 
-id => abcde
+id => 1
 [example][local][get-example] > show variables
 
-  +-------+------+-------------+-----------------------+-------------+-------------------------+
-  | rowid | name | environment | value                 | source      | timestamp               |
-  +-------+------+-------------+-----------------------+-------------+-------------------------+
-  | 1     | host | local       | http://localhost:8080 | user        | 2020-06-23 16:17:06 UTC |
-  | 3     | id   | local       | abcde                 | get-example | 2020-06-23 16:20:34 UTC |
-  +-------+------+-------------+-----------------------+-------------+-------------------------+
+  +------+-------------+---------------------------+-------------+
+  | name | environment | value                     | source      |
+  +------+-------------+---------------------------+-------------+
+  | host | local       | http://localhost:8080     | user        |
+  | host | stage       | https://stage.example.com | user        |
+  | id   |             | 1                         | get-example |
+  +------+-------------+---------------------------+-------------+
 
 ```
 
@@ -148,7 +151,7 @@ or a part of a JSON body and save it in a variable.
 | :white_check_mark: | automatically set input option to variable value |
 | :white_check_mark: | edit variable                                    |
 | :soon:             | edit request                                     |
-| :soon:             | tab completion                                   |
+| :white_check_mark: | tab completion                                   |
 |                    | extract from all items in an array               |
 |                    | extract from other data formats                  |
 |                    | option to hide variable values                   |
