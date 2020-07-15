@@ -1,5 +1,5 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, Method, Request, Variable};
+use crate::db::{DbObject, InputOption, Method, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use std::fs;
@@ -45,7 +45,7 @@ pub fn request(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
 
     request.set_body(body);
     request.create(b.conn())?;
-    // TODO: update options for request
+    b.set_options(InputOption::get_by_name(b.conn(), request.name())?)?;
     b.set_completions()?;
     Ok(())
 }
@@ -75,7 +75,7 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         let (environment, value) = env_val;
         Variable::new(name, &environment, Some(&value), Some("user")).create(b.conn())?;
     }
-    // TODO update options for variable
+    b.set_options(InputOption::get_by(b.conn(), |x| x.option_name() == name)?)?;
     b.set_completions()?;
     Ok(())
 }

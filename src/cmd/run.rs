@@ -107,7 +107,9 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
             );
         }
         var.upsert(b.conn())?;
-        // TODO: update options for variable
+        b.set_options(InputOption::get_by(b.conn(), |x| {
+            x.option_name() == var.name()
+        })?)?;
     }
     b.set_completions()?;
     Ok(())

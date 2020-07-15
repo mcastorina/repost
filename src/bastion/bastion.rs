@@ -19,6 +19,7 @@ impl Bastion {
             line_reader: LineReader::new(),
         };
         bastion.set_completions()?;
+        bastion.set_options(InputOption::get_all(bastion.conn())?)?;
         Ok(bastion)
     }
     pub fn conn(&self) -> &Connection {
@@ -54,6 +55,34 @@ impl Bastion {
         );
         Ok(())
     }
+    pub fn set_options(&mut self, opts: Vec<InputOption>) -> Result<()> {
+        let env = self.current_environment();
+        if env.is_none() {
+            // if the current environment is none, clear the value
+            for mut opt in opts {
+                opt.set_value(None);
+                opt.update(self.conn())?;
+            }
+            return Ok(());
+        }
+        let env = env.unwrap();
+        // else set option.value according to the environment
+        for mut opt in opts {
+            let mut var = Variable::get_by(self.conn(), |x| {
+                x.name() == opt.option_name() && x.environment() == env
+            })?;
+            if var.len() == 0 {
+                opt.set_value(None);
+            } else if var.len() == 1 {
+                let var = &mut var[0];
+                opt.set_value(var.value());
+            } else {
+                unreachable!();
+            }
+            opt.update(self.conn())?;
+        }
+        Ok(())
+    }
 
     pub fn get_input(&mut self, input: &mut String) -> Option<()> {
         // read the line
@@ -66,6 +95,14 @@ impl Bastion {
 
     pub fn state(&self) -> &ReplState {
         &self.state
+    }
+    pub fn current_environment(&self) -> Option<&str> {
+        match &self.state {
+            ReplState::Environment(_, env) | ReplState::EnvironmentRequest(_, _, env) => {
+                Some(env.as_ref())
+            }
+            _ => None,
+        }
     }
     pub fn current_request(&self) -> Option<&str> {
         match &self.state {
@@ -151,9 +188,8 @@ impl Bastion {
                 }
             }
         };
-        // update completions
+        self.set_options(InputOption::get_all(self.conn())?)?;
         self.set_completions()?;
-        // TODO: update options
         Ok(())
     }
     pub fn set_environment(&mut self, env: Option<&str>) -> Result<()> {
@@ -161,6 +197,7 @@ impl Bastion {
             return Err(Error::new(ErrorKind::NotFound));
         }
         self.state.set_environment(env)?;
+        self.set_options(InputOption::get_all(self.conn())?)?;
         Ok(())
     }
     pub fn set_request(&mut self, req: Option<&str>) -> Result<()> {

@@ -66,14 +66,18 @@ pub trait DbObject {
         Self: std::marker::Sized;
     fn name(&self) -> &str;
 
+    fn get_by<F>(conn: &Connection, f: F) -> Result<Vec<Self>>
+    where
+        Self: std::marker::Sized,
+        F: Fn(&Self) -> bool,
+    {
+        Ok(Self::get_all(conn)?.into_iter().filter(f).collect())
+    }
     fn get_by_name(conn: &Connection, name: &str) -> Result<Vec<Self>>
     where
         Self: std::marker::Sized,
     {
-        Ok(Self::get_all(conn)?
-            .into_iter()
-            .filter(|x| x.name() == name)
-            .collect())
+        Self::get_by(conn, |x| x.name() == name)
     }
     fn delete_by_name(conn: &Connection, name: &str) -> Result<()>
     where
