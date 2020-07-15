@@ -12,7 +12,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn new() -> Result<Repl> {
-        let mut repl = Repl {
+        let repl = Repl {
             bastion: Bastion::new()?,
         };
         Ok(repl)

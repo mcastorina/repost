@@ -1,16 +1,11 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Method, OutputOption, Request, Variable};
+use crate::db::{DbObject, InputOption, OutputOption, Request};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
-use colored::*;
 use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
-use regex::Regex;
-use reqwest::blocking;
-use reqwest::header::HeaderMap;
-use serde_json::Value;
 use terminal_size::{terminal_size, Width};
 
-pub fn execute(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
+pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
     if b.current_request().is_none() {
         return Err(Error::new(ErrorKind::ArgumentError(
             "Info is only available in a request specific context. Try setting a request first.",

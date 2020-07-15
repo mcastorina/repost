@@ -1,6 +1,6 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Method, Request, Variable};
-use crate::error::{Error, ErrorKind, Result};
+use crate::db::{DbObject, InputOption, Request, Variable};
+use crate::error::Result;
 use clap_v3::ArgMatches;
 
 pub fn requests(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {

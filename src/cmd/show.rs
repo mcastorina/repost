@@ -6,7 +6,7 @@ use terminal_size::{terminal_size, Width};
 
 pub const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
 
-pub fn print_table<T: PrintableTable>(matches: &ArgMatches, t: T) -> Result<()> {
+pub fn print_table<T: PrintableTable>(_matches: &ArgMatches, t: T) -> Result<()> {
     let mut width = 76;
     if let Some((Width(w), _)) = terminal_size() {
         width = w - 4;

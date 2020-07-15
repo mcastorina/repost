@@ -1,10 +1,8 @@
+use super::DbObject;
 use super::PrintableTableStruct;
-use super::{db::DbObject, Db};
 use crate::error::Result;
-use chrono::Utc;
 use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
-use std::collections::HashMap;
 
 pub struct InputOption {
     request_name: String,

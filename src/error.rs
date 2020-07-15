@@ -78,21 +78,21 @@ impl From<reqwest::Error> for Error {
     }
 }
 impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Error {
+    fn from(_err: serde_json::Error) -> Error {
         Error {
             kind: ErrorKind::ParseError,
         }
     }
 }
 impl From<regex::Error> for Error {
-    fn from(err: regex::Error) -> Error {
+    fn from(_err: regex::Error) -> Error {
         Error {
             kind: ErrorKind::ParseError,
         }
     }
 }
 impl From<std::num::ParseIntError> for Error {
-    fn from(err: std::num::ParseIntError) -> Error {
+    fn from(_err: std::num::ParseIntError) -> Error {
         Error {
             kind: ErrorKind::ParseError,
         }

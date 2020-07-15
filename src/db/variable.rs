@@ -1,5 +1,5 @@
+use super::DbObject;
 use super::PrintableTableStruct;
-use super::{db::DbObject, Db};
 use crate::error::Result;
 use chrono::Utc;
 use comfy_table::Cell;
@@ -52,9 +52,6 @@ impl Variable {
     }
     pub fn value(&self) -> Option<&str> {
         self.value.as_deref()
-    }
-    pub fn consume_value(&mut self) -> Option<String> {
-        self.value.take()
     }
     pub fn set_value(&mut self, value: Option<&str>) {
         self.value = value.map(|x| String::from(x));

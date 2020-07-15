@@ -1,5 +1,5 @@
 use super::PrintableTableStruct;
-use super::{db::DbObject, Db, InputOption};
+use super::{DbObject, InputOption};
 use crate::error::{Error, ErrorKind, Result};
 use comfy_table::Cell;
 use regex::Regex;

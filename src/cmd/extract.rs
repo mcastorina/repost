@@ -1,12 +1,7 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Method, OutputOption, Request, Variable};
+use crate::db::{DbObject, OutputOption};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
-use colored::*;
-use regex::Regex;
-use reqwest::blocking;
-use reqwest::header::HeaderMap;
-use serde_json::Value;
 
 pub fn execute(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     if b.current_request().is_none() {

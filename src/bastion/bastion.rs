@@ -1,5 +1,5 @@
 use super::completer::LineReader;
-use crate::db::{self, Db, DbObject, Environment, InputOption, OutputOption, Request, Variable};
+use crate::db::{Db, DbObject, Environment, InputOption, OutputOption, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use colored::*;
 use rusqlite::Connection;

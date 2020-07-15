@@ -1,12 +1,11 @@
 use rustyline::completion::{Completer, Pair};
 use rustyline::config::OutputStreamType;
 use rustyline::error::ReadlineError;
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
-use rustyline::hint::{Hinter, HistoryHinter};
-use rustyline::validate::{MatchingBracketValidator, Validator};
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::validate::Validator;
 use rustyline::{CompletionType, Config, Context, EditMode, Editor, Helper};
 use serde_yaml::Value;
-use std::collections::HashMap;
 
 pub struct LineReader {
     editor: Editor<LineReaderHelper>,

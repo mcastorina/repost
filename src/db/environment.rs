@@ -1,9 +1,8 @@
+use super::DbObject;
 use super::PrintableTableStruct;
-use super::{db::DbObject, Db};
 use crate::error::Result;
-use chrono::Utc;
 use comfy_table::Cell;
-use rusqlite::{params, Connection, NO_PARAMS};
+use rusqlite::{Connection, NO_PARAMS};
 
 pub struct Environment {
     name: String,
@@ -16,14 +15,14 @@ impl Environment {
 }
 
 impl DbObject for Environment {
-    fn create(&self, conn: &Connection) -> Result<()> {
+    fn create(&self, _conn: &Connection) -> Result<()> {
         // TODO: return an error, but these should never be called
         Ok(())
     }
-    fn delete(&self, conn: &Connection) -> Result<()> {
+    fn delete(&self, _conn: &Connection) -> Result<()> {
         Ok(())
     }
-    fn update(&self, conn: &Connection) -> Result<usize> {
+    fn update(&self, _conn: &Connection) -> Result<usize> {
         Ok(0)
     }
     fn get_all(conn: &Connection) -> Result<Vec<Environment>> {
