@@ -4,6 +4,8 @@ use crate::error::{Error, ErrorKind, Result};
 use comfy_table::Cell;
 use regex::Regex;
 use rusqlite::{params, Connection, NO_PARAMS};
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 pub struct Request {
     name: String,
@@ -120,7 +122,7 @@ impl Request {
     pub fn consume_body(&mut self) -> Option<Vec<u8>> {
         self.body.take()
     }
-    pub fn variable_names(&self) -> Vec<String> {
+    pub fn variable_names(&self) -> HashSet<String> {
         // find all variables in the request
         // TODO: lazy static
         let re = Regex::new(r"\{(.*?)\}").unwrap();
@@ -145,8 +147,7 @@ impl Request {
             names.append(&mut body);
         }
 
-        // TODO: unique names
-        names
+        HashSet::from_iter(names.into_iter())
     }
     pub fn replace_input_options(&mut self, options: &Vec<InputOption>) -> Result<()> {
         // TODO: better replacement for all options

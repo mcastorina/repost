@@ -3,6 +3,8 @@ use crate::error::Result;
 use comfy_table::Cell;
 use rusqlite::{Connection, NO_PARAMS};
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 pub struct Db {
     conn: Connection,
@@ -132,19 +134,24 @@ pub trait DbObject {
     where
         Self: std::marker::Sized,
         F: Fn(&Self) -> T,
+        T: std::cmp::Eq + std::hash::Hash,
     {
-        // TODO: unique values
-        Ok(Self::get_all(conn)?.into_iter().map(|x| f(&x)).collect())
+        Ok(
+            HashSet::<T>::from_iter(Self::get_all(conn)?.into_iter().map(|x| f(&x)))
+                .into_iter()
+                .collect(),
+        )
     }
     fn collect_by<F, T>(conn: &Connection, f: F) -> Result<Vec<T>>
     where
         Self: std::marker::Sized,
         F: Fn(&Self) -> Option<T>,
+        T: std::cmp::Eq + std::hash::Hash,
     {
-        // TODO: unique values
-        Ok(Self::get_all(conn)?
-            .into_iter()
-            .filter_map(|x| f(&x))
-            .collect())
+        Ok(
+            HashSet::<T>::from_iter(Self::get_all(conn)?.into_iter().filter_map(|x| f(&x)))
+                .into_iter()
+                .collect(),
+        )
     }
 }
