@@ -59,6 +59,9 @@ impl Variable {
     pub fn set_value(&mut self, value: Option<&str>) {
         self.value = value.map(|x| String::from(x));
     }
+    pub fn set_source(&mut self, source: Option<&str>) {
+        self.source = source.map(|x| String::from(x));
+    }
 }
 
 impl DbObject for Variable {

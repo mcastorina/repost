@@ -149,6 +149,9 @@ impl OutputOption {
     pub fn request_name(&self) -> &str {
         self.request_name.as_ref()
     }
+    pub fn extraction_type(&self) -> &str {
+        self.extraction_type.as_ref()
+    }
     pub fn extraction_source(&self) -> &str {
         self.extraction_source.as_ref()
     }

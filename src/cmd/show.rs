@@ -4,7 +4,7 @@ use clap_v3::ArgMatches;
 use comfy_table::{ContentArrangement, Table};
 use terminal_size::{terminal_size, Width};
 
-const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
+pub const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
 
 pub fn print_table<T: PrintableTable>(matches: &ArgMatches, t: T) -> Result<()> {
     let mut width = 76;

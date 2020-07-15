@@ -85,7 +85,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
 
     // extract options into variables
     for opt in output_opts {
-        let var = match opt.extraction_source() {
+        let var = match opt.extraction_type() {
             "body" => body_to_var(&opt, &text),
             "header" => header_to_var(&opt, resp.headers()),
             x => {
@@ -99,7 +99,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         }
         let mut var = var.unwrap();
         // TODO: set source
-        // var.source = Some(String::from(req.name()));
+        var.set_source(Some(req.name()));
         if !quiet {
             println!(
                 "{}",
@@ -109,6 +109,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         var.upsert(b.conn())?;
         // TODO: update options for variable
     }
+    b.set_completions()?;
     Ok(())
 }
 
@@ -144,7 +145,7 @@ fn create_reqwest(req: &mut Request) -> Result<blocking::Request> {
 fn body_to_var(opt: &OutputOption, body: &str) -> Result<Variable> {
     let value = get_json_value(body, opt.extraction_source())?;
     Ok(Variable::new(
-        opt.name(),
+        opt.option_name(),
         "", // TODO use current environment
         value.as_str(),
         None,
@@ -158,7 +159,7 @@ fn header_to_var(opt: &OutputOption, headers: &HeaderMap) -> Result<Variable> {
         return Err(Error::new(ErrorKind::ParseError));
     }
     Ok(Variable::new(
-        opt.name(),
+        opt.option_name(),
         "", // TODO use current environment
         value,
         None,
