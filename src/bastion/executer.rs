@@ -43,7 +43,16 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             _ => unreachable!(),
         },
         ("set", Some(matches)) => match matches.subcommand() {
-            ("workspace", Some(matches)) => b.set_workspace(matches.value_of("workspace").unwrap()),
+            ("workspace", Some(matches)) => {
+                // TODO: add validator to yaml once available
+                let ws = matches.value_of("workspace").unwrap();
+                if !ws.chars().all(char::is_alphanumeric) {
+                    return Err(Error::new(ErrorKind::ArgumentError(
+                        "Only alphanumeric characters allowed.",
+                    )));
+                }
+                b.set_workspace(ws)
+            }
             ("environment", Some(matches)) => b.set_environment(matches.value_of("environment")),
             ("request", Some(matches)) => b.set_request(matches.value_of("request")),
             ("option", Some(matches)) => b.set_option(
