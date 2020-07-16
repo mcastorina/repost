@@ -28,8 +28,6 @@ add extractors.
   | get-example  | host        | https://stage.example.com |
   +--------------+-------------+---------------------------+
 
-[example][stage][get-example] > show
-requests      variables     environments  options       workspaces
 [example][stage][get-example] > use environment local
 [example][local][get-example] > show options
 
