@@ -109,7 +109,7 @@ add extractors.
   ]
 }
 
-id => 1
+id <= 1
 [example][local][get-example] > show variables
 
   +------+-------------+---------------------------+-------------+

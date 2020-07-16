@@ -103,7 +103,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         if !quiet {
             println!(
                 "{}",
-                format!("{} => {}", var.name(), var.value().unwrap_or("")).bright_black()
+                format!("{} <= {}", var.name(), var.value().unwrap_or("")).bright_black()
             );
         }
         var.upsert(b.conn())?;
