@@ -26,7 +26,7 @@ impl LineReader {
         let h = LineReaderHelper::new(&base_yaml);
         let mut rl = Editor::with_config(config);
         rl.set_helper(Some(h));
-        rl.load_history("history.txt").unwrap_or(());
+        rl.load_history("repost_history").unwrap_or(());
 
         LineReader {
             editor: rl,
@@ -46,11 +46,11 @@ impl LineReader {
             }
             Err(ReadlineError::Interrupted) => Some(()),
             Err(ReadlineError::Eof) => {
-                self.editor.save_history("history.txt").unwrap_or(());
+                self.editor.save_history("repost_history").unwrap_or(());
                 None
             }
             Err(_) => {
-                self.editor.save_history("history.txt").unwrap_or(());
+                self.editor.save_history("repost_history").unwrap_or(());
                 None
             }
         }

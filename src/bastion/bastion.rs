@@ -171,6 +171,7 @@ impl Bastion {
                 if Request::exists(self.db.conn(), req.as_ref())? {
                     ReplState::Request(ws, req)
                 } else {
+                    self.line_reader.set_base();
                     ReplState::Base(ws)
                 }
             }
@@ -182,9 +183,15 @@ impl Bastion {
                     Request::exists(self.db.conn(), req.as_ref())?,
                 ) {
                     (true, true) => ReplState::EnvironmentRequest(ws, env, req),
-                    (true, false) => ReplState::Environment(ws, env),
+                    (true, false) => {
+                        self.line_reader.set_base();
+                        ReplState::Environment(ws, env)
+                    }
                     (false, true) => ReplState::Request(ws, req),
-                    (false, false) => ReplState::Base(ws),
+                    (false, false) => {
+                        self.line_reader.set_base();
+                        ReplState::Base(ws)
+                    }
                 }
             }
         };
