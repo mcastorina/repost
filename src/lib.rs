@@ -55,14 +55,9 @@ impl Repl {
                 std::process::exit(1);
             }
         }
-        if let Err(x) = env::set_current_dir(&root) {
-            println!("Could not set the working directory: {}", x);
-            println!("Quitting..");
-            std::process::exit(1);
-        }
 
         let repl = Repl {
-            bastion: Bastion::new()?,
+            bastion: Bastion::new(root)?,
         };
         Ok(repl)
     }

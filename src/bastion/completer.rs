@@ -6,14 +6,16 @@ use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
 use rustyline::{CompletionType, Config, Context, EditMode, Editor, Helper};
 use serde_yaml::Value;
+use std::path::{Path, PathBuf};
 
 pub struct LineReader {
+    root: PathBuf,
     editor: Editor<LineReaderHelper>,
     base_yaml: Value,
     request_yaml: Value,
 }
 impl LineReader {
-    pub fn new() -> LineReader {
+    pub fn new<P: AsRef<Path>>(root: P) -> LineReader {
         // setup rustyline
         let config = Config::builder()
             .history_ignore_space(true)
@@ -26,14 +28,16 @@ impl LineReader {
         let h = LineReaderHelper::new(&base_yaml);
         let mut rl = Editor::with_config(config);
         rl.set_helper(Some(h));
-        rl.load_history("repost_history").unwrap_or(());
 
-        LineReader {
+        let mut lr = LineReader {
+            root: root.as_ref().to_path_buf(),
             editor: rl,
             base_yaml,
             // TODO: add set difference of (base - request) subcommands to request_yaml
             request_yaml,
-        }
+        };
+        lr.editor.load_history(&lr.history_filepath()).unwrap_or(());
+        lr
     }
 
     pub fn read_line(&mut self, input: &mut String, prompt: String) -> Option<()> {
@@ -46,14 +50,17 @@ impl LineReader {
             }
             Err(ReadlineError::Interrupted) => Some(()),
             Err(ReadlineError::Eof) => {
-                self.editor.save_history("repost_history").unwrap_or(());
+                self.editor.save_history(&self.history_filepath()).unwrap_or(());
                 None
             }
             Err(_) => {
-                self.editor.save_history("repost_history").unwrap_or(());
+                self.editor.save_history(&self.history_filepath()).unwrap_or(());
                 None
             }
         }
+    }
+    fn history_filepath(&self) -> PathBuf {
+        self.root.join("repost_history")
     }
 
     pub fn set_base(&mut self) {

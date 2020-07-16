@@ -5,17 +5,25 @@ use rusqlite::{Connection, NO_PARAMS};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use std::path::{Path, PathBuf};
 
 pub struct Db {
+    root: PathBuf,
     conn: Connection,
 }
 impl Db {
-    pub fn new(path: &str) -> Result<Db> {
+    pub fn new<P: AsRef<Path>>(root: P, path: &str) -> Result<Db> {
         let db = Db {
-            conn: Connection::open(path)?,
+            root: root.as_ref().to_path_buf(),
+            conn: Connection::open(root.as_ref().join(path))?,
         };
         db.create_tables()?;
         Ok(db)
+    }
+    pub fn set_db(&mut self, path: &str) -> Result<()> {
+        self.conn = Connection::open(self.root.join(path))?;
+        self.create_tables()?;
+        Ok(())
     }
 
     pub fn conn(&self) -> &Connection {

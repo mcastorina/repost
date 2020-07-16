@@ -4,6 +4,7 @@ use crate::error::{Error, ErrorKind, Result};
 use colored::*;
 use rusqlite::Connection;
 use std::fs;
+use std::path::PathBuf;
 
 pub struct Bastion {
     state: ReplState,
@@ -12,11 +13,11 @@ pub struct Bastion {
 }
 
 impl Bastion {
-    pub fn new() -> Result<Bastion> {
+    pub fn new(root: PathBuf) -> Result<Bastion> {
         let mut bastion = Bastion {
             state: ReplState::Base(String::from("repost")),
-            db: Db::new("repost.db")?,
-            line_reader: LineReader::new(),
+            db: Db::new(&root, "repost.db")?,
+            line_reader: LineReader::new(&root),
         };
         bastion.set_completions()?;
         bastion.set_options(InputOption::get_all(bastion.conn())?)?;
@@ -155,7 +156,7 @@ impl Bastion {
     pub fn set_workspace(&mut self, workspace: &str) -> Result<()> {
         let ws = String::from(workspace);
 
-        self.db = Db::new(format!("{}.db", workspace).as_ref())?;
+        self.db.set_db(format!("{}.db", workspace).as_ref())?;
         self.state = match &self.state {
             ReplState::Base(_) => ReplState::Base(ws),
             ReplState::Environment(_, env) => {
