@@ -84,7 +84,8 @@ impl DbObject for Variable {
         Ok(())
     }
     fn update(&self, conn: &Connection) -> Result<usize> {
-        let num = conn.execute(
+        // first try by rowid
+        let mut num = conn.execute(
             "UPDATE variables SET
                 name = ?1,
                 environment = ?2,
@@ -101,6 +102,23 @@ impl DbObject for Variable {
                 self.rowid,
             ],
         )?;
+        // then try by name, environment
+        if num == 0 {
+            num = conn.execute(
+                "UPDATE variables SET
+                    value = ?3,
+                    source = ?4,
+                    timestamp = ?5
+                WHERE name = ?1 AND environment = ?2;",
+                params![
+                    self.name,
+                    self.environment,
+                    self.value,
+                    self.source,
+                    format!("{}", Utc::now().format("%Y-%m-%d %T %Z")),
+                ],
+            )?;
+        }
         Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<Variable>> {
