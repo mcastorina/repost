@@ -50,11 +50,15 @@ impl LineReader {
             }
             Err(ReadlineError::Interrupted) => Some(()),
             Err(ReadlineError::Eof) => {
-                self.editor.save_history(&self.history_filepath()).unwrap_or(());
+                self.editor
+                    .save_history(&self.history_filepath())
+                    .unwrap_or(());
                 None
             }
             Err(_) => {
-                self.editor.save_history(&self.history_filepath()).unwrap_or(());
+                self.editor
+                    .save_history(&self.history_filepath())
+                    .unwrap_or(());
                 None
             }
         }

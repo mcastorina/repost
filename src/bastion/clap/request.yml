@@ -22,6 +22,9 @@ subcommands:
                 long: quiet
                 takes_value: false
                 required: false
+            - no-pager:
+                long: no-pager
+                takes_value: false
     - extract:
         about: Extract data from the output of a request
         visible_aliases: ["ex"]

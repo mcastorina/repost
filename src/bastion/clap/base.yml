@@ -146,4 +146,7 @@ subcommands:
                 long: quiet
                 takes_value: false
                 required: false
+            - no-pager:
+                long: no-pager
+                takes_value: false
 

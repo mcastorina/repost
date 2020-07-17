@@ -7,6 +7,9 @@ use regex::Regex;
 use reqwest::blocking;
 use reqwest::header::HeaderMap;
 use serde_json::Value;
+use std::process::{Command, Stdio};
+use std::io::Write;
+use std::env;
 
 pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Result<()> {
     let req = req.or(b.current_request());
@@ -68,17 +71,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     resp.copy_to(&mut text)?;
     let text = String::from_utf8(text).unwrap();
 
-    // TODO: invoke $PAGER if length > $LINES
-    let v: serde_json::Result<serde_json::Value> = serde_json::from_str(&text);
-    if v.is_ok() {
-        let v = v.unwrap();
-        println!("{}", serde_json::to_string_pretty(&v).unwrap());
-    } else {
-        print!("{}", text);
-        if !(&text).ends_with('\n') {
-            println!("{}", "%".bold().reversed());
-        }
-    }
+    display_body(&text, matches.is_present("no-pager"));
     if output_opts.len() > 0 {
         println!();
     }
@@ -189,4 +182,35 @@ fn get_json_value(data: &str, query: &str) -> Result<Value> {
         }
     }
     Ok(result.take())
+}
+
+fn display_body(text: &str, no_pager: bool) {
+    let v: serde_json::Result<serde_json::Value> = serde_json::from_str(text);
+    let text = match v {
+        Ok(v) => format!("{}\n", serde_json::to_string_pretty(&v).unwrap()),
+        _ => String::from(text),
+    };
+
+    let mut used_pager = false;
+    if !no_pager && text.lines().count() > 80 {
+        // try to invoke $PAGER
+        // TODO: support args in $PAGER
+        if let Ok(pager) = env::var("PAGER") {
+            if let Ok(mut child) = Command::new(pager)
+                .stdin(Stdio::piped())
+                .spawn() {
+                if let Some(stdin) = child.stdin.as_mut() {
+                    let _ = stdin.write_all(text.as_bytes());
+                }
+                let _ = child.wait();
+                used_pager = true;
+            }
+        }
+    }
+    if !used_pager {
+        print!("{}", text);
+        if !(text).ends_with('\n') {
+            println!("{}", "%".bold().reversed());
+        }
+    }
 }
