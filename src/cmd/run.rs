@@ -29,6 +29,13 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     let input_opts = InputOption::get_by_name(b.conn(), req.name())?;
     let output_opts = OutputOption::get_by_name(b.conn(), req.name())?;
 
+    // if this request has extractions, check if there is an environment
+    if output_opts.len() > 0 && b.current_environment().is_none() {
+        return Err(Error::new(ErrorKind::ArgumentError(
+            "The request contains extractions and must be ran from an environment",
+        )));
+    }
+
     // do option substitution
     // TODO: return result with missing options
     req.replace_input_options(&input_opts)?;
@@ -79,8 +86,8 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     // extract options into variables
     for opt in output_opts {
         let var = match opt.extraction_type() {
-            "body" => body_to_var(&opt, &text, b.current_environment()),
-            "header" => header_to_var(&opt, resp.headers(), b.current_environment()),
+            "body" => body_to_var(&opt, &text, b.current_environment().unwrap()),
+            "header" => header_to_var(&opt, resp.headers(), b.current_environment().unwrap()),
             x => {
                 println!("Encountered unexpected source: {}", x);
                 continue;
@@ -91,7 +98,6 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
             continue;
         }
         let mut var = var.unwrap();
-        // TODO: set source
         var.set_source(Some(req.name()));
         if !quiet {
             println!(
@@ -137,28 +143,18 @@ fn create_reqwest(req: &mut Request) -> Result<blocking::Request> {
 
     Ok(builder.build()?)
 }
-fn body_to_var(opt: &OutputOption, body: &str, env: Option<&str>) -> Result<Variable> {
+fn body_to_var(opt: &OutputOption, body: &str, env: &str) -> Result<Variable> {
     let value = get_json_value(body, opt.extraction_source())?;
-    Ok(Variable::new(
-        opt.option_name(),
-        env.unwrap_or(""), // TODO: allow None for environment
-        value.as_str(),
-        None,
-    ))
+    Ok(Variable::new(opt.option_name(), env, value.as_str(), None))
 }
-fn header_to_var(opt: &OutputOption, headers: &HeaderMap, env: Option<&str>) -> Result<Variable> {
+fn header_to_var(opt: &OutputOption, headers: &HeaderMap, env: &str) -> Result<Variable> {
     let value = headers
         .get(opt.extraction_source())
         .map(|x| x.to_str().unwrap());
     if value.is_none() {
         return Err(Error::new(ErrorKind::ParseError));
     }
-    Ok(Variable::new(
-        opt.option_name(),
-        env.unwrap_or(""), // TODO: allow None for environment
-        value,
-        None,
-    ))
+    Ok(Variable::new(opt.option_name(), env, value, None))
 }
 fn get_json_value(data: &str, query: &str) -> Result<Value> {
     let mut v: Value = serde_json::from_str(data)?;
