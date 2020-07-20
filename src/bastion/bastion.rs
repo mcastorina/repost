@@ -1,5 +1,5 @@
 use super::completer::LineReader;
-use crate::db::{Db, DbObject, Environment, InputOption, OutputOption, Request, Variable};
+use crate::db::{Db, DbObject, Environment, InputOption, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use colored::*;
 use rusqlite::Connection;
@@ -114,22 +114,6 @@ impl Bastion {
         }
     }
 
-    // TODO: filter these results based on state
-    pub fn get_requests(&self) -> Result<Vec<Request>> {
-        Request::get_all(self.conn())
-    }
-    pub fn get_variables(&self) -> Result<Vec<Variable>> {
-        Variable::get_all(self.conn())
-    }
-    pub fn get_environments(&self) -> Result<Vec<Environment>> {
-        Environment::get_all(self.conn())
-    }
-    pub fn get_input_options(&self) -> Result<Vec<InputOption>> {
-        InputOption::get_all(self.conn())
-    }
-    pub fn get_output_options(&self) -> Result<Vec<OutputOption>> {
-        OutputOption::get_all(self.conn())
-    }
     pub fn get_workspaces(&self) -> Result<Vec<String>> {
         // TODO: option for config directory; set default to $XDG_CONFIG_DIR/repost
         let mut result = vec![];

@@ -29,16 +29,12 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             _ => unreachable!(),
         },
         ("show", Some(matches)) => match matches.subcommand() {
-            ("requests", Some(matches)) => show::print_table(matches, b.get_requests()?),
-            ("variables", Some(matches)) => show::print_table(matches, b.get_variables()?),
-            ("environments", Some(matches)) => show::print_table(matches, b.get_environments()?),
-            ("options", Some(matches)) => {
-                show::print_table(matches, b.get_input_options()?)?;
-                // show::print_table(matches, b.get_output_options()?)?;
-                Ok(())
-            }
-            ("workspaces", Some(matches)) => {
-                show::print_table(matches, (String::from("workspace"), b.get_workspaces()?))
+            ("requests", Some(matches)) => show::requests(b, matches),
+            ("variables", Some(matches)) => show::variables(b, matches),
+            ("options", Some(matches)) => show::options(b, matches),
+            ("environments", Some(_)) => show::environments(b, matches),
+            ("workspaces", Some(_)) => {
+                show::print_table((String::from("workspace"), b.get_workspaces()?))
             }
             _ => unreachable!(),
         },
@@ -68,7 +64,6 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             ("options", Some(matches)) => delete::options(b, matches),
             _ => unreachable!(),
         },
-        // TODO: run in request state
         ("run", Some(matches)) => run::execute(b, matches, matches.value_of("request")),
         ("extract", Some(matches)) => extract::execute(b, matches),
         ("info", Some(matches)) => info::execute(b, matches),
