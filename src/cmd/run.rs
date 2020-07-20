@@ -7,9 +7,9 @@ use regex::Regex;
 use reqwest::blocking;
 use reqwest::header::HeaderMap;
 use serde_json::Value;
-use std::process::{Command, Stdio};
-use std::io::Write;
 use std::env;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Result<()> {
     let req = req.or(b.current_request());
@@ -196,9 +196,7 @@ fn display_body(text: &str, no_pager: bool) {
         // try to invoke $PAGER
         // TODO: support args in $PAGER
         if let Ok(pager) = env::var("PAGER") {
-            if let Ok(mut child) = Command::new(pager)
-                .stdin(Stdio::piped())
-                .spawn() {
+            if let Ok(mut child) = Command::new(pager).stdin(Stdio::piped()).spawn() {
                 if let Some(stdin) = child.stdin.as_mut() {
                     let _ = stdin.write_all(text.as_bytes());
                 }

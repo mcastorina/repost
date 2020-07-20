@@ -65,6 +65,7 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
         ("delete", Some(matches)) => match matches.subcommand() {
             ("requests", Some(matches)) => delete::requests(b, matches),
             ("variables", Some(matches)) => delete::variables(b, matches),
+            ("options", Some(matches)) => delete::options(b, matches),
             _ => unreachable!(),
         },
         // TODO: run in request state
