@@ -32,7 +32,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     // if this request has extractions, check if there is an environment
     if output_opts.len() > 0 && b.current_environment().is_none() {
         return Err(Error::new(ErrorKind::ArgumentError(
-            "The request contains extractions and must be ran from an environment",
+            "The request contains extractions and must be ran from an environment.",
         )));
     }
 
@@ -89,7 +89,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
             "body" => body_to_var(&opt, &text, b.current_environment().unwrap()),
             "header" => header_to_var(&opt, resp.headers(), b.current_environment().unwrap()),
             x => {
-                println!("Encountered unexpected source: {}", x);
+                println!("Encountered unexpected source: {}.", x);
                 continue;
             }
         };

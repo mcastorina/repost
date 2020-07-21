@@ -134,6 +134,10 @@ subcommands:
             - variables:
                 about: Print variables
                 visible_aliases: ["variable", "vars", "var", "v"]
+                args:
+                    - name:
+                        help: Filter by name
+                        required: false
             - environments:
                 about: Print environments
                 visible_aliases: ["environment", "envs", "env", "e"]

@@ -11,10 +11,17 @@ pub const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
 pub fn requests(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
     print_table(Request::get_all(b.conn())?)
 }
-pub fn variables(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
-    match b.current_environment() {
-        Some(env) => print_table(Variable::get_by(b.conn(), |var| var.environment() == env)?),
-        None => print_table(Variable::get_all(b.conn())?),
+pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
+    let name = matches.value_of("name");
+    match (b.current_environment(), name) {
+        (Some(env), Some(name)) => print_table(Variable::get_by(b.conn(), |var| {
+            var.environment() == env && var.name() == name
+        })?),
+        (Some(env), None) => {
+            print_table(Variable::get_by(b.conn(), |var| var.environment() == env)?)
+        }
+        (None, Some(name)) => print_table(Variable::get_by_name(b.conn(), name)?),
+        (None, None) => print_table(Variable::get_all(b.conn())?),
     }
 }
 pub fn options(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
