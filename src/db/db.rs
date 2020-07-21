@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
+use std::fs;
 
 pub struct Db {
     root: PathBuf,
@@ -29,6 +30,30 @@ impl Db {
     pub fn conn(&self) -> &Connection {
         &self.conn
     }
+
+    pub fn get_dbs(&self) -> Result<Vec<String>> {
+        // TODO: option for config directory; set default to $XDG_CONFIG_DIR/repost
+        let mut result = vec![];
+        let paths = fs::read_dir(&self.root)?;
+        for path in paths {
+            let path = path?.path();
+            // filter out .db extensions
+            match path.extension() {
+                Some(x) => {
+                    if x != "db" {
+                        continue;
+                    }
+                }
+                _ => continue,
+            }
+            let ws = path.file_stem().unwrap();
+            if let Some(x) = ws.to_str() {
+                result.push(String::from(x));
+            }
+        }
+        Ok(result)
+    }
+
     fn create_tables(&self) -> Result<()> {
         Request::create_table(&self.conn)?;
         Variable::create_table(&self.conn)?;

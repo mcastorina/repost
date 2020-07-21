@@ -3,7 +3,6 @@ use crate::db::{Db, DbObject, Environment, InputOption, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use colored::*;
 use rusqlite::Connection;
-use std::fs;
 use std::path::PathBuf;
 
 pub struct Bastion {
@@ -115,26 +114,7 @@ impl Bastion {
     }
 
     pub fn get_workspaces(&self) -> Result<Vec<String>> {
-        // TODO: option for config directory; set default to $XDG_CONFIG_DIR/repost
-        let mut result = vec![];
-        let paths = fs::read_dir("./")?;
-        for path in paths {
-            let path = path?.path();
-            // filter out .db extensions
-            match path.extension() {
-                Some(x) => {
-                    if x != "db" {
-                        continue;
-                    }
-                }
-                _ => continue,
-            }
-            let ws = path.file_stem().unwrap();
-            if let Some(x) = ws.to_str() {
-                result.push(String::from(x));
-            }
-        }
-        Ok(result)
+        self.db.get_dbs()
     }
 
     pub fn set_workspace(&mut self, workspace: &str) -> Result<()> {
