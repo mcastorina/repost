@@ -105,28 +105,23 @@ pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
 
     // print planned requests
     let mut requests = Vec::new();
-    let mut iters: Vec<_> = input_opts
-        .iter()
-        .map(|opt| opt.values().into_iter())
-        .collect();
-    loop {
-        let opt_values: Vec<Option<&str>> = iters.iter_mut().map(|i| i.next()).collect();
-        if opt_values.iter().any(|x| x.is_none()) {
-            break;
+    let opts: Vec<_> = input_opts.iter().map(|opt| opt.values()).collect();
+
+    if opts.iter().map(|x| x.len()).all(|x| x > 0) {
+        for i in 0..opts.iter().map(|x| x.len()).max().unwrap_or(0) {
+            let opt_values: Vec<&str> = opts.iter().map(|v| v[i % v.len()]).collect();
+            let mut opts = input_opts.clone();
+            let mut req = req.clone();
+            for (opt, opt_value) in opts.iter_mut().zip(opt_values) {
+                opt.set_value(Some(opt_value));
+            }
+            let _ = req.replace_input_options(&opts);
+            requests.push(req);
         }
-        let mut opts = input_opts.clone();
-        let mut req = req.clone();
-        for (opt, opt_value) in opts.iter_mut().zip(opt_values) {
-            opt.set_value(opt_value);
-        }
-        let _ = req.replace_input_options(&opts);
-        requests.push(req);
     }
-    if requests.len() > 0 {
-        println!("  Planned Requests");
-        super::show::print_table(requests)?;
-        println!();
-    }
+    println!("  Planned Requests");
+    super::show::print_table(requests)?;
+    println!();
 
     Ok(())
 }
