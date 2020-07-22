@@ -16,6 +16,7 @@ pub fn requests(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         }
         // TODO: verify we don't need to update options for request
     }
+    b.set_state()?;
     b.set_completions()?;
     Ok(())
 }

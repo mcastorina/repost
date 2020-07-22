@@ -188,6 +188,51 @@ impl Bastion {
         self.set_completions()?;
         Ok(())
     }
+    pub fn set_state(&mut self) -> Result<()> {
+        if let Some(state) = match &self.state {
+            ReplState::Environment(ws, env) => {
+                let ws = String::from(ws);
+                if Environment::exists(self.db.conn(), env)? {
+                    None
+                } else {
+                    Some(ReplState::Base(ws))
+                }
+            }
+            ReplState::Request(ws, req) => {
+                let ws = String::from(ws);
+                if Request::exists(self.db.conn(), req)? {
+                    None
+                } else {
+                    self.line_reader.set_base();
+                    Some(ReplState::Base(ws))
+                }
+            }
+            ReplState::EnvironmentRequest(ws, env, req) => {
+                let ws = String::from(ws);
+                let env = String::from(env);
+                let req = String::from(req);
+                match (
+                    Environment::exists(self.db.conn(), env.as_ref())?,
+                    Request::exists(self.db.conn(), req.as_ref())?,
+                ) {
+                    (true, true) => None,
+                    (true, false) => {
+                        self.line_reader.set_base();
+                        Some(ReplState::Environment(ws, env))
+                    }
+                    (false, true) => Some(ReplState::Request(ws, req)),
+                    (false, false) => {
+                        self.line_reader.set_base();
+                        Some(ReplState::Base(ws))
+                    }
+                }
+            }
+            _ => None,
+        } {
+            self.state = state;
+        }
+        Ok(())
+    }
     pub fn set_option(&self, option_name: &str, values: Vec<&str>) -> Result<()> {
         match &self.state {
             ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
