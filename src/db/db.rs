@@ -4,9 +4,9 @@ use comfy_table::Cell;
 use rusqlite::{Connection, NO_PARAMS};
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fs;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use std::fs;
 
 pub struct Db {
     root: PathBuf,

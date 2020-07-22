@@ -9,9 +9,13 @@ use terminal_size::{terminal_size, Width};
 pub const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
 
 pub fn requests(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
-    print_table(Request::get_all(b.conn())?)
+    println!();
+    print_table(Request::get_all(b.conn())?)?;
+    println!();
+    Ok(())
 }
 pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
+    println!();
     let name = matches.value_of("name");
     match (b.current_environment(), name) {
         (Some(env), Some(name)) => print_table(Variable::get_by(b.conn(), |var| {
@@ -22,16 +26,24 @@ pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
         }
         (None, Some(name)) => print_table(Variable::get_by_name(b.conn(), name)?),
         (None, None) => print_table(Variable::get_all(b.conn())?),
-    }
+    }?;
+    println!();
+    Ok(())
 }
 pub fn options(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
+    println!();
     match b.current_request() {
         Some(req) => print_table(InputOption::get_by_name(b.conn(), req)?),
         None => print_table(InputOption::get_all(b.conn())?),
-    }
+    }?;
+    println!();
+    Ok(())
 }
 pub fn environments(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
-    print_table(Environment::get_all(b.conn())?)
+    println!();
+    print_table(Environment::get_all(b.conn())?)?;
+    println!();
+    Ok(())
 }
 
 pub fn print_table<T: PrintableTable>(t: T) -> Result<()> {
@@ -50,11 +62,9 @@ pub fn print_table<T: PrintableTable>(t: T) -> Result<()> {
         table.add_row(row);
     }
 
-    println!();
     for line in table.to_string().split('\n') {
         println!("  {}", line);
     }
-    println!();
 
     Ok(())
 }

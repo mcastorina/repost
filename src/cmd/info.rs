@@ -71,9 +71,9 @@ pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
             .set_content_arrangement(ContentArrangement::Dynamic)
             .set_table_width(width);
         println!("  Input Options");
-        table.set_header(vec!["name", "current value"]);
-        for opt in input_opts {
-            table.add_row(vec![opt.option_name(), opt.value().unwrap_or("")]);
+        table.set_header(vec!["name", "current values"]);
+        for opt in &input_opts {
+            table.add_row(vec![opt.option_name(), &opt.values().join("\n")]);
         }
         for line in table.to_string().split('\n') {
             println!("  {}", line);
@@ -102,5 +102,31 @@ pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
         }
         println!();
     }
+
+    // print planned requests
+    let mut requests = Vec::new();
+    let mut iters: Vec<_> = input_opts
+        .iter()
+        .map(|opt| opt.values().into_iter())
+        .collect();
+    loop {
+        let opt_values: Vec<Option<&str>> = iters.iter_mut().map(|i| i.next()).collect();
+        if opt_values.iter().any(|x| x.is_none()) {
+            break;
+        }
+        let mut opts = input_opts.clone();
+        let mut req = req.clone();
+        for (opt, opt_value) in opts.iter_mut().zip(opt_values) {
+            opt.set_value(opt_value);
+        }
+        let _ = req.replace_input_options(&opts);
+        requests.push(req);
+    }
+    if requests.len() > 0 {
+        println!("  Planned Requests");
+        super::show::print_table(requests)?;
+        println!();
+    }
+
     Ok(())
 }

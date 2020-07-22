@@ -4,18 +4,21 @@ use crate::error::Result;
 use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
 
+#[derive(Debug, Clone)]
 pub struct InputOption {
     request_name: String,
     option_name: String,
-    value: Option<String>,
+    values: Vec<String>,
 }
 
 impl InputOption {
-    pub fn new(req_name: &str, opt_name: &str, value: Option<String>) -> InputOption {
+    const VALUE_SEPARATOR: &'static str = "\n~\n";
+
+    pub fn new(req_name: &str, opt_name: &str, values: Vec<String>) -> InputOption {
         InputOption {
             request_name: String::from(req_name),
             option_name: String::from(opt_name),
-            value,
+            values,
         }
     }
     pub fn create_table(conn: &Connection) -> Result<()> {
@@ -38,11 +41,33 @@ impl InputOption {
     pub fn request_name(&self) -> &str {
         self.request_name.as_ref()
     }
-    pub fn value(&self) -> Option<&str> {
-        self.value.as_deref()
+    pub fn values(&self) -> Vec<&str> {
+        self.values.iter().map(AsRef::as_ref).collect()
     }
     pub fn set_value(&mut self, value: Option<&str>) {
-        self.value = value.map(|x| String::from(x));
+        self.values = match value {
+            Some(x) => vec![String::from(x)],
+            None => vec![],
+        }
+    }
+    pub fn set_values(&mut self, values: Vec<String>) {
+        self.values = values;
+    }
+
+    fn stringify_values(values: Vec<&str>) -> Option<String> {
+        match values.len() {
+            0 => None,
+            _ => Some(values.join(InputOption::VALUE_SEPARATOR)),
+        }
+    }
+    fn unstringify_values(value: Option<String>) -> Vec<String> {
+        match value {
+            Some(value) => value
+                .split(InputOption::VALUE_SEPARATOR)
+                .map(String::from)
+                .collect(),
+            None => vec![],
+        }
     }
 }
 
@@ -51,7 +76,11 @@ impl DbObject for InputOption {
         conn.execute(
             "INSERT INTO input_options (request_name, option_name, value)
                   VALUES (?1, ?2, ?3);",
-            params![self.request_name, self.option_name, self.value],
+            params![
+                self.request_name,
+                self.option_name,
+                InputOption::stringify_values(self.values())
+            ],
         )?;
         Ok(())
     }
@@ -68,7 +97,11 @@ impl DbObject for InputOption {
             "UPDATE input_options SET
                 value = ?1
             WHERE request_name = ?2 AND option_name = ?3;",
-            params![self.value, self.request_name, self.option_name],
+            params![
+                InputOption::stringify_values(self.values()),
+                self.request_name,
+                self.option_name
+            ],
         )?;
         Ok(num)
     }
@@ -80,7 +113,7 @@ impl DbObject for InputOption {
             Ok(InputOption {
                 request_name: row.get(0)?,
                 option_name: row.get(1)?,
-                value: row.get(2)?,
+                values: InputOption::unstringify_values(row.get(2)?),
             })
         })?;
 
@@ -97,14 +130,14 @@ impl PrintableTableStruct for InputOption {
         vec![
             Cell::new("request_name"),
             Cell::new("option_name"),
-            Cell::new("value"),
+            Cell::new("values"),
         ]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
         vec![vec![
             Cell::new(&self.request_name),
             Cell::new(&self.option_name),
-            Cell::new(self.value.as_ref().unwrap_or(&String::from(""))),
+            Cell::new(self.values().join("\n")),
         ]]
     }
 }

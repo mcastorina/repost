@@ -36,8 +36,7 @@ impl Variable {
                   environment     TEXT NOT NULL,
                   value           TEXT,
                   source          TEXT,
-                  timestamp       TEXT,
-                  UNIQUE(name, environment)
+                  timestamp       TEXT
               )",
             NO_PARAMS,
         )?;
@@ -149,6 +148,7 @@ impl DbObject for Variable {
 impl PrintableTableStruct for Variable {
     fn get_header() -> Vec<Cell> {
         vec![
+            Cell::new("id"),
             Cell::new("name"),
             Cell::new("environment"),
             Cell::new("value"),
@@ -157,6 +157,7 @@ impl PrintableTableStruct for Variable {
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
         vec![vec![
+            Cell::new(self.rowid),
             Cell::new(self.name()),
             Cell::new(self.environment()),
             Cell::new(self.value.as_ref().unwrap_or(&String::from(""))),

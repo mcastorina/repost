@@ -74,10 +74,19 @@ impl Bastion {
             if var.len() == 0 {
                 opt.set_value(None);
             } else if var.len() == 1 {
-                let var = &mut var[0];
+                let var = var.remove(0);
                 opt.set_value(var.value());
             } else {
-                unreachable!();
+                if var.iter().any(|v| v.value().is_none()) {
+                    opt.set_value(None);
+                } else {
+                    opt.set_values(
+                        var.iter()
+                            .filter_map(|v| v.value())
+                            .map(String::from)
+                            .collect(),
+                    );
+                }
             }
             opt.update(self.conn())?;
         }

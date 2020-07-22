@@ -7,6 +7,7 @@ use rusqlite::{params, Connection, NO_PARAMS};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
+#[derive(Debug, Clone)]
 pub struct Request {
     name: String,
     method: Method,
@@ -15,6 +16,7 @@ pub struct Request {
     body: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Clone)]
 pub enum Method {
     GET,
     POST,
@@ -157,14 +159,14 @@ impl Request {
         //          2. iterate backwards to perform replacement
         // find all variables and replace with values in options
         for opt in options {
-            if opt.value().is_none() {
+            if opt.values().len() == 0 {
                 // All input options are required
                 return Err(Error::new(ErrorKind::MissingOption(String::from(
                     opt.option_name(),
                 ))));
             }
             let old = format!("{{{}}}", opt.option_name());
-            let new = opt.value().unwrap();
+            let new = opt.values().remove(0);
             self.url = self.url.replace(&old, &new);
             self.headers = self.headers.as_ref().map(|h| h.replace(&old, &new));
             if let Some(body) = &self.body {
@@ -192,7 +194,7 @@ impl DbObject for Request {
         )?;
         // create input options
         for var_name in self.variable_names().iter() {
-            InputOption::new(self.name(), var_name, None).create(conn)?;
+            InputOption::new(self.name(), var_name, vec![]).create(conn)?;
         }
         Ok(())
     }
