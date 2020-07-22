@@ -23,7 +23,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         1 => (),
         _ => unreachable!(),
     };
-    let mut req = req.remove(0);
+    let req = req.remove(0);
 
     // get options for this request
     let input_opts = InputOption::get_by_name(b.conn(), req.name())?;
@@ -36,82 +36,119 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         )));
     }
 
-    // do option substitution
-    // TODO: return result with missing options
-    req.replace_input_options(&input_opts)?;
+    // create all request objects given input options
+    let requests = create_requests(&req, &input_opts)?;
 
-    let reqw = create_reqwest(&mut req)?;
-    let quiet = matches.is_present("quiet");
-
-    if !quiet {
-        println!(
-            "{}",
-            format!("> {} {}", reqw.method(), reqw.url()).bright_black()
-        );
-        for header in reqw.headers() {
-            let (name, value) = header;
-            println!(
-                "{}",
-                format!("> {}: {}", name, value.to_str().unwrap()).bright_black()
-            );
+    // delete extractions
+    for opt in output_opts.iter() {
+        for var in Variable::get_by(b.conn(), |v| {
+            v.name() == opt.option_name() && v.source().unwrap_or("") == req.name()
+        })? {
+            var.delete(b.conn())?;
         }
-        println!();
     }
 
-    let mut resp = blocking::Client::new().execute(reqw)?;
+    for mut req in requests {
+        let reqw = create_reqwest(&mut req)?;
+        let quiet = matches.is_present("quiet");
 
-    // output response code and headers
-    if !quiet {
-        println!("{}", format!("< {}", resp.status()).bright_black());
-        for header in resp.headers() {
-            let (name, value) = header;
-            println!(
-                "{}",
-                format!("< {}: {}", name, value.to_str().unwrap()).bright_black()
-            );
-        }
-        println!();
-    }
-
-    // output body with missing-newline indicator
-    let mut text: Vec<u8> = vec![];
-    resp.copy_to(&mut text)?;
-    let text = String::from_utf8(text).unwrap();
-
-    display_body(&text, matches.is_present("no-pager"));
-    if output_opts.len() > 0 {
-        println!();
-    }
-
-    // extract options into variables
-    for opt in output_opts {
-        let var = match opt.extraction_type() {
-            "body" => body_to_var(&opt, &text, b.current_environment().unwrap()),
-            "header" => header_to_var(&opt, resp.headers(), b.current_environment().unwrap()),
-            x => {
-                println!("Encountered unexpected source: {}.", x);
-                continue;
-            }
-        };
-        if let Err(x) = var {
-            println!("[!] {}", x);
-            continue;
-        }
-        let mut var = var.unwrap();
-        var.set_source(Some(req.name()));
         if !quiet {
             println!(
                 "{}",
-                format!("{} <= {}", var.name(), var.value().unwrap_or("")).bright_black()
+                format!("> {} {}", reqw.method(), reqw.url()).bright_black()
             );
+            for header in reqw.headers() {
+                let (name, value) = header;
+                println!(
+                    "{}",
+                    format!("> {}: {}", name, value.to_str().unwrap()).bright_black()
+                );
+            }
+            println!();
         }
-        var.upsert(b.conn())?;
-        b.set_options(InputOption::get_by(b.conn(), |x| {
-            x.option_name() == var.name()
-        })?)?;
+
+        let mut resp = blocking::Client::new().execute(reqw)?;
+
+        // output response code and headers
+        if !quiet {
+            println!("{}", format!("< {}", resp.status()).bright_black());
+            for header in resp.headers() {
+                let (name, value) = header;
+                println!(
+                    "{}",
+                    format!("< {}: {}", name, value.to_str().unwrap()).bright_black()
+                );
+            }
+            println!();
+        }
+
+        // output body with missing-newline indicator
+        let mut text: Vec<u8> = vec![];
+        resp.copy_to(&mut text)?;
+        let text = String::from_utf8(text).unwrap();
+
+        display_body(&text, matches.is_present("no-pager"));
+        if output_opts.len() > 0 {
+            println!();
+        }
+
+        // extract options into variables
+        for opt in output_opts.iter() {
+            let var = match opt.extraction_type() {
+                "body" => body_to_var(&opt, &text, b.current_environment().unwrap()),
+                "header" => header_to_var(&opt, resp.headers(), b.current_environment().unwrap()),
+                x => {
+                    println!("Encountered unexpected source: {}.", x);
+                    continue;
+                }
+            };
+            if let Err(x) = var {
+                println!("[!] {}", x);
+                continue;
+            }
+            let mut var = var.unwrap();
+            var.set_source(Some(req.name()));
+            if !quiet {
+                println!(
+                    "{}",
+                    format!("{} <= {}", var.name(), var.value().unwrap_or("")).bright_black()
+                );
+            }
+            var.create(b.conn())?;
+            b.set_options(InputOption::get_by(b.conn(), |x| {
+                x.option_name() == var.name()
+            })?)?;
+        }
+        b.set_completions()?;
     }
-    b.set_completions()?;
     Ok(())
+}
+
+pub fn create_requests(req: &Request, input_opts: &Vec<InputOption>) -> Result<Vec<Request>> {
+    let missing_opts: Vec<_> = input_opts
+        .iter()
+        .filter(|opt| opt.values().len() == 0)
+        .map(|opt| String::from(opt.option_name()))
+        .collect();
+    if missing_opts.len() > 0 {
+        // All input options are required
+        return Err(Error::new(ErrorKind::MissingOptions(missing_opts)));
+    }
+
+    let mut requests = Vec::new();
+    let opts: Vec<_> = input_opts.iter().map(|opt| opt.values()).collect();
+
+    for i in 0..opts.iter().map(|x| x.len()).max().unwrap_or(0) {
+        let opt_values: Vec<&str> = opts.iter().map(|v| v[i % v.len()]).collect();
+        let mut opts = input_opts.clone();
+        let mut req = req.clone();
+        for (opt, opt_value) in opts.iter_mut().zip(opt_values) {
+            opt.set_value(Some(opt_value));
+        }
+        req.replace_input_options(&opts)?;
+        requests.push(req);
+    }
+    Ok(requests)
 }
 
 fn create_reqwest(req: &mut Request) -> Result<blocking::Request> {

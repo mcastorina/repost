@@ -158,13 +158,17 @@ impl Request {
         //          1. find all start/end indices
         //          2. iterate backwards to perform replacement
         // find all variables and replace with values in options
+        let missing_opts: Vec<_> = options
+            .iter()
+            .filter(|opt| opt.values().len() == 0)
+            .map(|opt| String::from(opt.option_name()))
+            .collect();
+        if missing_opts.len() > 0 {
+            // All input options are required
+            return Err(Error::new(ErrorKind::MissingOptions(missing_opts)));
+        }
         for opt in options {
-            if opt.values().len() == 0 {
-                // All input options are required
-                return Err(Error::new(ErrorKind::MissingOption(String::from(
-                    opt.option_name(),
-                ))));
-            }
+            if opt.values().len() == 0 {}
             let old = format!("{{{}}}", opt.option_name());
             let new = opt.values().remove(0);
             self.url = self.url.replace(&old, &new);

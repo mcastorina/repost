@@ -8,7 +8,7 @@ pub enum ErrorKind {
     ClapError(clap_v3::Error),
     IOError(std::io::Error),
     ArgumentError(&'static str),
-    MissingOption(String),
+    MissingOptions(Vec<String>),
     ReqwestError(reqwest::Error),
     ParseError,
     NotFound,
@@ -27,7 +27,9 @@ impl std::fmt::Display for Error {
             ErrorKind::ClapError(x) => write!(f, "{}", x),
             ErrorKind::IOError(x) => write!(f, "{}", x),
             ErrorKind::ArgumentError(x) => write!(f, "{}", x),
-            ErrorKind::MissingOption(x) => write!(f, "The following option is missing: {}", x),
+            ErrorKind::MissingOptions(x) => {
+                write!(f, "The following options are missing: {}", x.join(", "))
+            }
             ErrorKind::ReqwestError(x) => write!(f, "{}", x),
             ErrorKind::NotFound => write!(f, "Not found."),
             ErrorKind::ParseError => write!(f, "Parse error."),
@@ -41,7 +43,7 @@ impl std::fmt::Debug for Error {
             ErrorKind::ClapError(x) => write!(f, "ClapError({})", x),
             ErrorKind::IOError(x) => write!(f, "IOError({})", x),
             ErrorKind::ArgumentError(x) => write!(f, "ArgumentError({})", x),
-            ErrorKind::MissingOption(x) => write!(f, "MissingOption({})", x),
+            ErrorKind::MissingOptions(x) => write!(f, "MissingOptions({:?})", x),
             ErrorKind::ReqwestError(x) => write!(f, "ReqwestError({})", x),
             ErrorKind::NotFound => write!(f, "Not found."),
             ErrorKind::ParseError => write!(f, "Parse error."),

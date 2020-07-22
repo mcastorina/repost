@@ -52,6 +52,9 @@ impl Variable {
     pub fn value(&self) -> Option<&str> {
         self.value.as_deref()
     }
+    pub fn source(&self) -> Option<&str> {
+        self.source.as_deref()
+    }
     pub fn set_value(&mut self, value: Option<&str>) {
         self.value = value.map(|x| String::from(x));
     }
