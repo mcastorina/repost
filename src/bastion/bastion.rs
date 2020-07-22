@@ -80,12 +80,7 @@ impl Bastion {
                 if var.iter().any(|v| v.value().is_none()) {
                     opt.set_value(None);
                 } else {
-                    opt.set_values(
-                        var.iter()
-                            .filter_map(|v| v.value())
-                            .map(String::from)
-                            .collect(),
-                    );
+                    opt.set_values(var.iter().filter_map(|v| v.value()).collect());
                 }
             }
             opt.update(self.conn())?;
@@ -193,7 +188,7 @@ impl Bastion {
         self.set_completions()?;
         Ok(())
     }
-    pub fn set_option(&self, option_name: &str, value: Option<&str>) -> Result<()> {
+    pub fn set_option(&self, option_name: &str, values: Vec<&str>) -> Result<()> {
         match &self.state {
             ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
                 let opt = InputOption::get_by_name_map(self.db.conn(), &req, |e| {
@@ -204,7 +199,7 @@ impl Bastion {
                     Err(Error::new(ErrorKind::NotFound))
                 } else {
                     let mut opt = opt.unwrap();
-                    opt.set_value(value);
+                    opt.set_values(values);
                     opt.update(self.db.conn())?;
                     Ok(())
                 }

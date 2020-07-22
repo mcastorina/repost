@@ -163,6 +163,7 @@ subcommands:
                         required: true
                     - value:
                         help: Option value
+                        multiple: true
             - environment:
                 about: Set the environment as used for variable substitution
                 visible_aliases: ["env", "e"]

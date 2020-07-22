@@ -50,8 +50,8 @@ impl InputOption {
             None => vec![],
         }
     }
-    pub fn set_values(&mut self, values: Vec<String>) {
-        self.values = values;
+    pub fn set_values(&mut self, values: Vec<&str>) {
+        self.values = values.into_iter().map(String::from).collect();
     }
 
     fn stringify_values(values: Vec<&str>) -> Option<String> {
