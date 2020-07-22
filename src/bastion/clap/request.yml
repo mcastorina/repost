@@ -17,7 +17,7 @@ subcommands:
                 required: false
                 multiple: false # TODO run multiple in a row
             - quiet:
-                help: Print only the response body
+                help: Print only the response data
                 short: q
                 long: quiet
                 takes_value: false
@@ -25,6 +25,11 @@ subcommands:
             - no-pager:
                 long: no-pager
                 takes_value: false
+            - data:
+                help: HTTP request data
+                short: d
+                takes_value: true
+                multiple: true
     - extract:
         about: Extract data from the output of a request
         visible_aliases: ["ex"]
@@ -107,7 +112,7 @@ subcommands:
                         takes_value: true
                         multiple: true
                     - data:
-                        help: HTTP request body
+                        help: HTTP request data
                         short: d
                         takes_value: true
             - variable:

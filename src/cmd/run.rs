@@ -8,6 +8,7 @@ use reqwest::blocking;
 use reqwest::header::HeaderMap;
 use serde_json::Value;
 use std::env;
+use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -23,7 +24,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         1 => (),
         _ => unreachable!(),
     };
-    let req = req.remove(0);
+    let mut req = req.remove(0);
 
     // get options for this request
     let input_opts = InputOption::get_by_name(b.conn(), req.name())?;
@@ -34,6 +35,25 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         return Err(Error::new(ErrorKind::ArgumentError(
             "The request contains extractions and must be ran from an environment.",
         )));
+    }
+
+    // modify the request object given run arguments
+    if let Some(data) = matches.values_of("data") {
+        for data in data {
+            if req.body().is_none() {
+                req.add_query_param(data);
+            } else {
+                // TODO: make this a common function
+                let data = if data.starts_with('@') {
+                    let mut filename = data.chars();
+                    filename.next(); // discard @
+                    Some(fs::read(filename.collect::<String>())?)
+                } else {
+                    Some(data.as_bytes().to_vec())
+                };
+                req.set_body(data);
+            }
+        }
     }
 
     // create all request objects given input options
@@ -134,6 +154,12 @@ pub fn create_requests(req: &Request, input_opts: &Vec<InputOption>) -> Result<V
     if missing_opts.len() > 0 {
         // All input options are required
         return Err(Error::new(ErrorKind::MissingOptions(missing_opts)));
+    }
+
+    if input_opts.len() == 0 {
+        let mut req = req.clone();
+        req.replace_input_options(&input_opts)?;
+        return Ok(vec![req]);
     }
 
     let mut requests = Vec::new();

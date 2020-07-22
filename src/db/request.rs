@@ -85,6 +85,14 @@ impl Request {
         headers.push_str(format!("{}: {}", key, value).as_ref());
         self.headers = Some(headers);
     }
+    pub fn add_query_param(&mut self, query: &str) {
+        if self.url.contains('?') {
+            self.url.push('&');
+        } else {
+            self.url.push('?');
+        }
+        self.url.push_str(query);
+    }
     pub fn set_body(&mut self, body: Option<Vec<u8>>) {
         self.body = body;
     }

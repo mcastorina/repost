@@ -36,7 +36,7 @@ subcommands:
                         takes_value: true
                         multiple: true
                     - data:
-                        help: HTTP request body
+                        help: HTTP request data
                         short: d
                         takes_value: true
             - variable:
@@ -153,4 +153,9 @@ subcommands:
             - no-pager:
                 long: no-pager
                 takes_value: false
+            - data:
+                help: HTTP request data
+                short: d
+                takes_value: true
+                multiple: true
 
