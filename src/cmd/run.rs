@@ -94,30 +94,31 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
 
         // extract options into variables
         for opt in output_opts.iter() {
-            let var = match opt.extraction_type() {
-                "body" => body_to_var(&opt, &text, b.current_environment().unwrap()),
-                "header" => header_to_var(&opt, resp.headers(), b.current_environment().unwrap()),
+            let vars = match opt.extraction_type() {
+                "body" => body_to_vars(&opt, &text, b.current_environment().unwrap()),
+                "header" => header_to_vars(&opt, resp.headers(), b.current_environment().unwrap()),
                 x => {
                     println!("Encountered unexpected source: {}.", x);
                     continue;
                 }
             };
-            if let Err(x) = var {
+            if let Err(x) = vars {
                 println!("[!] {}", x);
                 continue;
             }
-            let mut var = var.unwrap();
-            var.set_source(Some(req.name()));
-            if !quiet {
-                println!(
-                    "{}",
-                    format!("{} <= {}", var.name(), var.value().unwrap_or("")).bright_black()
-                );
+            for var in vars.unwrap().iter_mut() {
+                var.set_source(Some(req.name()));
+                if !quiet {
+                    println!(
+                        "{}",
+                        format!("{} <= {}", var.name(), var.value().unwrap_or("")).bright_black()
+                    );
+                }
+                var.create(b.conn())?;
+                b.set_options(InputOption::get_by(b.conn(), |x| {
+                    x.option_name() == var.name()
+                })?)?;
             }
-            var.create(b.conn())?;
-            b.set_options(InputOption::get_by(b.conn(), |x| {
-                x.option_name() == var.name()
-            })?)?;
         }
         b.set_completions()?;
     }
@@ -180,25 +181,30 @@ fn create_reqwest(req: &mut Request) -> Result<blocking::Request> {
 
     Ok(builder.build()?)
 }
-fn body_to_var(opt: &OutputOption, body: &str, env: &str) -> Result<Variable> {
-    let value = get_json_value(body, opt.extraction_source())?;
-    Ok(Variable::new(opt.option_name(), env, value.as_str(), None))
+fn body_to_vars(opt: &OutputOption, body: &str, env: &str) -> Result<Vec<Variable>> {
+    let values = get_json_values(&serde_json::from_str(body)?, opt.extraction_source())?;
+    Ok(values
+        .into_iter()
+        .map(|value| Variable::new(opt.option_name(), env, value.as_str(), None))
+        .collect())
 }
-fn header_to_var(opt: &OutputOption, headers: &HeaderMap, env: &str) -> Result<Variable> {
+fn header_to_vars(opt: &OutputOption, headers: &HeaderMap, env: &str) -> Result<Vec<Variable>> {
     let value = headers
         .get(opt.extraction_source())
         .map(|x| x.to_str().unwrap());
     if value.is_none() {
         return Err(Error::new(ErrorKind::ParseError));
     }
-    Ok(Variable::new(opt.option_name(), env, value, None))
+    // TODO: handle multiple headers
+    Ok(vec![Variable::new(opt.option_name(), env, value, None)])
 }
-fn get_json_value(data: &str, query: &str) -> Result<Value> {
-    let mut v: Value = serde_json::from_str(data)?;
+fn get_json_values(root: &Value, query: &str) -> Result<Vec<Value>> {
+    let mut v: Value = root.clone();
     let mut result: &mut Value = &mut v;
 
-    let re = Regex::new(r"\[(\d+)\]")?;
-    for token in query.split(".") {
+    let re = Regex::new(r"\[(\d+|\*)\]")?;
+    let tokens = query.split(".");
+    for token in tokens.clone() {
         let name = token.splitn(2, "[").next().unwrap();
         let mr = result.get_mut(name);
         if mr.is_none() {
@@ -206,15 +212,31 @@ fn get_json_value(data: &str, query: &str) -> Result<Value> {
         }
         result = mr.unwrap();
         for cap in re.captures_iter(token) {
-            let num: usize = cap[1].parse()?;
-            let mr = result.get_mut(num);
-            if mr.is_none() {
-                return Err(Error::new(ErrorKind::ParseError));
+            let index = &cap[1];
+            if index == "*" {
+                let mut tokens = tokens.skip_while(|x| x != &token);
+                tokens.next();
+                let rest = tokens.collect::<Vec<&str>>().join(".");
+
+                let mut results = vec![];
+                if !result.is_array() {
+                    return Err(Error::new(ErrorKind::ParseError));
+                }
+                for value in result.as_array().unwrap() {
+                    results.extend(get_json_values(value, &rest)?);
+                }
+                return Ok(results);
+            } else {
+                let num: usize = index.parse()?;
+                let mr = result.get_mut(num);
+                if mr.is_none() {
+                    return Err(Error::new(ErrorKind::ParseError));
+                }
+                result = mr.unwrap();
             }
-            result = mr.unwrap();
         }
     }
-    Ok(result.take())
+    Ok(vec![result.take()])
 }
 
 fn display_body(text: &str, no_pager: bool) {
