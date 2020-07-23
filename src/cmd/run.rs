@@ -68,9 +68,11 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         }
     }
 
+    RequestResponse::delete_all(b.conn());
+    let quiet = matches.is_present("quiet");
+    let many_requests = requests.len() > 1;
     for mut req in requests {
         let reqw = create_reqwest(&mut req)?;
-        let quiet = matches.is_present("quiet");
 
         if !quiet {
             println!(
@@ -109,7 +111,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         rr.set_response(&resp, &text);
         let text = String::from_utf8(text).unwrap();
 
-        display_body(&text, matches.is_present("no-pager"));
+        display_body(&text, many_requests || matches.is_present("no-pager"));
         if output_opts.len() > 0 {
             println!();
         }
@@ -145,6 +147,13 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         }
         rr.create(b.conn());
     }
+
+    if many_requests {
+        println!("\n  Summary");
+        super::show::print_table(RequestResponse::get_all(b.conn())?);
+        println!();
+    }
+
     b.set_completions()?;
     Ok(())
 }

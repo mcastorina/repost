@@ -2,7 +2,7 @@ use super::request::{Method, Request};
 use super::PrintableTableStruct;
 use super::{DbObject, InputOption};
 use crate::error::{Error, ErrorKind, Result};
-use comfy_table::Cell;
+use comfy_table::{Attribute, Cell, Color};
 use regex::Regex;
 use reqwest::blocking;
 use rusqlite::{params, Connection, NO_PARAMS};
@@ -76,6 +76,11 @@ impl RequestResponse {
               )",
             NO_PARAMS,
         )?;
+        Ok(())
+    }
+
+    pub fn delete_all(conn: &Connection) -> Result<()> {
+        conn.execute("DELETE FROM request_responses;", NO_PARAMS)?;
         Ok(())
     }
 
@@ -188,10 +193,24 @@ impl PrintableTableStruct for RequestResponse {
         vec![Cell::new("id"), Cell::new("request"), Cell::new("status")]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
+        let status = self.response_status.clone().unwrap_or(String::from("-"));
+        let status = match status.chars().next().unwrap_or('-') {
+            '2' => Cell::new(status).fg(Color::Green),
+            '3' => Cell::new(status).fg(Color::Yellow),
+            '4' => Cell::new(status).fg(Color::Red),
+            '5' => Cell::new(status)
+                .fg(Color::Red)
+                .add_attribute(Attribute::Bold),
+            _ => Cell::new(status),
+        };
         vec![vec![
             Cell::new(&self.rowid),
-            Cell::new(&self.request_url),
-            Cell::new(self.response_status.as_ref().unwrap_or(&String::from("-"))),
+            Cell::new(format!(
+                "{} {}",
+                self.request_method.to_string(),
+                self.request_url
+            )),
+            status,
         ]]
     }
 }
