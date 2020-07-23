@@ -150,7 +150,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
 
     if many_requests {
         println!("\n  Summary");
-        super::show::print_table(RequestResponse::get_all(b.conn())?)?;
+        super::show::print_table(RequestResponse::get_all(b.conn())?);
         println!();
     }
 

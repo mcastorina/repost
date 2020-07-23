@@ -34,8 +34,10 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             ("options", Some(matches)) => show::options(b, matches),
             ("environments", Some(_)) => show::environments(b, matches),
             ("workspaces", Some(_)) => {
-                show::print_table((String::from("workspace"), b.get_workspaces()?))
+                show::print_table((String::from("workspace"), b.get_workspaces()?));
+                Ok(())
             }
+            ("response", Some(matches)) => show::response(b, matches),
             _ => unreachable!(),
         },
         ("set", Some(matches)) => match matches.subcommand() {

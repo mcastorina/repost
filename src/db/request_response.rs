@@ -1,6 +1,6 @@
 use super::request::Method;
 use super::{DbObject, PrintableTableStruct};
-use crate::error::Result;
+use crate::error::{Error, ErrorKind, Result};
 use comfy_table::{Attribute, Cell, Color};
 use reqwest::blocking;
 use rusqlite::{params, Connection, NO_PARAMS};
@@ -57,6 +57,40 @@ impl RequestResponse {
             .push((String::from(key), String::from(value)));
     }
 
+    pub fn url(&self) -> &str {
+        self.request_url.as_ref()
+    }
+    pub fn method(&self) -> &str {
+        self.request_method.to_string().as_ref()
+    }
+    pub fn request_headers(&self) -> Vec<&str> {
+        match &self.request_headers {
+            None => vec![],
+            Some(headers) => headers.split("\n").collect(),
+        }
+    }
+    pub fn request_body(&self) -> Option<&Vec<u8>> {
+        self.request_body.as_ref()
+    }
+    pub fn status(&self) -> Option<&str> {
+        self.response_status.as_deref()
+    }
+    pub fn response_headers(&self) -> Vec<&str> {
+        match &self.response_headers {
+            None => vec![],
+            Some(headers) => headers.split("\n").collect(),
+        }
+    }
+    pub fn response_body(&self) -> Option<&Vec<u8>> {
+        self.response_body.as_ref()
+    }
+    pub fn extractions(&self) -> Vec<(&str, &str)> {
+        self.response_extractions
+            .iter()
+            .map(|x| (x.0.as_ref(), x.1.as_ref()))
+            .collect()
+    }
+
     pub fn create_table(conn: &Connection) -> Result<()> {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS request_responses (
@@ -78,6 +112,44 @@ impl RequestResponse {
     pub fn delete_all(conn: &Connection) -> Result<()> {
         conn.execute("DELETE FROM request_responses;", NO_PARAMS)?;
         Ok(())
+    }
+    pub fn get_by_id(conn: &Connection, id: u32) -> Result<RequestResponse> {
+        let mut stmt = conn.prepare(
+            "SELECT 
+                    rowid,
+                    request_url,
+                    request_method,
+                    request_headers,
+                    request_body,
+                    response_status,
+                    response_headers,
+                    response_body,
+                    response_extractions
+                FROM request_responses WHERE rowid = ?1;",
+        )?;
+
+        let req_resps = stmt.query_map(params![id], |row| {
+            let s: String = row.get(2)?;
+            Ok(RequestResponse {
+                rowid: row.get(0)?,
+                request_url: row.get(1)?,
+                request_method: Method::new(s.as_ref()),
+                request_headers: row.get(3)?,
+                request_body: row.get(4)?,
+                response_status: row.get(5)?,
+                response_headers: row.get(6)?,
+                response_body: row.get(7)?,
+                response_extractions: RequestResponse::unstringify_extractions(row.get(8)?),
+            })
+        })?;
+
+        // TODO: print a warning for errors
+        let mut v: Vec<_> = req_resps.filter_map(|req| req.ok()).collect();
+        if v.len() == 0 {
+            Err(Error::new(ErrorKind::NotFound))
+        } else {
+            Ok(v.remove(0))
+        }
     }
 
     fn stringify_extractions(v: &Vec<(String, String)>) -> Option<String> {

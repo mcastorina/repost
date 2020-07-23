@@ -152,6 +152,23 @@ subcommands:
             - workspaces:
                 about: Print workspaces
                 visible_aliases: ["workspace", "ws", "w"]
+            - response:
+                about: Print information about the last request and response
+                visible_aliases: ["resp", "rr"]
+                args:
+                    - id:
+                        help: The ID of the response to show detailed information
+                        required: false
+                    - transmitted:
+                        help: Show detailed request data
+                        short: t
+                        long: transmitted
+                        takes_value: false
+                    - received:
+                        help: Show detailed response data
+                        short: r
+                        long: received
+                        takes_value: false
     - set:
         settings:
             - SubcommandRequiredElseHelp

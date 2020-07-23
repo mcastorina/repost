@@ -106,7 +106,7 @@ pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
     // print planned requests
     let requests = super::run::create_requests(&req, &input_opts).unwrap_or(vec![]);
     println!("  Planned Requests");
-    super::show::print_table(requests)?;
+    super::show::print_table(requests);
     println!();
 
     Ok(())

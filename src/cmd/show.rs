@@ -1,8 +1,9 @@
 use crate::bastion::Bastion;
 use crate::db::PrintableTable;
-use crate::db::{DbObject, Environment, InputOption, Request, Variable};
+use crate::db::{DbObject, Environment, InputOption, Request, RequestResponse, Variable};
 use crate::error::Result;
 use clap_v3::ArgMatches;
+use colored::*;
 use comfy_table::{ContentArrangement, Table};
 use terminal_size::{terminal_size, Width};
 
@@ -10,7 +11,7 @@ pub const TABLE_FORMAT: &'static str = "||--+-++|    ++++++";
 
 pub fn requests(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
     println!();
-    print_table(Request::get_all(b.conn())?)?;
+    print_table(Request::get_all(b.conn())?);
     println!();
     Ok(())
 }
@@ -26,7 +27,7 @@ pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
         }
         (None, Some(name)) => print_table(Variable::get_by_name(b.conn(), name)?),
         (None, None) => print_table(Variable::get_all(b.conn())?),
-    }?;
+    };
     println!();
     Ok(())
 }
@@ -35,18 +36,87 @@ pub fn options(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
     match b.current_request() {
         Some(req) => print_table(InputOption::get_by_name(b.conn(), req)?),
         None => print_table(InputOption::get_all(b.conn())?),
-    }?;
+    };
     println!();
     Ok(())
 }
 pub fn environments(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
     println!();
-    print_table(Environment::get_all(b.conn())?)?;
+    print_table(Environment::get_all(b.conn())?);
     println!();
     Ok(())
 }
+pub fn response(b: &Bastion, matches: &ArgMatches) -> Result<()> {
+    let id = matches.value_of("id");
+    if id.is_none() {
+        println!();
+        print_table(RequestResponse::get_all(b.conn())?);
+        println!();
+        return Ok(());
+    }
+    let id = id.unwrap();
+    let rr = RequestResponse::get_by_id(b.conn(), id.parse()?)?;
 
-pub fn print_table<T: PrintableTable>(t: T) -> Result<()> {
+    let tx = matches.is_present("transmitted");
+    let rx = matches.is_present("received");
+    let (tx, rx) = match (tx, rx) {
+        (false, false) => (true, true),
+        x => x,
+    };
+
+    if tx {
+        println!("\n{}", "  Request".bold());
+        println!("  =========");
+        println!(
+            "{}",
+            format!("> {} {}", rr.method(), rr.url()).bright_black()
+        );
+        for header in rr.request_headers() {
+            println!("{}", format!("> {}", header).bright_black(),);
+        }
+        println!();
+
+        if let Some(body) = rr.request_body() {
+            println!("{}", "  Request Body".bold());
+            println!("  ==============");
+            println!("{}\n", std::str::from_utf8(body).unwrap());
+        }
+    }
+
+    if rx {
+        println!("\n{}", "  Response".bold());
+        println!("  ==========");
+        println!(
+            "{}",
+            format!("< {}", rr.status().unwrap_or("-")).bright_black()
+        );
+        for header in rr.response_headers() {
+            println!("{}", format!("< {}", header).bright_black(),);
+        }
+        println!();
+
+        if let Some(body) = rr.response_body() {
+            println!("{}", "  Response Body".bold());
+            println!("  ===============");
+            println!("{}\n", std::str::from_utf8(body).unwrap());
+        }
+
+        let extractions = rr.extractions();
+        if extractions.len() > 0 {
+            println!("{}", "  Extractions".bold());
+            println!("  =============");
+            for e in extractions {
+                let (name, value) = e;
+                println!("{}", format!("{} <= {}", name, value).bright_black());
+            }
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+pub fn print_table<T: PrintableTable>(t: T) {
     let mut width = 76;
     if let Some((Width(w), _)) = terminal_size() {
         width = w - 4;
@@ -65,6 +135,4 @@ pub fn print_table<T: PrintableTable>(t: T) -> Result<()> {
     for line in table.to_string().split('\n') {
         println!("  {}", line);
     }
-
-    Ok(())
 }
