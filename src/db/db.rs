@@ -1,4 +1,4 @@
-use super::{InputOption, OutputOption, Request, Variable};
+use super::{InputOption, OutputOption, Request, RequestResponse, Variable};
 use crate::error::Result;
 use comfy_table::Cell;
 use rusqlite::{Connection, NO_PARAMS};
@@ -59,6 +59,7 @@ impl Db {
         Variable::create_table(&self.conn)?;
         InputOption::create_table(&self.conn)?;
         OutputOption::create_table(&self.conn)?;
+        RequestResponse::create_table(&self.conn)?;
         self.conn.execute("PRAGMA foreign_keys = ON", NO_PARAMS)?;
 
         Ok(())

@@ -1,5 +1,5 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Method, OutputOption, Request, Variable};
+use crate::db::{DbObject, InputOption, Method, OutputOption, Request, RequestResponse, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use colored::*;
@@ -87,6 +87,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
             println!();
         }
 
+        let mut rr = RequestResponse::new(&reqw);
         let mut resp = blocking::Client::new().execute(reqw)?;
 
         // output response code and headers
@@ -105,6 +106,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         // output body with missing-newline indicator
         let mut text: Vec<u8> = vec![];
         resp.copy_to(&mut text)?;
+        rr.set_response(&resp, &text);
         let text = String::from_utf8(text).unwrap();
 
         display_body(&text, matches.is_present("no-pager"));
@@ -128,6 +130,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
             }
             for var in vars.unwrap().iter_mut() {
                 var.set_source(Some(req.name()));
+                rr.add_extraction(var.name(), var.value().unwrap_or(""));
                 if !quiet {
                     println!(
                         "{}",
@@ -140,8 +143,9 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
                 })?)?;
             }
         }
-        b.set_completions()?;
+        rr.create(b.conn());
     }
+    b.set_completions()?;
     Ok(())
 }
 

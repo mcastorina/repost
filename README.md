@@ -150,10 +150,11 @@ or a part of a JSON body and save it in a variable.
 | :white_check_mark: | edit variable                                    |
 | :soon:             | edit request                                     |
 | :white_check_mark: | tab completion                                   |
-|                    | extract from all items in an array               |
+| :white_check_mark: | extract from all items in an array               |
+| :white_check_mark: | send multiple requests for multiple input opts   |
 |                    | extract from other data formats                  |
 |                    | option to hide variable values                   |
-|                    | run flags                                        |
+| :soon:             | run flags                                        |
 |                    | run flag for each input option                   |
 |                    | clipboard integration                            |
 |                    | create request from curl command                 |
