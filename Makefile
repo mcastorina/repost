@@ -8,9 +8,13 @@ check:
 	cargo check
 
 build: target/debug/repost
+release: target/release/repost
 
 target/debug/repost: Cargo.toml $(RS_FILES)
 	cargo build
+
+target/release/repost: Cargo.toml $(RS_FILES)
+	cargo build --release
 
 fmt: $(RS_FILES)
 	cargo fmt

@@ -38,7 +38,18 @@ will have access to request specific commands.
 Another important thing to know is input options are denoted by
 `{name}` and can be anywhere in the url, headers, or body.
 
-### Quick start
+## Installation
+Currently the only way to install this is to build from source and
+run the executable. You will need the Rust build tools (specifically
+`cargo`).
+
+```
+» git clone https://github.com/mcastorina/repost && cd repost
+» make release
+» ls -l ./target/release/repost
+```
+
+## Quick start
 This section shows how to create a request, define variables, and
 add extractors.
 
@@ -57,7 +68,7 @@ or `$HOME/.repost/$WORKSPACE_NAME.db`.
 **Note:** If you forget what command does what, use `help` or `--help`
 for more information about the available commands and flags.
 
-#### Setting a workspace
+### Setting a workspace
 Your current workspace is where all of your data will be saved.
 Repost starts with the default workspace: `repost`, but we can
 change that using `set workspace <workspace_name>`.
@@ -79,7 +90,7 @@ To show the available workspaces, use `show workspaces`.
   +-----------+
 ```
 
-#### Create a request
+### Create a request
 The minimum request has a name and a URL. Headers can be added with
 `-H` and a body with `-d`. If the argument to `-d` starts with `@`,
 repost will try to find the file to use as its body. Use `{option-name}`
@@ -119,7 +130,7 @@ our current request and view the `info`.
 
 ```
 
-#### Set options
+### Set options
 From the request state, we can use `set option` to set the value for the request.
 
 ```
@@ -152,7 +163,7 @@ Here we see the current value, and the planned requests if we were
 to run it. You may set multiple values for the same input option by
 providing more values on the command line.
 
-#### Run a request
+### Run a request
 There are two ways to run a request. If you are in a request state, simply using
 `run` will execute the current request. The other way is to specify the request
 name to run.
@@ -184,7 +195,7 @@ name to run.
 }
 ```
 
-#### Define a variable
+### Define a variable
 Variables are environment specific, and should generally match your
 request's input options. When you are in an environment, the value
 of the variable will automatically be populated in the input option.
@@ -215,7 +226,7 @@ Now we can set an environment using `set environment`. Additionally,
 Note that when we set the environment, our input option gets updated
 to the value of the variable.
 
-#### Add extractors
+### Add extractors
 Extractors may be added in the request state. The command `extract`
 is used to add it as an output option to the request. Extractors will
 try to capture a certain part of a request and save it to a variable.
@@ -227,7 +238,7 @@ or `header` to denote which part of the response to extract from.
 
 Currently, only JSON extraction is supported.
 
-##### JSON query expression
+#### JSON query expression
 The simplified language is `.` separated sub-fields and `[]` for
 accessing arrays. The value inside `[]` must be an integer OR `*`
 meaning all array objects.
