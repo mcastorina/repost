@@ -39,9 +39,9 @@ Another important thing to know is input options are denoted by
 `{name}` and can be anywhere in the url, headers, or body.
 
 ## Installation
-Currently the only way to install this is to build from source and
-run the executable. You will need the Rust build tools (specifically
-`cargo`).
+The binary can be downloaded from the release page.
+
+Alternatively, you may build from source (rust build tools required):
 
 ```
 » git clone https://github.com/mcastorina/repost && cd repost
