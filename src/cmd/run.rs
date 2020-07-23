@@ -62,7 +62,9 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     // delete extractions
     for opt in output_opts.iter() {
         for var in Variable::get_by(b.conn(), |v| {
-            v.name() == opt.option_name() && v.source().unwrap_or("") == req.name()
+            v.name() == opt.option_name()
+                && v.source().unwrap_or("") == req.name()
+                && v.environment() == b.current_environment().unwrap()
         })? {
             var.delete(b.conn())?;
         }

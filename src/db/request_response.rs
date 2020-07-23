@@ -115,7 +115,7 @@ impl RequestResponse {
     }
     pub fn get_by_id(conn: &Connection, id: u32) -> Result<RequestResponse> {
         let mut stmt = conn.prepare(
-            "SELECT 
+            "SELECT
                     rowid,
                     request_url,
                     request_method,
@@ -220,7 +220,7 @@ impl DbObject for RequestResponse {
     }
     fn get_all(conn: &Connection) -> Result<Vec<RequestResponse>> {
         let mut stmt = conn.prepare(
-            "SELECT 
+            "SELECT
                     rowid,
                     request_url,
                     request_method,

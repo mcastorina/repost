@@ -30,7 +30,11 @@ pub fn variables(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
             continue;
         }
         for e in v {
-            e.delete(b.conn())?;
+            // only delete variables in the current environment if set
+            match b.current_environment() {
+                Some(x) if x != e.environment() => (),
+                _ => e.delete(b.conn())?,
+            };
         }
         // TODO: only update if the option source is "variable"
         b.set_options(InputOption::get_by(b.conn(), |x| x.option_name() == var)?)?;
