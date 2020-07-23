@@ -68,7 +68,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         }
     }
 
-    RequestResponse::delete_all(b.conn());
+    RequestResponse::delete_all(b.conn())?;
     let quiet = matches.is_present("quiet");
     let many_requests = requests.len() > 1;
     for mut req in requests {
@@ -145,12 +145,12 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
                 })?)?;
             }
         }
-        rr.create(b.conn());
+        rr.create(b.conn())?;
     }
 
     if many_requests {
         println!("\n  Summary");
-        super::show::print_table(RequestResponse::get_all(b.conn())?);
+        super::show::print_table(RequestResponse::get_all(b.conn())?)?;
         println!();
     }
 

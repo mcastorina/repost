@@ -1,13 +1,9 @@
-use super::request::{Method, Request};
-use super::PrintableTableStruct;
-use super::{DbObject, InputOption};
-use crate::error::{Error, ErrorKind, Result};
+use super::request::Method;
+use super::{DbObject, PrintableTableStruct};
+use crate::error::Result;
 use comfy_table::{Attribute, Cell, Color};
-use regex::Regex;
 use reqwest::blocking;
 use rusqlite::{params, Connection, NO_PARAMS};
-use std::collections::HashSet;
-use std::iter::FromIterator;
 
 pub struct RequestResponse {
     rowid: u32,
@@ -146,7 +142,7 @@ impl DbObject for RequestResponse {
         )?;
         Ok(())
     }
-    fn update(&self, conn: &Connection) -> Result<usize> {
+    fn update(&self, _conn: &Connection) -> Result<usize> {
         // TODO: not supported
         Ok(0)
     }
