@@ -141,6 +141,17 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
                         format!("{} <= {}", var.name(), var.value().unwrap_or("")).bright_black()
                     );
                 }
+
+                // delete variables that have the same name, environment, and value
+                let vars = Variable::get_by(b.conn(), |v| {
+                    v.name() == var.name()
+                        && v.environment() == var.environment()
+                        && v.value() == var.value()
+                })?;
+                for v in vars {
+                    v.delete(b.conn())?;
+                }
+
                 var.create(b.conn())?;
                 b.set_options(InputOption::get_by(b.conn(), |x| {
                     x.option_name() == var.name()
