@@ -8,6 +8,7 @@ pub enum ErrorKind {
     ClapError(clap_v3::Error),
     IOError(std::io::Error),
     ArgumentError(&'static str),
+    RequestStateExpected(&'static str),
     MissingOptions(Vec<String>),
     ReqwestError(reqwest::Error),
     ParseError,
@@ -27,6 +28,11 @@ impl std::fmt::Display for Error {
             ErrorKind::ClapError(x) => write!(f, "{}", x),
             ErrorKind::IOError(x) => write!(f, "{}", x),
             ErrorKind::ArgumentError(x) => write!(f, "{}", x),
+            ErrorKind::RequestStateExpected(x) => write!(
+                f,
+                "{} is only available in a request specific context. Try setting a request first.",
+                x
+            ),
             ErrorKind::MissingOptions(x) => {
                 write!(f, "The following options are missing: {}", x.join(", "))
             }
@@ -43,6 +49,7 @@ impl std::fmt::Debug for Error {
             ErrorKind::ClapError(x) => write!(f, "ClapError({})", x),
             ErrorKind::IOError(x) => write!(f, "IOError({})", x),
             ErrorKind::ArgumentError(x) => write!(f, "ArgumentError({})", x),
+            ErrorKind::RequestStateExpected(x) => write!(f, "RequestStateExpected({})", x),
             ErrorKind::MissingOptions(x) => write!(f, "MissingOptions({:?})", x),
             ErrorKind::ReqwestError(x) => write!(f, "ReqwestError({})", x),
             ErrorKind::NotFound => write!(f, "Not found."),

@@ -5,9 +5,7 @@ use clap_v3::ArgMatches;
 
 pub fn execute(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     if b.current_request().is_none() {
-        return Err(Error::new(ErrorKind::ArgumentError(
-            "Extract is only available in a request specific context. Try setting a request first.",
-        )));
+        return Err(Error::new(ErrorKind::RequestStateExpected("Extract")));
     }
     let request = b.current_request().unwrap();
     let extraction_source = matches.value_of("type").unwrap();

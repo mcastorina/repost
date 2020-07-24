@@ -1,7 +1,7 @@
 use crate::bastion::Bastion;
 use crate::db::PrintableTable;
 use crate::db::{DbObject, Environment, InputOption, Request, RequestResponse, Variable};
-use crate::error::Result;
+use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use colored::*;
 use comfy_table::{ContentArrangement, Table};
@@ -32,11 +32,13 @@ pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 pub fn options(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
+    if b.current_request().is_none() {
+        return Err(Error::new(ErrorKind::RequestStateExpected("Show options")));
+    }
+    let request = b.current_request().unwrap();
+
     println!();
-    match b.current_request() {
-        Some(req) => print_table(InputOption::get_by_name(b.conn(), req)?),
-        None => print_table(InputOption::get_all(b.conn())?),
-    };
+    print_table(InputOption::get_by_name(b.conn(), request)?);
     println!();
     Ok(())
 }

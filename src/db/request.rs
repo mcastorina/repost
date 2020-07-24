@@ -1,7 +1,7 @@
 use super::PrintableTableStruct;
 use super::{DbObject, InputOption};
 use crate::error::{Error, ErrorKind, Result};
-use comfy_table::Cell;
+use comfy_table::{Cell, Color};
 use regex::Regex;
 use reqwest::Method;
 use rusqlite::{params, Connection, NO_PARAMS};
@@ -276,8 +276,13 @@ impl PrintableTableStruct for Request {
                 "false"
             }
         };
+        let can_run = self.input_options.iter().all(|x| x.values().len() > 0);
+        let mut name = Cell::new(&self.name);
+        if can_run {
+            name = name.fg(Color::Green);
+        }
         vec![vec![
-            Cell::new(&self.name),
+            name,
             Cell::new(self.method.to_string()),
             Cell::new(&self.url),
             Cell::new(self.headers.as_ref().unwrap_or(&String::from(""))),

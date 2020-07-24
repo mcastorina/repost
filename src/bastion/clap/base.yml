@@ -70,9 +70,6 @@ subcommands:
             - environments:
                 about: Print environments
                 visible_aliases: ["environment", "envs", "env", "e"]
-            - options:
-                about: Print options
-                visible_aliases: ["option", "opts", "opt", "o"]
             - workspaces:
                 about: Print workspaces
                 visible_aliases: ["workspace", "ws", "w"]
