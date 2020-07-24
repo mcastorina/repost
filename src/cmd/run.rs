@@ -1,11 +1,12 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Method, OutputOption, Request, RequestResponse, Variable};
+use crate::db::{DbObject, InputOption, OutputOption, Request, RequestResponse, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use colored::*;
 use regex::Regex;
 use reqwest::blocking;
 use reqwest::header::HeaderMap;
+use reqwest::Method;
 use serde_json::Value;
 use std::env;
 use std::fs;
@@ -208,12 +209,17 @@ fn create_reqwest(req: &mut Request) -> Result<blocking::Request> {
     // TODO: should this be a method of Request?
     let client = blocking::Client::new();
     let mut builder = match req.method() {
-        Method::GET => client.get(req.url()),
-        Method::POST => client.post(req.url()),
-        Method::PUT => client.put(req.url()),
-        Method::PATCH => client.patch(req.url()),
-        Method::DELETE => client.delete(req.url()),
-        Method::HEAD => client.head(req.url()),
+        &Method::GET => client.get(req.url()),
+        &Method::POST => client.post(req.url()),
+        &Method::PUT => client.put(req.url()),
+        &Method::PATCH => client.patch(req.url()),
+        &Method::DELETE => client.delete(req.url()),
+        &Method::HEAD => client.head(req.url()),
+        _ => {
+            return Err(Error::new(ErrorKind::ArgumentError(
+                "Method not supported.",
+            )));
+        }
     };
     // add headers
     if let Some(x) = req.headers() {

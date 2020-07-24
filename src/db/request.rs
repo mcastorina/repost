@@ -3,6 +3,7 @@ use super::{DbObject, InputOption};
 use crate::error::{Error, ErrorKind, Result};
 use comfy_table::Cell;
 use regex::Regex;
+use reqwest::Method;
 use rusqlite::{params, Connection, NO_PARAMS};
 use std::collections::HashSet;
 use std::iter::FromIterator;
@@ -14,41 +15,6 @@ pub struct Request {
     url: String,
     headers: Option<String>,
     body: Option<Vec<u8>>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Method {
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
-    HEAD,
-}
-impl Method {
-    // TODO: implement display for method
-    pub fn to_string(&self) -> &str {
-        match self {
-            Method::GET => "GET",
-            Method::POST => "POST",
-            Method::PUT => "PUT",
-            Method::PATCH => "PATCH",
-            Method::DELETE => "DELETE",
-            Method::HEAD => "HEAD",
-        }
-    }
-    pub fn new(s: &str) -> Method {
-        // TODO: case insensitive
-        match s {
-            "GET" => Method::GET,
-            "POST" => Method::POST,
-            "PUT" => Method::PUT,
-            "PATCH" => Method::PATCH,
-            "DELETE" => Method::DELETE,
-            "HEAD" => Method::HEAD,
-            _ => Method::GET,
-        }
-    }
 }
 
 impl Request {
@@ -245,7 +211,7 @@ impl DbObject for Request {
             let s: String = row.get(1)?;
             Ok(Request {
                 name: row.get(0)?,
-                method: Method::new(s.as_ref()),
+                method: Method::from_bytes(s.as_bytes()).unwrap_or(Method::GET),
                 url: row.get(2)?,
                 headers: row.get(3)?,
                 body: row.get(4)?,

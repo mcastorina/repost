@@ -1,7 +1,8 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Method, Request, Variable};
+use crate::db::{DbObject, InputOption, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
+use reqwest::Method;
 use std::fs;
 
 pub fn request(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
@@ -36,7 +37,9 @@ pub fn request(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
             (items.next().unwrap().trim(), items.next().unwrap().trim())
         })
         .collect();
-    method = matches.value_of("method").map(|x| Method::new(x));
+    method = matches
+        .value_of("method")
+        .map(|x| Method::from_bytes(x.as_bytes()).unwrap_or(Method::GET));
 
     let mut request = Request::new(name, method, url);
     for header in headers {

@@ -1,8 +1,8 @@
-use super::request::Method;
 use super::{DbObject, PrintableTableStruct};
 use crate::error::{Error, ErrorKind, Result};
 use comfy_table::{Attribute, Cell, Color};
 use reqwest::blocking;
+use reqwest::Method;
 use rusqlite::{params, Connection, NO_PARAMS};
 
 pub struct RequestResponse {
@@ -24,7 +24,7 @@ impl RequestResponse {
         RequestResponse {
             rowid: 0,
             request_url: format!("{}", req.url()),
-            request_method: Method::new(req.method().as_str()),
+            request_method: req.method().clone(),
             request_headers: Some(
                 req.headers()
                     .iter()
@@ -60,8 +60,8 @@ impl RequestResponse {
     pub fn url(&self) -> &str {
         self.request_url.as_ref()
     }
-    pub fn method(&self) -> &str {
-        self.request_method.to_string().as_ref()
+    pub fn method(&self) -> String {
+        self.request_method.to_string()
     }
     pub fn request_headers(&self) -> Vec<&str> {
         match &self.request_headers {
@@ -133,7 +133,7 @@ impl RequestResponse {
             Ok(RequestResponse {
                 rowid: row.get(0)?,
                 request_url: row.get(1)?,
-                request_method: Method::new(s.as_ref()),
+                request_method: Method::from_bytes(s.as_bytes()).unwrap_or(Method::GET),
                 request_headers: row.get(3)?,
                 request_body: row.get(4)?,
                 response_status: row.get(5)?,
@@ -238,7 +238,7 @@ impl DbObject for RequestResponse {
             Ok(RequestResponse {
                 rowid: row.get(0)?,
                 request_url: row.get(1)?,
-                request_method: Method::new(s.as_ref()),
+                request_method: Method::from_bytes(s.as_bytes()).unwrap_or(Method::GET),
                 request_headers: row.get(3)?,
                 request_body: row.get(4)?,
                 response_status: row.get(5)?,
