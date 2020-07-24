@@ -1,5 +1,5 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, OutputOption, Request};
+use crate::db::{DbObject, OutputOption, Request};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
@@ -15,7 +15,7 @@ pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
     // display request, input options, and output options
     let req = Request::get_by_name(b.conn(), req)?.remove(0);
     // get options for this request
-    let input_opts = InputOption::get_by_name(b.conn(), req.name())?;
+    let input_opts = req.input_options();
     let output_opts = OutputOption::get_by_name(b.conn(), req.name())?;
 
     let mut width = 76;
@@ -72,7 +72,7 @@ pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
             .set_table_width(width);
         println!("  Input Options");
         table.set_header(vec!["name", "current values"]);
-        for opt in &input_opts {
+        for opt in input_opts {
             table.add_row(vec![opt.option_name(), &opt.values().join("\n")]);
         }
         for line in table.to_string().split('\n') {
@@ -104,7 +104,7 @@ pub fn execute(b: &mut Bastion, _matches: &ArgMatches) -> Result<()> {
     }
 
     // print planned requests
-    let requests = super::run::create_requests(&req, &input_opts).unwrap_or(vec![]);
+    let requests = super::run::create_requests(&req).unwrap_or(vec![]);
     println!("  Planned Requests");
     super::show::print_table(requests);
     println!();

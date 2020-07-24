@@ -236,18 +236,10 @@ impl Bastion {
     pub fn set_option(&self, option_name: &str, values: Vec<&str>) -> Result<()> {
         match &self.state {
             ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
-                let opt = InputOption::get_by_name_map(self.db.conn(), &req, |e| {
-                    String::from(e.option_name())
-                })?
-                .remove(option_name);
-                if opt.is_none() {
-                    Err(Error::new(ErrorKind::NotFound))
-                } else {
-                    let mut opt = opt.unwrap();
-                    opt.set_values(values);
-                    opt.update(self.db.conn())?;
-                    Ok(())
-                }
+                let mut req = Request::get_by_name(self.db.conn(), &req)?.remove(0);
+                req.set_input_option(option_name, values)?;
+                req.update(self.db.conn())?;
+                Ok(())
             }
             _ => Err(Error::new(ErrorKind::NotFound)),
         }
