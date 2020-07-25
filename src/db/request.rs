@@ -1,5 +1,5 @@
 use super::PrintableTableStruct;
-use super::{DbObject, InputOption};
+use super::{DbObject, InputOption, OutputOption};
 use crate::error::{Error, ErrorKind, Result};
 use comfy_table::{Cell, Color};
 use regex::Regex;
@@ -17,6 +17,7 @@ pub struct Request {
     body: Option<Vec<u8>>,
 
     input_options: Vec<InputOption>,
+    output_options: Vec<OutputOption>,
 }
 
 impl Request {
@@ -30,6 +31,7 @@ impl Request {
             body: None,
 
             input_options: vec![],
+            output_options: vec![],
         };
         r.input_options = r
             .variable_names()
@@ -107,6 +109,9 @@ impl Request {
     }
     pub fn input_options(&self) -> &Vec<InputOption> {
         &self.input_options
+    }
+    pub fn output_options(&self) -> &Vec<OutputOption> {
+        &self.output_options
     }
     pub fn consume_body(&mut self) -> Option<Vec<u8>> {
         self.body.take()
@@ -199,18 +204,19 @@ impl DbObject for Request {
         for option in self.input_options.iter() {
             option.create(conn)?;
         }
+        // create output options
+        for option in self.output_options.iter() {
+            option.create(conn)?;
+        }
         Ok(())
     }
     fn delete(&self, conn: &Connection) -> Result<()> {
-        // TODO: should this get the options for the request, then call delete()
-        //       on the objects?
         for option in self.input_options.iter() {
             option.delete(conn)?;
         }
-        conn.execute(
-            "DELETE FROM output_options WHERE request_name = ?1;",
-            params![self.name],
-        )?;
+        for option in self.output_options.iter() {
+            option.delete(conn)?;
+        }
         conn.execute("DELETE FROM requests WHERE name = ?1;", params![self.name])?;
         Ok(())
     }
@@ -236,7 +242,8 @@ impl DbObject for Request {
 
         let requests = stmt.query_map(NO_PARAMS, |row| {
             let name: String = row.get(0)?;
-            let opts = InputOption::get_by_name(conn, &name);
+            let input_opts = InputOption::get_by_name(conn, &name);
+            let output_opts = OutputOption::get_by_name(conn, &name);
             // TODO: error checking
             Ok(Request {
                 name,
@@ -246,7 +253,8 @@ impl DbObject for Request {
                 headers: row.get(3)?,
                 body: row.get(4)?,
 
-                input_options: opts.unwrap(),
+                input_options: input_opts.unwrap(),
+                output_options: output_opts.unwrap(),
             })
         })?;
 

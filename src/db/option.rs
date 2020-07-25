@@ -137,6 +137,7 @@ impl PrintableTableStruct for InputOption {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct OutputOption {
     request_name: String,
     option_name: String,

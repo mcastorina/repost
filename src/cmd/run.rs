@@ -28,7 +28,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     let mut req = req.remove(0);
 
     // get options for this request
-    let output_opts = OutputOption::get_by_name(b.conn(), req.name())?;
+    let output_opts = req.output_options().clone();
 
     // if this request has extractions, check if there is an environment
     if output_opts.len() > 0 && b.current_environment().is_none() {
