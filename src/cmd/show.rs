@@ -81,7 +81,8 @@ pub fn response(b: &Bastion, matches: &ArgMatches) -> Result<()> {
         if let Some(body) = rr.request_body() {
             println!("{}", "  Request Body".bold());
             println!("  ==============");
-            println!("{}\n", std::str::from_utf8(body).unwrap());
+            super::run::display_body(std::str::from_utf8(body).unwrap(), true);
+            println!();
         }
     }
 
@@ -100,7 +101,8 @@ pub fn response(b: &Bastion, matches: &ArgMatches) -> Result<()> {
         if let Some(body) = rr.response_body() {
             println!("{}", "  Response Body".bold());
             println!("  ===============");
-            println!("{}\n", std::str::from_utf8(body).unwrap());
+            super::run::display_body(std::str::from_utf8(body).unwrap(), true);
+            println!();
         }
 
         let extractions = rr.extractions();

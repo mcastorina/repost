@@ -298,7 +298,7 @@ fn get_json_values(root: &Value, query: &str) -> Result<Vec<Value>> {
     Ok(vec![result.take()])
 }
 
-fn display_body(text: &str, no_pager: bool) {
+pub fn display_body(text: &str, no_pager: bool) {
     let v: serde_json::Result<serde_json::Value> = serde_json::from_str(text);
     let text = match v {
         Ok(v) => format!("{}\n", serde_json::to_string_pretty(&v).unwrap()),
