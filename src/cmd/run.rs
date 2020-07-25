@@ -1,11 +1,12 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Method, OutputOption, Request, RequestResponse, Variable};
+use crate::db::{DbObject, InputOption, OutputOption, Request, RequestResponse, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use colored::*;
 use regex::Regex;
 use reqwest::blocking;
 use reqwest::header::HeaderMap;
+use reqwest::Method;
 use serde_json::Value;
 use std::env;
 use std::fs;
@@ -27,8 +28,7 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     let mut req = req.remove(0);
 
     // get options for this request
-    let input_opts = InputOption::get_by_name(b.conn(), req.name())?;
-    let output_opts = OutputOption::get_by_name(b.conn(), req.name())?;
+    let output_opts = req.output_options().clone();
 
     // if this request has extractions, check if there is an environment
     if output_opts.len() > 0 && b.current_environment().is_none() {
@@ -56,8 +56,8 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
         }
     }
 
-    // create all request objects given input options
-    let requests = create_requests(&req, &input_opts)?;
+    // create all request objects
+    let requests = create_requests(&req)?;
 
     // delete extractions
     for opt in output_opts.iter() {
@@ -171,7 +171,9 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Resu
     Ok(())
 }
 
-pub fn create_requests(req: &Request, input_opts: &Vec<InputOption>) -> Result<Vec<Request>> {
+// TODO: make this a method of Request
+pub fn create_requests(req: &Request) -> Result<Vec<Request>> {
+    let input_opts = req.input_options();
     let missing_opts: Vec<_> = input_opts
         .iter()
         .filter(|opt| opt.values().len() == 0)
@@ -184,7 +186,7 @@ pub fn create_requests(req: &Request, input_opts: &Vec<InputOption>) -> Result<V
 
     if input_opts.len() == 0 {
         let mut req = req.clone();
-        req.replace_input_options(&input_opts)?;
+        req.replace_input_options()?;
         return Ok(vec![req]);
     }
 
@@ -196,9 +198,9 @@ pub fn create_requests(req: &Request, input_opts: &Vec<InputOption>) -> Result<V
         let mut opts = input_opts.clone();
         let mut req = req.clone();
         for (opt, opt_value) in opts.iter_mut().zip(opt_values) {
-            opt.set_value(Some(opt_value));
+            req.set_input_option(opt.option_name(), vec![opt_value])?;
         }
-        req.replace_input_options(&opts)?;
+        req.replace_input_options()?;
         requests.push(req);
     }
     Ok(requests)
@@ -208,12 +210,17 @@ fn create_reqwest(req: &mut Request) -> Result<blocking::Request> {
     // TODO: should this be a method of Request?
     let client = blocking::Client::new();
     let mut builder = match req.method() {
-        Method::GET => client.get(req.url()),
-        Method::POST => client.post(req.url()),
-        Method::PUT => client.put(req.url()),
-        Method::PATCH => client.patch(req.url()),
-        Method::DELETE => client.delete(req.url()),
-        Method::HEAD => client.head(req.url()),
+        &Method::GET => client.get(req.url()),
+        &Method::POST => client.post(req.url()),
+        &Method::PUT => client.put(req.url()),
+        &Method::PATCH => client.patch(req.url()),
+        &Method::DELETE => client.delete(req.url()),
+        &Method::HEAD => client.head(req.url()),
+        _ => {
+            return Err(Error::new(ErrorKind::ArgumentError(
+                "Method not supported.",
+            )));
+        }
     };
     // add headers
     if let Some(x) = req.headers() {

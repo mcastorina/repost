@@ -1,8 +1,9 @@
 use super::PrintableTableStruct;
-use super::{DbObject, InputOption};
+use super::{DbObject, InputOption, OutputOption};
 use crate::error::{Error, ErrorKind, Result};
-use comfy_table::Cell;
+use comfy_table::{Cell, Color};
 use regex::Regex;
+use reqwest::Method;
 use rusqlite::{params, Connection, NO_PARAMS};
 use std::collections::HashSet;
 use std::iter::FromIterator;
@@ -14,53 +15,30 @@ pub struct Request {
     url: String,
     headers: Option<String>,
     body: Option<Vec<u8>>,
-}
 
-#[derive(Debug, Clone)]
-pub enum Method {
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
-    HEAD,
-}
-impl Method {
-    // TODO: implement display for method
-    pub fn to_string(&self) -> &str {
-        match self {
-            Method::GET => "GET",
-            Method::POST => "POST",
-            Method::PUT => "PUT",
-            Method::PATCH => "PATCH",
-            Method::DELETE => "DELETE",
-            Method::HEAD => "HEAD",
-        }
-    }
-    pub fn new(s: &str) -> Method {
-        // TODO: case insensitive
-        match s {
-            "GET" => Method::GET,
-            "POST" => Method::POST,
-            "PUT" => Method::PUT,
-            "PATCH" => Method::PATCH,
-            "DELETE" => Method::DELETE,
-            "HEAD" => Method::HEAD,
-            _ => Method::GET,
-        }
-    }
+    input_options: Vec<InputOption>,
+    output_options: Vec<OutputOption>,
 }
 
 impl Request {
     pub fn new(name: &str, method: Option<Method>, url: &str) -> Request {
         let method = method.unwrap_or(Request::name_to_method(name));
-        Request {
+        let mut r = Request {
             name: String::from(name),
             method: method,
             url: String::from(url),
             headers: None,
             body: None,
-        }
+
+            input_options: vec![],
+            output_options: vec![],
+        };
+        r.input_options = r
+            .variable_names()
+            .iter()
+            .map(|var_name| InputOption::new(r.name(), var_name, vec![]))
+            .collect();
+        r
     }
     pub fn create_table(conn: &Connection) -> Result<()> {
         conn.execute(
@@ -129,6 +107,12 @@ impl Request {
     pub fn body(&self) -> &Option<Vec<u8>> {
         &self.body
     }
+    pub fn input_options(&self) -> &Vec<InputOption> {
+        &self.input_options
+    }
+    pub fn output_options(&self) -> &Vec<OutputOption> {
+        &self.output_options
+    }
     pub fn consume_body(&mut self) -> Option<Vec<u8>> {
         self.body.take()
     }
@@ -159,14 +143,26 @@ impl Request {
 
         HashSet::from_iter(names.into_iter())
     }
-    pub fn replace_input_options(&mut self, options: &Vec<InputOption>) -> Result<()> {
+    pub fn set_input_option(&mut self, opt: &str, values: Vec<&str>) -> Result<()> {
+        let opt = self
+            .input_options
+            .iter_mut()
+            .find(|x| x.option_name() == opt);
+        if opt.is_none() {
+            return Err(Error::new(ErrorKind::NotFound));
+        }
+        opt.unwrap().set_values(values);
+        Ok(())
+    }
+    pub fn replace_input_options(&mut self) -> Result<()> {
         // TODO: better replacement for all options
         //       this could result in some unexpected behavior
         //       will need to do a two pass approach:
         //          1. find all start/end indices
         //          2. iterate backwards to perform replacement
         // find all variables and replace with values in options
-        let missing_opts: Vec<_> = options
+        let missing_opts: Vec<_> = self
+            .input_options
             .iter()
             .filter(|opt| opt.values().len() == 0)
             .map(|opt| String::from(opt.option_name()))
@@ -175,7 +171,7 @@ impl Request {
             // All input options are required
             return Err(Error::new(ErrorKind::MissingOptions(missing_opts)));
         }
-        for opt in options {
+        for opt in self.input_options.iter() {
             if opt.values().len() == 0 {}
             let old = format!("{{{}}}", opt.option_name());
             let new = opt.values().remove(0);
@@ -205,22 +201,22 @@ impl DbObject for Request {
             ],
         )?;
         // create input options
-        for var_name in self.variable_names().iter() {
-            InputOption::new(self.name(), var_name, vec![]).create(conn)?;
+        for option in self.input_options.iter() {
+            option.create(conn)?;
+        }
+        // create output options
+        for option in self.output_options.iter() {
+            option.create(conn)?;
         }
         Ok(())
     }
     fn delete(&self, conn: &Connection) -> Result<()> {
-        // TODO: should this get the options for the request, then call delete()
-        //       on the objects?
-        conn.execute(
-            "DELETE FROM input_options WHERE request_name = ?1;",
-            params![self.name],
-        )?;
-        conn.execute(
-            "DELETE FROM output_options WHERE request_name = ?1;",
-            params![self.name],
-        )?;
+        for option in self.input_options.iter() {
+            option.delete(conn)?;
+        }
+        for option in self.output_options.iter() {
+            option.delete(conn)?;
+        }
         conn.execute("DELETE FROM requests WHERE name = ?1;", params![self.name])?;
         Ok(())
     }
@@ -236,19 +232,29 @@ impl DbObject for Request {
                 self.body
             ],
         )?;
+        for option in self.input_options.iter() {
+            option.update(conn)?;
+        }
         Ok(num)
     }
     fn get_all(conn: &Connection) -> Result<Vec<Request>> {
         let mut stmt = conn.prepare("SELECT name, method, url, headers, body FROM requests;")?;
 
         let requests = stmt.query_map(NO_PARAMS, |row| {
-            let s: String = row.get(1)?;
+            let name: String = row.get(0)?;
+            let input_opts = InputOption::get_by_name(conn, &name);
+            let output_opts = OutputOption::get_by_name(conn, &name);
+            // TODO: error checking
             Ok(Request {
-                name: row.get(0)?,
-                method: Method::new(s.as_ref()),
+                name,
+                method: Method::from_bytes(row.get::<_, String>(1)?.as_bytes())
+                    .unwrap_or(Method::GET),
                 url: row.get(2)?,
                 headers: row.get(3)?,
                 body: row.get(4)?,
+
+                input_options: input_opts.unwrap(),
+                output_options: output_opts.unwrap(),
             })
         })?;
 
@@ -278,8 +284,13 @@ impl PrintableTableStruct for Request {
                 "false"
             }
         };
+        let can_run = self.input_options.iter().all(|x| x.values().len() > 0);
+        let mut name = Cell::new(&self.name);
+        if can_run {
+            name = name.fg(Color::Green);
+        }
         vec![vec![
-            Cell::new(&self.name),
+            name,
             Cell::new(self.method.to_string()),
             Cell::new(&self.url),
             Cell::new(self.headers.as_ref().unwrap_or(&String::from(""))),

@@ -127,21 +127,17 @@ impl DbObject for InputOption {
 
 impl PrintableTableStruct for InputOption {
     fn get_header() -> Vec<Cell> {
-        vec![
-            Cell::new("request_name"),
-            Cell::new("option_name"),
-            Cell::new("values"),
-        ]
+        vec![Cell::new("option_name"), Cell::new("values")]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
         vec![vec![
-            Cell::new(&self.request_name),
             Cell::new(&self.option_name),
             Cell::new(self.values().join("\n")),
         ]]
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct OutputOption {
     request_name: String,
     option_name: String,
