@@ -33,11 +33,13 @@ subcommands:
                     - headers:
                         help: HTTP request headers
                         short: H
+                        long: header
                         takes_value: true
                         multiple: true
                     - data:
                         help: HTTP request data
                         short: d
+                        long: data
                         takes_value: true
             - variable:
                 about: Create a variable
@@ -172,4 +174,3 @@ subcommands:
                 short: d
                 takes_value: true
                 multiple: true
-

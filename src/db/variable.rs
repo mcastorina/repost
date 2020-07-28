@@ -28,7 +28,6 @@ impl Variable {
         }
     }
     pub fn create_table(conn: &Connection) -> Result<()> {
-        // TODO: multiple of the same variable name / environment
         conn.execute(
             "CREATE TABLE IF NOT EXISTS variables (
                   rowid           INTEGER PRIMARY KEY,

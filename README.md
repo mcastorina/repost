@@ -318,7 +318,10 @@ populated with the response values.
 | :question:         | variable generation                              |
 | :question:         | dependency graph                                 |
 |                    | global environment                               |
-|                    | color requests that have all options satisfied   |
+| :white_check_mark: | color requests that have all options satisfied   |
+|                    | request statistics                               |
+|                    | compare response against previous                |
+| :question:         | support for automatic functional testing         |
 
 * :white_check_mark: - In master
 * :soon: - In progress

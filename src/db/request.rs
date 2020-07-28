@@ -61,6 +61,22 @@ impl Request {
             }
         };
         headers.push_str(format!("{}: {}", key, value).as_ref());
+
+        // TODO: refactor this
+        let header_vars: HashSet<String> = variable_names(key)
+            .union(&variable_names(value))
+            .map(String::from)
+            .collect();
+        let new_vars: HashSet<String> = header_vars
+            .difference(&self.variable_names())
+            .map(String::from)
+            .collect();
+        let mut new_opts = new_vars
+            .iter()
+            .map(|var_name| InputOption::new(self.name(), var_name, vec![]))
+            .collect();
+        self.input_options.append(&mut new_opts);
+
         self.headers = Some(headers);
     }
     pub fn add_query_param(&mut self, query: &str) {
@@ -119,26 +135,16 @@ impl Request {
     pub fn variable_names(&self) -> HashSet<String> {
         // find all variables in the request
         // TODO: lazy static
-        let re = Regex::new(r"\{(.*?)\}").unwrap();
-        let mut names: Vec<String> = re
-            .captures_iter(&self.url)
-            .map(|cap| String::from(cap.get(1).unwrap().as_str()))
-            .collect();
+        let mut names = vec![];
+        let url = variable_names(&self.url);
+        names.extend(url);
         if let Some(headers) = &self.headers {
-            let mut headers: Vec<String> = re
-                .captures_iter(&headers)
-                .map(|cap| String::from(cap.get(1).unwrap().as_str()))
-                .collect();
-            names.append(&mut headers);
+            let headers = variable_names(headers);
+            names.extend(headers);
         }
         if let Some(body) = &self.body {
-            let re = regex::bytes::Regex::new(r"\{(.*?)\}").unwrap();
-            let mut body: Vec<String> = re
-                .captures_iter(&body)
-                .map(|cap| String::from_utf8(cap.get(1).unwrap().as_bytes().to_vec()))
-                .filter_map(|x| x.ok())
-                .collect();
-            names.append(&mut body);
+            let body = variable_names(&String::from_utf8(body.clone()).unwrap());
+            names.extend(body);
         }
 
         HashSet::from_iter(names.into_iter())
@@ -297,4 +303,15 @@ impl PrintableTableStruct for Request {
             Cell::new(has_body),
         ]]
     }
+}
+
+fn variable_names(s: &str) -> HashSet<String> {
+    // find all variables in the request
+    // TODO: lazy static
+    let re = Regex::new(r"\{(.*?)\}").unwrap();
+    let names: Vec<String> = re
+        .captures_iter(s)
+        .map(|cap| String::from(cap.get(1).unwrap().as_str()))
+        .collect();
+    HashSet::from_iter(names.into_iter())
 }
