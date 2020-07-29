@@ -88,6 +88,21 @@ impl Request {
         self.url.push_str(query);
     }
     pub fn set_body(&mut self, body: Option<Vec<u8>>) {
+        // TODO: refactor this
+        match (&self.body, &body) {
+            (None, Some(body)) => {
+                let body_vars: HashSet<String> =
+                    variable_names(&String::from_utf8(body.clone()).unwrap());
+                let mut new_opts = body_vars
+                    .iter()
+                    .map(|var_name| InputOption::new(self.name(), var_name, vec![]))
+                    .collect();
+                self.input_options.append(&mut new_opts);
+            }
+            _ => {
+                // TODO
+            }
+        }
         self.body = body;
     }
 
