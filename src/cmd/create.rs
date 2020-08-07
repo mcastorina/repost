@@ -41,7 +41,7 @@ pub fn request(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         .value_of("method")
         .map(|x| Method::from_bytes(x.as_bytes()).unwrap_or(Method::GET));
 
-    let mut request = Request::new(name, method, url, headers, body);
+    let request = Request::new(name, method, url, headers, body);
     request.create(b.conn())?;
     // b.set_completions()?;
     Ok(())

@@ -13,7 +13,7 @@ pub struct Request {
     name: String,
     method: Method,
     url: String,
-    headers: Option<String>,
+    headers: Vec<String>,
     body: Option<Vec<u8>>,
 
     input_options: Vec<InputOption>,
@@ -33,7 +33,10 @@ impl Request {
             name: String::from(name),
             method: method,
             url: String::from(url),
-            headers: None, // TODO
+            headers: headers
+                .into_iter()
+                .map(|x| format!("{}: {}", x.0, x.1))
+                .collect(),
             body: body,
 
             input_options: vec![],
@@ -50,10 +53,25 @@ impl Request {
         self.name.as_ref()
     }
     pub fn get_unique(conn: &Connection, name: &str) -> Result<Request> {
-        todo!();
+        // TODO: direct call to db
+        let mut req: Vec<_> = Request::get_by(conn, |r| r.name() == name)?;
+        if req.len() == 0 {
+            Err(Error::new(ErrorKind::NotFound))
+        } else {
+            Ok(req.remove(0))
+        }
     }
     pub fn exists(conn: &Connection, name: &str) -> Result<bool> {
-        todo!();
+        match Request::get_unique(conn, name) {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                if let ErrorKind::NotFound = e.kind() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
     }
     pub fn create_table(conn: &Connection) -> Result<()> {
         conn.execute(
@@ -91,9 +109,8 @@ impl Request {
         let mut names = vec![];
         let url = variable_names(&self.url);
         names.extend(url);
-        if let Some(headers) = &self.headers {
-            let headers = variable_names(headers);
-            names.extend(headers);
+        for header in &self.headers {
+            names.extend(variable_names(header));
         }
         if let Some(body) = &self.body {
             let body = variable_names(&String::from_utf8(body.clone()).unwrap());
@@ -117,16 +134,31 @@ impl Request {
         todo!();
     }
     pub fn input_options(&self) -> &Vec<InputOption> {
-        todo!();
+        &self.input_options
     }
-    pub fn output_options(&self) -> &Vec<InputOption> {
-        todo!();
+    pub fn output_options(&self) -> &Vec<OutputOption> {
+        &self.output_options
     }
     pub fn create_requests(&self) -> Vec<RequestRunner> {
         todo!();
     }
     pub fn delete_option(&mut self) -> Result<()> {
         todo!();
+    }
+
+    fn stringify_headers(h: &Vec<String>) -> Option<String> {
+        if h.len() == 0 {
+            None
+        } else {
+            Some(h.join("\n"))
+        }
+    }
+    fn unstringify_headers(h: Option<String>) -> Vec<String> {
+        if h.is_none() {
+            vec![]
+        } else {
+            h.unwrap().split("\n").map(String::from).collect()
+        }
     }
 }
 
@@ -139,7 +171,7 @@ impl DbObject for Request {
                 self.name,
                 self.method.to_string(),
                 self.url,
-                self.headers,
+                Request::stringify_headers(&self.headers),
                 self.body
             ],
         )?;
@@ -171,7 +203,7 @@ impl DbObject for Request {
                 self.name,
                 self.method.to_string(),
                 self.url,
-                self.headers,
+                Request::stringify_headers(&self.headers),
                 self.body
             ],
         )?;
@@ -185,15 +217,15 @@ impl DbObject for Request {
 
         let requests = stmt.query_map(NO_PARAMS, |row| {
             let name: String = row.get(0)?;
-            let input_opts = InputOption::get_by(conn, |i| i.option_name() == &name);
-            let output_opts = OutputOption::get_by(conn, |o| o.option_name() == &name);
+            let input_opts = InputOption::get_by(conn, |i| i.request_name() == &name);
+            let output_opts = OutputOption::get_by(conn, |o| o.request_name() == &name);
             // TODO: error checking
             Ok(Request {
                 name,
                 method: Method::from_bytes(row.get::<_, String>(1)?.as_bytes())
                     .unwrap_or(Method::GET),
                 url: row.get(2)?,
-                headers: row.get(3)?,
+                headers: Request::unstringify_headers(row.get(3)?),
                 body: row.get(4)?,
 
                 input_options: input_opts.unwrap(),
@@ -233,7 +265,7 @@ impl PrintableTableStruct for Request {
             name,
             Cell::new(self.method.to_string()),
             Cell::new(&self.url),
-            Cell::new(self.headers.as_ref().unwrap_or(&String::from(""))),
+            Cell::new(Request::stringify_headers(&self.headers).unwrap_or(String::new())),
             Cell::new(has_body),
         ]
     }
