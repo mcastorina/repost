@@ -41,24 +41,20 @@ impl Variable {
         )?;
         Ok(())
     }
-
+    pub fn set_all_options(conn: &Connection) -> Result<()> {
+        todo!();
+    }
+    pub fn set_options(&self, conn: &Connection) -> Result<()> {
+        todo!();
+    }
+    pub fn set_value(&mut self, value: Option<&str>) {
+        self.value = value.map(String::from);
+    }
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
     pub fn environment(&self) -> &str {
         self.environment.as_ref()
-    }
-    pub fn value(&self) -> Option<&str> {
-        self.value.as_deref()
-    }
-    pub fn source(&self) -> Option<&str> {
-        self.source.as_deref()
-    }
-    pub fn set_value(&mut self, value: Option<&str>) {
-        self.value = value.map(|x| String::from(x));
-    }
-    pub fn set_source(&mut self, source: Option<&str>) {
-        self.source = source.map(|x| String::from(x));
     }
 }
 
@@ -142,9 +138,6 @@ impl DbObject for Variable {
         // TODO: print a warning for errors
         Ok(vars.filter_map(|var| var.ok()).collect())
     }
-    fn name(&self) -> &str {
-        self.name()
-    }
 }
 
 impl PrintableTableStruct for Variable {
@@ -157,13 +150,13 @@ impl PrintableTableStruct for Variable {
             Cell::new("source"),
         ]
     }
-    fn get_rows(&self) -> Vec<Vec<Cell>> {
-        vec![vec![
+    fn get_row(&self) -> Vec<Cell> {
+        vec![
             Cell::new(self.rowid),
             Cell::new(self.name()),
             Cell::new(self.environment()),
             Cell::new(self.value.as_ref().unwrap_or(&String::from(""))),
             Cell::new(self.source.as_ref().unwrap_or(&String::from(""))),
-        ]]
+        ]
     }
 }

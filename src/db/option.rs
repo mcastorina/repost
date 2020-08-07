@@ -120,20 +120,17 @@ impl DbObject for InputOption {
         // TODO: print a warning for errors
         Ok(opts.filter_map(|opt| opt.ok()).collect())
     }
-    fn name(&self) -> &str {
-        self.request_name()
-    }
 }
 
 impl PrintableTableStruct for InputOption {
     fn get_header() -> Vec<Cell> {
         vec![Cell::new("option_name"), Cell::new("values")]
     }
-    fn get_rows(&self) -> Vec<Vec<Cell>> {
-        vec![vec![
+    fn get_row(&self) -> Vec<Cell> {
+        vec![
             Cell::new(&self.option_name),
             Cell::new(self.values().join("\n")),
-        ]]
+        ]
     }
 }
 
@@ -240,9 +237,6 @@ impl DbObject for OutputOption {
         // TODO: print a warning for errors
         Ok(opts.filter_map(|opt| opt.ok()).collect())
     }
-    fn name(&self) -> &str {
-        self.request_name()
-    }
 }
 
 impl PrintableTableStruct for OutputOption {
@@ -254,12 +248,12 @@ impl PrintableTableStruct for OutputOption {
             Cell::new("extraction_source"),
         ]
     }
-    fn get_rows(&self) -> Vec<Vec<Cell>> {
-        vec![vec![
+    fn get_row(&self) -> Vec<Cell> {
+        vec![
             Cell::new(&self.request_name),
             Cell::new(&self.option_name),
             Cell::new(&self.extraction_type),
             Cell::new(&self.extraction_source),
-        ]]
+        ]
     }
 }

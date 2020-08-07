@@ -1,5 +1,5 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, OutputOption};
+use crate::db::DbObject;
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 
@@ -12,7 +12,5 @@ pub fn execute(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     let key = matches.value_of("key").unwrap();
     let var = matches.value_of("variable").unwrap();
 
-    let opt = OutputOption::new(request, var, extraction_source, key);
-    opt.create(b.conn())?;
-    Ok(())
+    todo!();
 }

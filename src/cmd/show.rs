@@ -1,6 +1,6 @@
 use crate::bastion::Bastion;
 use crate::db::PrintableTable;
-use crate::db::{DbObject, Environment, InputOption, Request, RequestResponse, Variable};
+use crate::db::{DbObject, Environment, Request, RequestResponse, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use colored::*;
@@ -25,7 +25,7 @@ pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
         (Some(env), None) => {
             print_table(Variable::get_by(b.conn(), |var| var.environment() == env)?)
         }
-        (None, Some(name)) => print_table(Variable::get_by_name(b.conn(), name)?),
+        (None, Some(name)) => print_table(Variable::get_by(b.conn(), |v| v.name() == name)?),
         (None, None) => print_table(Variable::get_all(b.conn())?),
     };
     println!();
@@ -35,10 +35,10 @@ pub fn options(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
     if b.current_request().is_none() {
         return Err(Error::new(ErrorKind::RequestStateExpected("Show options")));
     }
-    let request = b.current_request().unwrap();
+    let request = Request::get_unique(b.conn(), b.current_request().unwrap())?;
 
     println!();
-    print_table(InputOption::get_by_name(b.conn(), request)?);
+    print_table(request.input_options());
     println!();
     Ok(())
 }

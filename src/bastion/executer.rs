@@ -53,10 +53,7 @@ pub fn execute_args(b: &mut Bastion, args: Vec<&str>) -> Result<()> {
             }
             ("environment", Some(matches)) => b.set_environment(matches.value_of("environment")),
             ("request", Some(matches)) => b.set_request(matches.value_of("request")),
-            ("option", Some(matches)) => b.set_option(
-                matches.value_of("option").unwrap(),
-                matches.values_of("value").unwrap_or_default().collect(),
-            ),
+            ("option", Some(matches)) => Ok(()),
             ("variable", Some(matches)) => set::variable(b, matches),
             _ => unreachable!(),
         },

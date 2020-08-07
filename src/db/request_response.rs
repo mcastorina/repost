@@ -251,16 +251,13 @@ impl DbObject for RequestResponse {
         // TODO: print a warning for errors
         Ok(req_resps.filter_map(|req| req.ok()).collect())
     }
-    fn name(&self) -> &str {
-        ""
-    }
 }
 
 impl PrintableTableStruct for RequestResponse {
     fn get_header() -> Vec<Cell> {
         vec![Cell::new("id"), Cell::new("request"), Cell::new("status")]
     }
-    fn get_rows(&self) -> Vec<Vec<Cell>> {
+    fn get_row(&self) -> Vec<Cell> {
         let status = self.response_status.clone().unwrap_or(String::from("-"));
         let status = match status.chars().next().unwrap_or('-') {
             '2' => Cell::new(status).fg(Color::Green),
@@ -271,7 +268,7 @@ impl PrintableTableStruct for RequestResponse {
                 .add_attribute(Attribute::Bold),
             _ => Cell::new(status),
         };
-        vec![vec![
+        vec![
             Cell::new(&self.rowid),
             Cell::new(format!(
                 "{} {}",
@@ -279,6 +276,6 @@ impl PrintableTableStruct for RequestResponse {
                 self.request_url
             )),
             status,
-        ]]
+        ]
     }
 }

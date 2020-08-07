@@ -1,5 +1,5 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Variable};
+use crate::db::{DbObject, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 
@@ -26,18 +26,5 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         })
         .collect();
 
-    let mut var = Variable::get_by_name_map(b.conn(), name, |e| String::from(e.environment()))?;
-    for env_val in env_vals {
-        let (environment, value) = env_val;
-        let mut var = var.remove(&environment).unwrap_or(Variable::new(
-            name,
-            &environment,
-            Some(&value),
-            Some("user"),
-        ));
-        var.set_value(Some(&value));
-        var.upsert(b.conn())?;
-    }
-    b.set_options(InputOption::get_by(b.conn(), |x| x.option_name() == name)?)?;
-    Ok(())
+    todo!();
 }

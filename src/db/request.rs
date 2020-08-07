@@ -1,5 +1,5 @@
 use super::PrintableTableStruct;
-use super::{DbObject, InputOption, OutputOption};
+use super::{DbObject, InputOption, OutputOption, RequestRunner};
 use crate::error::{Error, ErrorKind, Result};
 use comfy_table::{Cell, Color};
 use regex::Regex;
@@ -21,14 +21,20 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(name: &str, method: Option<Method>, url: &str) -> Request {
+    pub fn new(
+        name: &str,
+        method: Option<Method>,
+        url: &str,
+        headers: Vec<(&str, &str)>,
+        body: Option<Vec<u8>>,
+    ) -> Request {
         let method = method.unwrap_or(Request::name_to_method(name));
         let mut r = Request {
             name: String::from(name),
             method: method,
             url: String::from(url),
-            headers: None,
-            body: None,
+            headers: None, // TODO
+            body: body,
 
             input_options: vec![],
             output_options: vec![],
@@ -39,6 +45,15 @@ impl Request {
             .map(|var_name| InputOption::new(r.name(), var_name, vec![]))
             .collect();
         r
+    }
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+    pub fn get_unique(conn: &Connection, name: &str) -> Result<Request> {
+        todo!();
+    }
+    pub fn exists(conn: &Connection, name: &str) -> Result<bool> {
+        todo!();
     }
     pub fn create_table(conn: &Connection) -> Result<()> {
         conn.execute(
@@ -53,59 +68,6 @@ impl Request {
         )?;
         Ok(())
     }
-    pub fn add_header(&mut self, key: &str, value: &str) {
-        let mut headers = {
-            match &self.headers {
-                Some(x) => format!("{}\n", x),
-                None => String::new(),
-            }
-        };
-        headers.push_str(format!("{}: {}", key, value).as_ref());
-
-        // TODO: refactor this
-        let header_vars: HashSet<String> = variable_names(key)
-            .union(&variable_names(value))
-            .map(String::from)
-            .collect();
-        let new_vars: HashSet<String> = header_vars
-            .difference(&self.variable_names())
-            .map(String::from)
-            .collect();
-        let mut new_opts = new_vars
-            .iter()
-            .map(|var_name| InputOption::new(self.name(), var_name, vec![]))
-            .collect();
-        self.input_options.append(&mut new_opts);
-
-        self.headers = Some(headers);
-    }
-    pub fn add_query_param(&mut self, query: &str) {
-        if self.url.contains('?') {
-            self.url.push('&');
-        } else {
-            self.url.push('?');
-        }
-        self.url.push_str(query);
-    }
-    pub fn set_body(&mut self, body: Option<Vec<u8>>) {
-        // TODO: refactor this
-        match (&self.body, &body) {
-            (None, Some(body)) => {
-                let body_vars: HashSet<String> =
-                    variable_names(&String::from_utf8(body.clone()).unwrap());
-                let mut new_opts = body_vars
-                    .iter()
-                    .map(|var_name| InputOption::new(self.name(), var_name, vec![]))
-                    .collect();
-                self.input_options.append(&mut new_opts);
-            }
-            _ => {
-                // TODO
-            }
-        }
-        self.body = body;
-    }
-
     fn name_to_method(name: &str) -> Method {
         let name = name.to_lowercase();
         if name.starts_with("create") || name.starts_with("post") {
@@ -123,31 +85,7 @@ impl Request {
         }
     }
 
-    pub fn name(&self) -> &str {
-        self.name.as_ref()
-    }
-    pub fn method(&self) -> &Method {
-        &self.method
-    }
-    pub fn url(&self) -> &str {
-        self.url.as_ref()
-    }
-    pub fn headers(&self) -> &Option<String> {
-        &self.headers
-    }
-    pub fn body(&self) -> &Option<Vec<u8>> {
-        &self.body
-    }
-    pub fn input_options(&self) -> &Vec<InputOption> {
-        &self.input_options
-    }
-    pub fn output_options(&self) -> &Vec<OutputOption> {
-        &self.output_options
-    }
-    pub fn consume_body(&mut self) -> Option<Vec<u8>> {
-        self.body.take()
-    }
-    pub fn variable_names(&self) -> HashSet<String> {
+    fn variable_names(&self) -> HashSet<String> {
         // find all variables in the request
         // TODO: lazy static
         let mut names = vec![];
@@ -164,7 +102,7 @@ impl Request {
 
         HashSet::from_iter(names.into_iter())
     }
-    pub fn set_input_option(&mut self, opt: &str, values: Vec<&str>) -> Result<()> {
+    pub fn set_option(&mut self, opt: &str, values: Vec<&str>) -> Result<()> {
         let opt = self
             .input_options
             .iter_mut()
@@ -175,36 +113,20 @@ impl Request {
         opt.unwrap().set_values(values);
         Ok(())
     }
-    pub fn replace_input_options(&mut self) -> Result<()> {
-        // TODO: better replacement for all options
-        //       this could result in some unexpected behavior
-        //       will need to do a two pass approach:
-        //          1. find all start/end indices
-        //          2. iterate backwards to perform replacement
-        // find all variables and replace with values in options
-        let missing_opts: Vec<_> = self
-            .input_options
-            .iter()
-            .filter(|opt| opt.values().len() == 0)
-            .map(|opt| String::from(opt.option_name()))
-            .collect();
-        if missing_opts.len() > 0 {
-            // All input options are required
-            return Err(Error::new(ErrorKind::MissingOptions(missing_opts)));
-        }
-        for opt in self.input_options.iter() {
-            if opt.values().len() == 0 {}
-            let old = format!("{{{}}}", opt.option_name());
-            let new = opt.values().remove(0);
-            self.url = self.url.replace(&old, &new);
-            self.headers = self.headers.as_ref().map(|h| h.replace(&old, &new));
-            if let Some(body) = &self.body {
-                let old = format!(r"\{{{}\}}", opt.option_name());
-                let re = regex::bytes::Regex::new(&old).unwrap();
-                self.body = Some(re.replace_all(&body, new.as_bytes()).to_vec());
-            }
-        }
-        Ok(())
+    pub fn add_extraction(&mut self, opt: OutputOption) -> Result<()> {
+        todo!();
+    }
+    pub fn input_options(&self) -> &Vec<InputOption> {
+        todo!();
+    }
+    pub fn output_options(&self) -> &Vec<InputOption> {
+        todo!();
+    }
+    pub fn create_requests(&self) -> Vec<RequestRunner> {
+        todo!();
+    }
+    pub fn delete_option(&mut self) -> Result<()> {
+        todo!();
     }
 }
 
@@ -263,8 +185,8 @@ impl DbObject for Request {
 
         let requests = stmt.query_map(NO_PARAMS, |row| {
             let name: String = row.get(0)?;
-            let input_opts = InputOption::get_by_name(conn, &name);
-            let output_opts = OutputOption::get_by_name(conn, &name);
+            let input_opts = InputOption::get_by(conn, |i| i.option_name() == &name);
+            let output_opts = OutputOption::get_by(conn, |o| o.option_name() == &name);
             // TODO: error checking
             Ok(Request {
                 name,
@@ -282,9 +204,6 @@ impl DbObject for Request {
         // TODO: print a warning for errors
         Ok(requests.filter_map(|req| req.ok()).collect())
     }
-    fn name(&self) -> &str {
-        self.name()
-    }
 }
 
 impl PrintableTableStruct for Request {
@@ -297,7 +216,7 @@ impl PrintableTableStruct for Request {
             Cell::new("body?"),
         ]
     }
-    fn get_rows(&self) -> Vec<Vec<Cell>> {
+    fn get_row(&self) -> Vec<Cell> {
         let has_body = {
             if self.body.is_some() {
                 "true"
@@ -310,13 +229,13 @@ impl PrintableTableStruct for Request {
         if can_run {
             name = name.fg(Color::Green);
         }
-        vec![vec![
+        vec![
             name,
             Cell::new(self.method.to_string()),
             Cell::new(&self.url),
             Cell::new(self.headers.as_ref().unwrap_or(&String::from(""))),
             Cell::new(has_body),
-        ]]
+        ]
     }
 }
 

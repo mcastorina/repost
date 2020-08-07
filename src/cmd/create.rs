@@ -1,5 +1,5 @@
 use crate::bastion::Bastion;
-use crate::db::{DbObject, InputOption, Request, Variable};
+use crate::db::{DbObject, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use clap_v3::ArgMatches;
 use reqwest::Method;
@@ -41,15 +41,9 @@ pub fn request(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         .value_of("method")
         .map(|x| Method::from_bytes(x.as_bytes()).unwrap_or(Method::GET));
 
-    let mut request = Request::new(name, method, url);
-    for header in headers {
-        request.add_header(header.0, header.1);
-    }
-
-    request.set_body(body);
+    let mut request = Request::new(name, method, url, headers, body);
     request.create(b.conn())?;
-    b.set_options(InputOption::get_by_name(b.conn(), request.name())?)?;
-    b.set_completions()?;
+    // b.set_completions()?;
     Ok(())
 }
 
@@ -77,7 +71,6 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         let (environment, value) = env_val;
         Variable::new(name, &environment, Some(&value), Some("user")).create(b.conn())?;
     }
-    b.set_options(InputOption::get_by(b.conn(), |x| x.option_name() == name)?)?;
-    b.set_completions()?;
+    // b.set_completions()?;
     Ok(())
 }

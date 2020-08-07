@@ -1,5 +1,5 @@
 use super::completer::LineReader;
-use crate::db::{Db, DbObject, Environment, InputOption, Request, Variable};
+use crate::db::{Db, DbObject, Environment, Request, Variable};
 use crate::error::{Error, ErrorKind, Result};
 use colored::*;
 use rusqlite::Connection;
@@ -18,76 +18,13 @@ impl Bastion {
             db: Db::new(&root, "repost.db")?,
             line_reader: LineReader::new(&root),
         };
-        bastion.set_completions()?;
-        bastion.set_options(InputOption::get_all(bastion.conn())?)?;
+        // bastion.set_completions()?;
+        // bastion.set_options(InputOption::get_all(bastion.conn())?)?;
         Ok(bastion)
     }
     pub fn conn(&self) -> &Connection {
         self.db.conn()
     }
-    pub fn set_completions(&mut self) -> Result<()> {
-        self.line_reader
-            .environment_completions(Environment::collect_all(self.conn(), |x| {
-                String::from(x.name())
-            })?);
-        self.line_reader
-            .request_completions(Request::collect_all(self.conn(), |x| {
-                String::from(x.name())
-            })?);
-        self.line_reader
-            .variable_completions(Variable::collect_all(self.conn(), |x| {
-                String::from(x.name())
-            })?);
-        self.line_reader
-            .workspace_completions(self.get_workspaces()?);
-
-        let input_options = match &self.state {
-            ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
-                InputOption::get_by_name(self.conn(), req)?
-            }
-            _ => vec![],
-        };
-        self.line_reader.input_option_completions(
-            input_options
-                .into_iter()
-                .map(|x| String::from(x.option_name()))
-                .collect(),
-        );
-        Ok(())
-    }
-    pub fn set_options(&mut self, opts: Vec<InputOption>) -> Result<()> {
-        let env = self.current_environment();
-        if env.is_none() {
-            // if the current environment is none, clear the value
-            for mut opt in opts {
-                opt.set_value(None);
-                opt.update(self.conn())?;
-            }
-            return Ok(());
-        }
-        let env = env.unwrap();
-        // else set option.value according to the environment
-        for mut opt in opts {
-            let mut var = Variable::get_by(self.conn(), |x| {
-                x.name() == opt.option_name() && x.environment() == env
-            })?;
-            if var.len() == 0 {
-                opt.set_value(None);
-            } else if var.len() == 1 {
-                let var = var.remove(0);
-                opt.set_value(var.value());
-            } else {
-                if var.iter().any(|v| v.value().is_none()) {
-                    opt.set_value(None);
-                } else {
-                    opt.set_values(var.iter().filter_map(|v| v.value()).collect());
-                }
-            }
-            opt.update(self.conn())?;
-        }
-        Ok(())
-    }
-
     pub fn get_input(&mut self, input: &mut String) -> Option<()> {
         // read the line
         self.line_reader.read_line(input, self.state.get_prompt())
@@ -164,8 +101,8 @@ impl Bastion {
                 }
             }
         };
-        self.set_options(InputOption::get_all(self.conn())?)?;
-        self.set_completions()?;
+        // self.set_options(InputOption::get_all(self.conn())?)?;
+        // self.set_completions()?;
         Ok(())
     }
     pub fn set_environment(&mut self, env: Option<&str>) -> Result<()> {
@@ -173,7 +110,7 @@ impl Bastion {
             return Err(Error::new(ErrorKind::NotFound));
         }
         self.state.set_environment(env)?;
-        self.set_options(InputOption::get_all(self.conn())?)?;
+        // self.set_options(InputOption::get_all(self.conn())?)?;
         Ok(())
     }
     pub fn set_request(&mut self, req: Option<&str>) -> Result<()> {
@@ -185,7 +122,7 @@ impl Bastion {
             Some(_) => self.line_reader.set_request(),
             None => self.line_reader.set_base(),
         };
-        self.set_completions()?;
+        // self.set_completions()?;
         Ok(())
     }
     pub fn set_state(&mut self) -> Result<()> {
@@ -232,17 +169,6 @@ impl Bastion {
             self.state = state;
         }
         Ok(())
-    }
-    pub fn set_option(&self, option_name: &str, values: Vec<&str>) -> Result<()> {
-        match &self.state {
-            ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
-                let mut req = Request::get_by_name(self.db.conn(), &req)?.remove(0);
-                req.set_input_option(option_name, values)?;
-                req.update(self.db.conn())?;
-                Ok(())
-            }
-            _ => Err(Error::new(ErrorKind::NotFound)),
-        }
     }
 }
 
