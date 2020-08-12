@@ -37,7 +37,7 @@ impl Bastion {
     pub fn state(&self) -> &ReplState {
         &self.state
     }
-    pub fn current_environment(&self) -> Option<&str> {
+    pub fn environment(&self) -> Option<&str> {
         match &self.state {
             ReplState::Environment(_, env) | ReplState::EnvironmentRequest(_, env, _) => {
                 Some(env.as_ref())
@@ -45,12 +45,12 @@ impl Bastion {
             _ => None,
         }
     }
-    pub fn current_request(&self) -> Option<&str> {
+    pub fn request(&self) -> Result<Request> {
         match &self.state {
             ReplState::Request(_, req) | ReplState::EnvironmentRequest(_, _, req) => {
-                Some(req.as_ref())
+                Ok(Request::get_unique(self.conn(), req)?)
             }
-            _ => None,
+            _ => Err(Error::new(ErrorKind::RequestStateExpected("Command"))),
         }
     }
 
@@ -103,14 +103,6 @@ impl Bastion {
         };
         Variable::set_all_options(self.conn(), self.environment())?;
         Ok(())
-    }
-    pub fn environment(&self) -> Option<&str> {
-        match &self.state {
-            ReplState::Environment(_, env) | ReplState::EnvironmentRequest(_, env, _) => {
-                Some(env.as_ref())
-            }
-            _ => None,
-        }
     }
     pub fn set_environment(&mut self, env: Option<&str>) -> Result<()> {
         if env.is_some() && !Environment::exists(self.db.conn(), env.unwrap())? {

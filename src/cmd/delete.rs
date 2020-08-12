@@ -29,7 +29,7 @@ pub fn variables(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         }
         for e in v {
             // only delete variables in the current environment if set
-            match b.current_environment() {
+            match b.environment() {
                 Some(x) if x != e.environment() => (),
                 _ => e.delete(b.conn())?,
             };
@@ -39,5 +39,11 @@ pub fn variables(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
 }
 
 pub fn options(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
-    todo!();
+    let mut req = b.request()?;
+    let opts: Vec<&str> = matches.values_of("option").unwrap().collect();
+    for opt in opts {
+        req.delete_input_option(opt);
+    }
+    req.update(b.conn())?;
+    Ok(())
 }

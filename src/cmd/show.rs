@@ -18,7 +18,7 @@ pub fn requests(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
 pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
     println!();
     let name = matches.value_of("name");
-    match (b.current_environment(), name) {
+    match (b.environment(), name) {
         (Some(env), Some(name)) => print_table(Variable::get_by(b.conn(), |var| {
             var.environment() == env && var.name() == name
         })?),
@@ -32,13 +32,10 @@ pub fn variables(b: &Bastion, matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 pub fn options(b: &Bastion, _matches: &ArgMatches) -> Result<()> {
-    if b.current_request().is_none() {
-        return Err(Error::new(ErrorKind::RequestStateExpected("Show options")));
-    }
-    let request = Request::get_unique(b.conn(), b.current_request().unwrap())?;
+    let req = b.request()?;
 
     println!();
-    print_table(request.input_options());
+    print_table(req.input_options());
     println!();
     Ok(())
 }

@@ -143,13 +143,11 @@ impl Request {
     pub fn create_requests(&self) -> Vec<RequestRunner> {
         RequestRunner::new(self)
     }
-    pub fn delete_input_option(&mut self, name: &str) -> Result<()> {
+    pub fn delete_input_option(&mut self, name: &str) {
         self.input_options.retain(|x| x.option_name() != name);
-        Ok(())
     }
-    pub fn delete_output_option(&mut self, name: &str) -> Result<()> {
+    pub fn delete_output_option(&mut self, name: &str) {
         self.output_options.retain(|x| x.option_name() != name);
-        Ok(())
     }
 
     fn stringify_headers(h: &Vec<String>) -> Option<String> {
