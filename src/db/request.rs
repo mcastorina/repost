@@ -131,7 +131,8 @@ impl Request {
         Ok(())
     }
     pub fn add_extraction(&mut self, opt: OutputOption) -> Result<()> {
-        todo!();
+        self.output_options.push(opt);
+        Ok(())
     }
     pub fn input_options(&self) -> &Vec<InputOption> {
         &self.input_options
@@ -140,10 +141,15 @@ impl Request {
         &self.output_options
     }
     pub fn create_requests(&self) -> Vec<RequestRunner> {
-        todo!();
+        RequestRunner::new(self)
     }
-    pub fn delete_option(&mut self) -> Result<()> {
-        todo!();
+    pub fn delete_input_option(&mut self, name: &str) -> Result<()> {
+        self.input_options.retain(|x| x.option_name() != name);
+        Ok(())
+    }
+    pub fn delete_output_option(&mut self, name: &str) -> Result<()> {
+        self.output_options.retain(|x| x.option_name() != name);
+        Ok(())
     }
 
     fn stringify_headers(h: &Vec<String>) -> Option<String> {

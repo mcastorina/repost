@@ -1,5 +1,4 @@
-use super::DbObject;
-use super::PrintableTableStruct;
+use super::{DbObject, InputOption, PrintableTableStruct};
 use crate::error::Result;
 use chrono::Utc;
 use comfy_table::Cell;
@@ -41,17 +40,34 @@ impl Variable {
         )?;
         Ok(())
     }
-    pub fn set_all_options(conn: &Connection) -> Result<()> {
-        todo!();
+    pub fn set_all_options(conn: &Connection, env: Option<&str>) -> Result<()> {
+        if env.is_none() {
+            let mut opts = InputOption::get_all(conn)?;
+            for mut opt in opts {
+                opt.set_value(None);
+                opt.update(conn)?;
+            }
+        } else {
+            todo!();
+        }
+        Ok(())
     }
     pub fn set_options(&self, conn: &Connection) -> Result<()> {
-        todo!();
+        let mut opts = InputOption::get_by(conn, |opt| opt.option_name() == self.name())?;
+        for mut opt in opts {
+            opt.set_value(self.value());
+            opt.update(conn)?;
+        }
+        Ok(())
     }
     pub fn set_value(&mut self, value: Option<&str>) {
         self.value = value.map(String::from);
     }
     pub fn name(&self) -> &str {
         self.name.as_ref()
+    }
+    pub fn value(&self) -> Option<&str> {
+        self.value.as_deref()
     }
     pub fn environment(&self) -> &str {
         self.environment.as_ref()
