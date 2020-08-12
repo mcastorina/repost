@@ -43,7 +43,6 @@ pub fn request(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
 
     let request = Request::new(name, method, url, headers, body);
     request.create(b.conn())?;
-    // b.set_completions()?;
     Ok(())
 }
 
@@ -71,6 +70,5 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         let (environment, value) = env_val;
         Variable::new(name, &environment, Some(&value), Some("user")).create(b.conn())?;
     }
-    // b.set_completions()?;
     Ok(())
 }

@@ -13,7 +13,7 @@ impl Environment {
         self.name.as_ref()
     }
     pub fn exists(conn: &Connection, env: &str) -> Result<bool> {
-        todo!();
+        Ok(Environment::get_all(conn)?.iter().any(|e| e.name() == env))
     }
     pub fn get_all(conn: &Connection) -> Result<Vec<Environment>> {
         let mut stmt = conn.prepare("SELECT DISTINCT environment FROM variables;")?;

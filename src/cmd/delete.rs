@@ -15,8 +15,7 @@ pub fn requests(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
             e.delete(b.conn())?;
         }
     }
-    // b.set_state()?;
-    // b.set_completions()?;
+    b.set_state()?;
     Ok(())
 }
 
@@ -35,10 +34,7 @@ pub fn variables(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
                 _ => e.delete(b.conn())?,
             };
         }
-        // TODO: only update if the option source is "variable"
-        // b.set_options(InputOption::get_by(b.conn(), |x| x.option_name() == var)?)?;
     }
-    // b.set_completions()?;
     Ok(())
 }
 

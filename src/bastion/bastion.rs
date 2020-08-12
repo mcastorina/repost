@@ -18,8 +18,7 @@ impl Bastion {
             db: Db::new(&root, "repost.db")?,
             line_reader: LineReader::new(&root),
         };
-        // bastion.set_completions()?;
-        // bastion.set_options(InputOption::get_all(bastion.conn())?)?;
+        Variable::set_all_options(bastion.conn(), bastion.environment())?;
         Ok(bastion)
     }
     pub fn conn(&self) -> &Connection {
@@ -32,6 +31,7 @@ impl Bastion {
 
     pub fn execute(&mut self, command: &str) -> Result<()> {
         super::executer::execute(self, command)
+        // self.set_completions()
     }
 
     pub fn state(&self) -> &ReplState {
@@ -101,16 +101,23 @@ impl Bastion {
                 }
             }
         };
-        // self.set_options(InputOption::get_all(self.conn())?)?;
-        // self.set_completions()?;
+        Variable::set_all_options(self.conn(), self.environment())?;
         Ok(())
+    }
+    pub fn environment(&self) -> Option<&str> {
+        match &self.state {
+            ReplState::Environment(_, env) | ReplState::EnvironmentRequest(_, env, _) => {
+                Some(env.as_ref())
+            }
+            _ => None,
+        }
     }
     pub fn set_environment(&mut self, env: Option<&str>) -> Result<()> {
         if env.is_some() && !Environment::exists(self.db.conn(), env.unwrap())? {
             return Err(Error::new(ErrorKind::NotFound));
         }
         self.state.set_environment(env)?;
-        // self.set_options(InputOption::get_all(self.conn())?)?;
+        Variable::set_all_options(self.conn(), self.environment())?;
         Ok(())
     }
     pub fn set_request(&mut self, req: Option<&str>) -> Result<()> {
@@ -122,7 +129,6 @@ impl Bastion {
             Some(_) => self.line_reader.set_request(),
             None => self.line_reader.set_base(),
         };
-        // self.set_completions()?;
         Ok(())
     }
     pub fn set_state(&mut self) -> Result<()> {

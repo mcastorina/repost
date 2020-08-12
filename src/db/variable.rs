@@ -41,14 +41,25 @@ impl Variable {
         Ok(())
     }
     pub fn set_all_options(conn: &Connection, env: Option<&str>) -> Result<()> {
+        let mut opts = InputOption::get_all(conn)?;
         if env.is_none() {
-            let mut opts = InputOption::get_all(conn)?;
             for mut opt in opts {
                 opt.set_value(None);
                 opt.update(conn)?;
             }
         } else {
-            todo!();
+            let env = env.unwrap();
+            for mut opt in opts {
+                let var = Variable::get_by(conn, |var| {
+                    var.name() == opt.option_name() && var.environment() == env
+                })?
+                .pop();
+                match var {
+                    Some(v) => opt.set_value(v.value()),
+                    None => opt.set_value(None),
+                };
+                opt.update(conn)?;
+            }
         }
         Ok(())
     }
@@ -94,6 +105,11 @@ impl DbObject for Variable {
             "DELETE FROM variables WHERE rowid = ?1;",
             params![self.rowid],
         )?;
+        let mut opts = InputOption::get_by(conn, |opt| opt.option_name() == self.name())?;
+        for mut opt in opts {
+            opt.set_value(None);
+            opt.update(conn)?;
+        }
         Ok(())
     }
     fn update(&self, conn: &Connection) -> Result<usize> {
