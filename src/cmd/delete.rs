@@ -15,7 +15,6 @@ pub fn requests(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
             e.delete(b.conn())?;
         }
     }
-    b.set_state()?;
     Ok(())
 }
 
@@ -27,8 +26,9 @@ pub fn variables(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
             println!("Variable '{}' not found.", var);
             continue;
         }
+        // TODO: delete input options?
         for e in v {
-            // only delete variables in the current environment if set
+            // don't delete variables in the other environments if set
             match b.environment() {
                 Some(x) if x != e.environment() => (),
                 _ => e.delete(b.conn())?,
@@ -43,6 +43,7 @@ pub fn options(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     let opts: Vec<&str> = matches.values_of("option").unwrap().collect();
     for opt in opts {
         req.delete_input_option(opt);
+        req.delete_output_option(opt);
     }
     req.update(b.conn())?;
     Ok(())

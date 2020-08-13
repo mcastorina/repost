@@ -4,7 +4,7 @@ use crate::error::Result;
 use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InputOption {
     request_name: String,
     option_name: String,
@@ -134,7 +134,7 @@ impl PrintableTableStruct for InputOption {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct OutputOption {
     request_name: String,
     option_name: String,

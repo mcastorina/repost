@@ -30,8 +30,10 @@ impl Bastion {
     }
 
     pub fn execute(&mut self, command: &str) -> Result<()> {
-        super::executer::execute(self, command)
+        super::executer::execute(self, command)?;
+        self.set_state()?;
         // self.set_completions()
+        Ok(())
     }
 
     pub fn state(&self) -> &ReplState {

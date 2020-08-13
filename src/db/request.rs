@@ -130,9 +130,9 @@ impl Request {
         opt.unwrap().set_values(values);
         Ok(())
     }
-    pub fn add_extraction(&mut self, opt: OutputOption) -> Result<()> {
-        self.output_options.push(opt);
-        Ok(())
+    pub fn add_extraction(&mut self, var_name: &str, typ: &str, key: &str) {
+        self.output_options
+            .push(OutputOption::new(self.name(), var_name, typ, key));
     }
     pub fn input_options(&self) -> &Vec<InputOption> {
         &self.input_options
@@ -212,7 +212,20 @@ impl DbObject for Request {
             ],
         )?;
         for option in self.input_options.iter() {
-            option.update(conn)?;
+            option.upsert(conn)?;
+        }
+        for option in self.output_options.iter() {
+            option.upsert(conn)?;
+        }
+        for opt in InputOption::get_by(conn, |opt| opt.request_name() == self.name())?.iter() {
+            if !self.input_options.contains(opt) {
+                opt.delete(conn)?;
+            }
+        }
+        for opt in OutputOption::get_by(conn, |opt| opt.request_name() == self.name())?.iter() {
+            if !self.output_options.contains(opt) {
+                opt.delete(conn)?;
+            }
         }
         Ok(num)
     }
