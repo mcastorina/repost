@@ -26,5 +26,21 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
         })
         .collect();
 
-    todo!();
+    for env_val in env_vals {
+        let (env, val) = env_val;
+        let mut var = Variable::get_unique(b.conn(), name, &env).unwrap_or(Variable::new(
+            name,
+            &env,
+            None,
+            Some("user"),
+        ));
+        var.set_value(Some(&val));
+        var.upsert(b.conn())?;
+        if let Some(env) = b.environment() {
+            if env == var.environment() {
+                var.set_options(b.conn())?;
+            }
+        }
+    }
+    Ok(())
 }

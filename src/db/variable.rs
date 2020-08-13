@@ -1,5 +1,5 @@
 use super::{DbObject, InputOption, PrintableTableStruct};
-use crate::error::Result;
+use crate::error::{Error, ErrorKind, Result};
 use chrono::Utc;
 use comfy_table::Cell;
 use rusqlite::{params, Connection, NO_PARAMS};
@@ -83,6 +83,16 @@ impl Variable {
     pub fn environment(&self) -> &str {
         self.environment.as_ref()
     }
+    pub fn get_unique(conn: &Connection, name: &str, env: &str) -> Result<Variable> {
+        // TODO: direct call to db
+        let mut var: Vec<_> =
+            Variable::get_by(conn, |v| v.name() == name && v.environment() == env)?;
+        if var.len() == 0 {
+            Err(Error::new(ErrorKind::NotFound))
+        } else {
+            Ok(var.remove(0))
+        }
+    }
 }
 
 impl DbObject for Variable {
@@ -105,11 +115,6 @@ impl DbObject for Variable {
             "DELETE FROM variables WHERE rowid = ?1;",
             params![self.rowid],
         )?;
-        let mut opts = InputOption::get_by(conn, |opt| opt.option_name() == self.name())?;
-        for mut opt in opts {
-            opt.set_value(None);
-            opt.update(conn)?;
-        }
         Ok(())
     }
     fn update(&self, conn: &Connection) -> Result<usize> {
