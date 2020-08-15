@@ -52,6 +52,9 @@ impl Request {
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
+    pub fn url(&self) -> &str {
+        self.url.as_ref()
+    }
     pub fn get_unique(conn: &Connection, name: &str) -> Result<Request> {
         // TODO: direct call to db
         let mut req: Vec<_> = Request::get_by(conn, |r| r.name() == name)?;
@@ -140,7 +143,7 @@ impl Request {
     pub fn output_options(&self) -> &Vec<OutputOption> {
         &self.output_options
     }
-    pub fn create_requests(&self) -> Vec<RequestRunner> {
+    pub fn create_requests(self) -> Result<RequestRunner> {
         RequestRunner::new(self)
     }
     pub fn delete_input_option(&mut self, name: &str) {
@@ -163,6 +166,50 @@ impl Request {
         } else {
             h.unwrap().split("\n").map(String::from).collect()
         }
+    }
+
+    pub fn headers(&self) -> &Vec<String> {
+        &self.headers
+    }
+    pub fn take_body(&mut self) -> Option<Vec<u8>> {
+        self.body.take()
+    }
+    pub fn take_method(&mut self) -> Method {
+        self.method.clone()
+    }
+    // TODO: make this private / function of RequestRunner
+    pub fn replace_input_options(&mut self) -> Result<()> {
+        // TODO: better replacement for all options
+        //       this could result in some unexpected behavior
+        //       will need to do a two pass approach:
+        //          1. find all start/end indices
+        //          2. iterate backwards to perform replacement
+        // find all variables and replace with values in options
+        let missing_opts: Vec<_> = self
+            .input_options
+            .iter()
+            .filter(|opt| opt.values().len() == 0)
+            .map(|opt| String::from(opt.option_name()))
+            .collect();
+        if missing_opts.len() > 0 {
+            // All input options are required
+            return Err(Error::new(ErrorKind::MissingOptions(missing_opts)));
+        }
+        for opt in self.input_options.iter() {
+            if opt.values().len() == 0 {}
+            let old = format!("{{{}}}", opt.option_name());
+            let new = opt.values().remove(0);
+            self.url = self.url.replace(&old, &new);
+            for mut h in self.headers.iter_mut() {
+                *h = h.replace(&old, &new);
+            }
+            if let Some(body) = &self.body {
+                let old = format!(r"\{{{}\}}", opt.option_name());
+                let re = regex::bytes::Regex::new(&old).unwrap();
+                self.body = Some(re.replace_all(&body, new.as_bytes()).to_vec());
+            }
+        }
+        Ok(())
     }
 }
 

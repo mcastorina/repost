@@ -14,7 +14,15 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 pub fn execute(b: &mut Bastion, matches: &ArgMatches, req: Option<&str>) -> Result<()> {
-    todo!();
+    let req = match req {
+        Some(s) => Request::get_unique(b.conn(), s)?,
+        None => b.request()?,
+    };
+    // TODO: parse arguments and pass as options to create_requests()
+
+    let mut runner = req.create_requests()?;
+    println!("{:?}", runner);
+    runner.run()
 }
 
 fn get_json_values(root: &Value, query: &str) -> Result<Vec<Value>> {

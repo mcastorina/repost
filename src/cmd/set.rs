@@ -44,3 +44,13 @@ pub fn variable(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
     }
     Ok(())
 }
+
+pub fn option(b: &mut Bastion, matches: &ArgMatches) -> Result<()> {
+    let mut req = b.request()?;
+    let name = matches.value_of("option").unwrap();
+    let vals = matches.values_of("value").unwrap();
+
+    req.set_option(name, vals.collect())?;
+    req.update(b.conn())?;
+    Ok(())
+}
