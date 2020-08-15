@@ -15,8 +15,11 @@ impl RequestRunner {
             reqwests: RequestRunner::create_reqwests(r)?,
         })
     }
-    pub fn run(&self) -> Result<()> {
-        todo!();
+    pub fn run(self) -> Result<()> {
+        for reqw in self.reqwests {
+            blocking::Client::new().execute(reqw)?;
+        }
+        Ok(())
     }
 
     fn create_reqwests(req: Request) -> Result<Vec<blocking::Request>> {
