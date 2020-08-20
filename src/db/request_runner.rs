@@ -1,5 +1,7 @@
+use super::PrintableTable;
 use super::{DbObject, InputOption, OutputOption, Request};
 use crate::error::{Error, ErrorKind, Result};
+use comfy_table::Cell;
 use reqwest::blocking;
 use reqwest::Method;
 
@@ -73,5 +75,34 @@ impl RequestRunner {
         }
 
         Ok(builder.build()?)
+    }
+}
+
+impl Default for RequestRunner {
+    fn default() -> Self {
+        RequestRunner{
+            reqwests: vec![],
+        }
+    }
+}
+
+impl PrintableTable for RequestRunner {
+    fn get_header(&self) -> Vec<Cell> {
+        // TODO: table of option / values
+        vec![
+            Cell::new("id"),
+            Cell::new("url"),
+        ]
+    }
+    fn get_rows(&self) -> Vec<Vec<Cell>> {
+        let mut rows = vec![];
+        for (i, reqw) in self.reqwests.iter().enumerate() {
+            let row = vec![
+                Cell::new(i),
+                Cell::new(reqw.url()),
+            ];
+            rows.push(row);
+        }
+        rows
     }
 }

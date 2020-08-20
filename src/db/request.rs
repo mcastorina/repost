@@ -143,6 +143,12 @@ impl Request {
     pub fn output_options(&self) -> &Vec<OutputOption> {
         &self.output_options
     }
+    pub fn method(&self) -> &Method {
+        &self.method
+    }
+    pub fn body(&self) -> &Option<Vec<u8>> {
+        &self.body
+    }
     pub fn create_requests(self) -> Result<RequestRunner> {
         RequestRunner::new(self)
     }
