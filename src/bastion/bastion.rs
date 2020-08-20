@@ -19,6 +19,7 @@ impl Bastion {
             line_reader: LineReader::new(&root),
         };
         Variable::set_all_options(bastion.conn(), bastion.environment())?;
+        bastion.set_completions()?;
         Ok(bastion)
     }
     pub fn conn(&self) -> &Connection {
@@ -32,7 +33,7 @@ impl Bastion {
     pub fn execute(&mut self, command: &str) -> Result<()> {
         super::executer::execute(self, command)?;
         self.set_state()?;
-        // self.set_completions()
+        self.set_completions()?;
         Ok(())
     }
 
@@ -168,6 +169,40 @@ impl Bastion {
         } {
             self.state = state;
         }
+        Ok(())
+    }
+    pub fn set_completions(&mut self) -> Result<()> {
+        self.line_reader.environment_completions(
+            Environment::get_all(self.conn())?
+                .iter()
+                .map(Environment::name)
+                .map(String::from)
+                .collect(),
+        );
+        self.line_reader
+            .request_completions(Request::collect_all(self.conn(), |x| {
+                String::from(x.name())
+            })?);
+        self.line_reader
+            .variable_completions(Variable::collect_all(self.conn(), |x| {
+                String::from(x.name())
+            })?);
+        self.line_reader
+            .workspace_completions(self.get_workspaces()?);
+
+        match &self.state {
+            ReplState::Request(_, _) | ReplState::EnvironmentRequest(_, _, _) => {
+                self.line_reader.input_option_completions(
+                    self.request()?
+                        .input_options()
+                        .iter()
+                        .map(|x| x.option_name())
+                        .map(String::from)
+                        .collect(),
+                )
+            }
+            _ => self.line_reader.input_option_completions(vec![]),
+        };
         Ok(())
     }
 }

@@ -80,27 +80,19 @@ impl RequestRunner {
 
 impl Default for RequestRunner {
     fn default() -> Self {
-        RequestRunner{
-            reqwests: vec![],
-        }
+        RequestRunner { reqwests: vec![] }
     }
 }
 
 impl PrintableTable for RequestRunner {
     fn get_header(&self) -> Vec<Cell> {
         // TODO: table of option / values
-        vec![
-            Cell::new("id"),
-            Cell::new("url"),
-        ]
+        vec![Cell::new("id"), Cell::new("url")]
     }
     fn get_rows(&self) -> Vec<Vec<Cell>> {
         let mut rows = vec![];
         for (i, reqw) in self.reqwests.iter().enumerate() {
-            let row = vec![
-                Cell::new(i),
-                Cell::new(reqw.url()),
-            ];
+            let row = vec![Cell::new(i), Cell::new(reqw.url())];
             rows.push(row);
         }
         rows
