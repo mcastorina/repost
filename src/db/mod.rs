@@ -1,3 +1,5 @@
+mod models;
+
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{self, Error, Sqlite, SqlitePool};
 
@@ -19,11 +21,13 @@ impl Db {
     /// Open new connection to `path` and create it if it does
     /// not exist.
     pub async fn new(name: &str, path: &str) -> Result<Self, Error> {
-        Ok(Self {
+        let mut db = Self {
             name: name.to_string(),
             path: path.to_string(),
             pool: Db::load_pool(path).await?,
-        })
+        };
+        db.create_tables().await?;
+        Ok(db)
     }
 
     /// Set the workspace to `name` and create `name.db` if it does
@@ -48,16 +52,43 @@ impl Db {
         }
         Ok(SqlitePool::connect(&path).await?)
     }
+
+    async fn create_tables(&self) -> Result<(), Error> {
+        sqlx::query(
+            "
+            CREATE TABLE IF NOT EXISTS environments (name TEXT PRIMARY KEY NOT NULL);
+            ",
+        )
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use super::models::Environment;
     use super::Db;
+
+    // create an in-memory database for testing
+    async fn test_db() -> Db {
+        Db::new("testdb", "file:memdb?mode=memory&cache=shared")
+            .await
+            .expect("could not create database")
+    }
 
     #[tokio::test]
     async fn test_db_creation() {
-        Db::new("testdb", "file:memdb?mode=memory&cache=shared")
-            .await
-            .expect("could not create database");
+        // test_db will panic on error
+        test_db().await;
+    }
+
+    #[tokio::test]
+    async fn test_env_get_set() {
+        let db = test_db().await;
+        let env = Environment {
+            name: "foo".to_string(),
+        };
+        env.save(db.pool()).await.expect("could not save");
     }
 }
