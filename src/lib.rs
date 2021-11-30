@@ -1,3 +1,3 @@
-mod repl;
 mod cmd;
 mod db;
+mod repl;
