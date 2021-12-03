@@ -1,6 +1,6 @@
 use sqlx::{Error, FromRow, SqlitePool};
 
-#[derive(FromRow)]
+#[derive(Debug, FromRow, PartialEq, Eq)]
 pub struct Environment {
     pub name: String,
 }

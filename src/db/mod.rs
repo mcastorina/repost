@@ -53,6 +53,7 @@ impl Db {
         Ok(SqlitePool::connect(&path).await?)
     }
 
+    /// Try to create all tables required in the database file.
     async fn create_tables(&self) -> Result<(), Error> {
         sqlx::query(
             "
@@ -89,6 +90,12 @@ mod test {
         let env = Environment {
             name: "foo".to_string(),
         };
-        env.save(db.pool()).await.expect("could not save");
+        env.save(db.pool()).await.expect("could not get");
+
+        let got: Environment = sqlx::query_as("SELECT * FROM environments")
+            .fetch_one(db.pool())
+            .await
+            .expect("could not get");
+        assert_eq!(got, env);
     }
 }
