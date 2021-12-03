@@ -1,12 +1,11 @@
-mod models;
+pub mod models;
 
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{self, Error, Sqlite, SqlitePool};
 
-// * global DB pool that can be referenced for inline queries
-// * easily and safely swap DB pool (i.e. workspace)
-
-struct Db {
+/// Db object for describing the current workspace and storing all
+/// data in. This struct uses a sqlite database to store objects to.
+pub struct Db {
     /// Name of the workspace
     pub name: String,
 
@@ -87,9 +86,7 @@ mod test {
     #[tokio::test]
     async fn test_env_get_set() {
         let db = test_db().await;
-        let env = Environment {
-            name: "foo".to_string(),
-        };
+        let env = Environment::new("foo");
         env.save(db.pool()).await.expect("could not get");
 
         let got: Environment = sqlx::query_as("SELECT * FROM environments")
