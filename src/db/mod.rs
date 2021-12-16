@@ -62,6 +62,12 @@ impl Db {
         sqlx::query(
             "
             CREATE TABLE IF NOT EXISTS environments (name TEXT PRIMARY KEY NOT NULL);
+            CREATE TABLE IF NOT EXISTS variables (
+                id          INTEGER PRIMARY KEY,
+                name        TEXT NOT NULL,
+                env         TEXT NOT NULL,
+                value       TEXT
+            );
             ",
         )
         .execute(self.pool())

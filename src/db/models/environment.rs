@@ -1,8 +1,8 @@
 use sqlx::{Error, FromRow, SqlitePool};
 
-#[derive(Debug, PartialEq, Eq, FromRow)]
+#[derive(Debug, PartialEq, Eq, FromRow, Clone)]
 pub struct Environment {
-    pub name: String,
+    name: String,
 }
 
 impl Environment {
@@ -19,5 +19,17 @@ impl Environment {
             .execute(pool)
             .await?;
         Ok(())
+    }
+}
+
+impl<T: Into<String>> From<T> for Environment {
+    fn from(s: T) -> Self {
+        Environment::new(s)
+    }
+}
+
+impl AsRef<str> for Environment {
+    fn as_ref(&self) -> &str {
+        self.name.as_ref()
     }
 }
