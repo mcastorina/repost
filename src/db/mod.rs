@@ -66,7 +66,9 @@ impl Db {
                 id          INTEGER PRIMARY KEY,
                 name        TEXT NOT NULL,
                 env         TEXT NOT NULL,
-                value       TEXT
+                value       TEXT,
+                source      TEXT NOT NULL,
+                timestamp   TEXT NOT NULL
             );
             ",
         )

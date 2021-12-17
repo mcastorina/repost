@@ -11,7 +11,9 @@ pub async fn environment(db: &Db, name: &str) -> Result<(), Error> {
 }
 
 pub async fn variable(db: &Db, name: &str, env: &str, value: &str) -> Result<(), Error> {
-    Variable::new(name, env, value).save(db.pool()).await
+    Variable::new(name, env, value, "user")
+        .save(db.pool())
+        .await
 }
 
 #[cfg(test)]
