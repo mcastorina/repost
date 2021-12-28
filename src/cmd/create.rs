@@ -1,5 +1,5 @@
-use crate::db::models::Environment;
-use crate::db::models::Variable;
+use super::models::{Environment, Variable};
+use crate::db::models as db;
 use crate::db::Db;
 use builder_pattern::Builder;
 use sqlx::Error;
@@ -7,13 +7,13 @@ use sqlx::Error;
 /// Create an environment and save it to the database. This function
 /// returns an error if the environment already exists.
 pub async fn environment(db: &Db, name: &str) -> Result<(), Error> {
-    Environment::new(name).save(db.pool()).await
+    let env: db::Environment = Environment::new(name).into();
+    env.save(db.pool()).await
 }
 
 pub async fn variable(db: &Db, name: &str, env: &str, value: &str) -> Result<(), Error> {
-    Variable::new(name, env, value, "user")
-        .save(db.pool())
-        .await
+    let var: db::Variable = Variable::new(name, env, value, "user").into();
+    var.save(db.pool()).await
 }
 
 #[cfg(test)]

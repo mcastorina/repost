@@ -80,8 +80,9 @@ impl Db {
 
 #[cfg(test)]
 mod test {
-    use super::models::Environment;
+    use super::models::{Environment, Variable};
     use super::Db;
+    use crate::cmd::models as cmd;
 
     // create an in-memory database for testing
     async fn test_db() -> Db {
@@ -99,7 +100,7 @@ mod test {
     #[tokio::test]
     async fn test_env_get_set() {
         let db = test_db().await;
-        let env = Environment::new("foo");
+        let env: Environment = cmd::Environment::new("foo").into();
         env.save(db.pool()).await.expect("could not set");
 
         let got: Environment = sqlx::query_as("SELECT * FROM environments")
@@ -107,5 +108,20 @@ mod test {
             .await
             .expect("could not get");
         assert_eq!(got, env);
+    }
+
+    #[tokio::test]
+    async fn test_var_get_set() {
+        let db = test_db().await;
+        let var = cmd::Variable::new("foo", "env", "value", "source");
+        let db_var: Variable = var.clone().into();
+        db_var.save(db.pool()).await.expect("could not set");
+
+        let got: Variable = sqlx::query_as("SELECT * FROM variables")
+            .fetch_one(db.pool())
+            .await
+            .expect("could not get");
+        let got: cmd::Variable = got.into();
+        assert_eq!(got, var);
     }
 }
