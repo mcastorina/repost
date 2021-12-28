@@ -30,8 +30,8 @@ impl Variable {
     }
 }
 
-impl<'n, 'e, 'v, 's> From<cmd::Variable<'n, 'e, 'v, 's>> for Variable {
-    fn from(var: cmd::Variable<'n, 'e, 'v, 's>) -> Self {
+impl<'a> From<cmd::Variable<'a>> for Variable {
+    fn from(var: cmd::Variable<'a>) -> Self {
         Self {
             id: 0,
             name: var.name.into(),
