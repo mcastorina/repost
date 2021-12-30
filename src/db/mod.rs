@@ -90,6 +90,7 @@ mod test {
     use super::models::{Environment, Request, Variable};
     use super::Db;
     use crate::cmd::models as cmd;
+    use std::convert::TryInto;
 
     // create an in-memory database for testing
     async fn test_db() -> Db {
@@ -143,7 +144,7 @@ mod test {
             .fetch_one(db.pool())
             .await
             .expect("could not get");
-        let got: cmd::Request = got.into();
+        let got: cmd::Request = got.try_into().expect("db data did not parse");
         assert_eq!(got, req);
     }
 }

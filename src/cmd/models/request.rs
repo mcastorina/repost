@@ -2,7 +2,7 @@ use super::variable::VarString;
 use crate::db::models as db;
 use reqwest::Method;
 use std::borrow::Cow;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Request<'a> {
@@ -44,15 +44,16 @@ impl<'a> Request<'a> {
     }
 }
 
-impl<'a> From<db::Request> for Request<'a> {
-    fn from(req: db::Request) -> Self {
+impl<'a> TryFrom<db::Request> for Request<'a> {
+    type Error = ();
+    fn try_from(req: db::Request) -> Result<Self, Self::Error> {
         // TODO: headers and body
-        Self {
+        Ok(Self {
             name: req.name.into(),
-            method: req.method.parse().unwrap(),
+            method: req.method.parse().map_err(|_| ())?,
             url: req.url.into(),
             headers: vec![],
             body: None,
-        }
+        })
     }
 }
