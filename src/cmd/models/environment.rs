@@ -14,7 +14,10 @@ impl<'a> Environment<'a> {
     }
 }
 
-impl<'a, T: Into<Cow<'a, str>>> From<T> for Environment<'a> {
+impl<'a, T> From<T> for Environment<'a>
+where
+    T: Into<Cow<'a, str>>,
+{
     fn from(s: T) -> Self {
         Environment::new(s)
     }

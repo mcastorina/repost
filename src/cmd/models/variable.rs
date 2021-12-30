@@ -2,6 +2,8 @@ use super::Environment;
 use crate::db::models as db;
 use chrono::{DateTime, Local};
 use std::borrow::Cow;
+use std::collections::HashSet;
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Variable<'a> {
@@ -39,5 +41,34 @@ impl<'a> From<db::Variable> for Variable<'a> {
             source: var.source.into(),
             timestamp: var.timestamp,
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+/// A string that contains {variables}
+pub struct VarString<'a> {
+    /// Source string containing variables
+    source: Cow<'a, str>,
+
+    /// Set of variables found in source
+    vars: HashSet<Cow<'a, str>>,
+}
+
+impl<'a, T> From<T> for VarString<'a>
+where
+    T: Into<Cow<'a, str>>,
+{
+    fn from(t: T) -> Self {
+        // TODO: fill hashset
+        Self {
+            source: t.into(),
+            vars: HashSet::new(),
+        }
+    }
+}
+
+impl From<VarString<'_>> for String {
+    fn from(v: VarString<'_>) -> Self {
+        v.source.into()
     }
 }

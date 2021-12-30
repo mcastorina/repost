@@ -70,6 +70,13 @@ impl Db {
                 source      TEXT NOT NULL,
                 timestamp   TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS requests (
+                name        TEXT PRIMARY KEY,
+                method      TEXT NOT NULL,
+                url         TEXT NOT NULL,
+                headers     TEXT,
+                body        TEXT
+            );
             ",
         )
         .execute(self.pool())
@@ -80,7 +87,7 @@ impl Db {
 
 #[cfg(test)]
 mod test {
-    use super::models::{Environment, Variable};
+    use super::models::{Environment, Request, Variable};
     use super::Db;
     use crate::cmd::models as cmd;
 
@@ -123,5 +130,20 @@ mod test {
             .expect("could not get");
         let got: cmd::Variable = got.into();
         assert_eq!(got, var);
+    }
+
+    #[tokio::test]
+    async fn test_req_get_set() {
+        let db = test_db().await;
+        let req = cmd::Request::new("foo", "GET", "url").expect("new failed");
+        let db_req: Request = req.clone().into();
+        db_req.save(db.pool()).await.expect("could not set");
+
+        let got: Request = sqlx::query_as("SELECT * FROM requests")
+            .fetch_one(db.pool())
+            .await
+            .expect("could not get");
+        let got: cmd::Request = got.into();
+        assert_eq!(got, req);
     }
 }
