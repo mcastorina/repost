@@ -1,4 +1,4 @@
-use super::models::{Environment, Variable};
+use super::models::Variable;
 use crate::db::models as db;
 use crate::db::Db;
 use builder_pattern::Builder;
@@ -7,8 +7,7 @@ use sqlx::Error;
 /// Create an environment and save it to the database. This function
 /// returns an error if the environment already exists.
 pub async fn environment(db: &Db, name: &str) -> Result<(), Error> {
-    let env: db::Environment = Environment::new(name).into();
-    env.save(db.pool()).await
+    db::Environment::new(name).save(db.pool()).await
 }
 
 pub async fn variable(db: &Db, name: &str, env: &str, value: &str) -> Result<(), Error> {

@@ -1,14 +1,12 @@
-use super::Environment;
 use crate::db::models as db;
 use chrono::{DateTime, Local};
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Variable<'a> {
     pub name: Cow<'a, str>,
-    pub env: Environment<'a>,
+    pub env: db::Environment,
     pub value: Option<Cow<'a, str>>,
     pub source: Cow<'a, str>,
     pub timestamp: DateTime<Local>,
@@ -18,7 +16,7 @@ impl<'a> Variable<'a> {
     pub fn new<N, E, V, S>(name: N, env: E, value: V, source: S) -> Self
     where
         N: Into<Cow<'a, str>>,
-        E: Into<Environment<'a>>,
+        E: Into<db::Environment>,
         V: Into<Cow<'a, str>>,
         S: Into<Cow<'a, str>>,
     {
