@@ -87,9 +87,8 @@ impl Db {
 
 #[cfg(test)]
 mod test {
-    use super::models::{Environment, Request, Variable};
+    use super::models::{DbEnvironment, DbRequest, DbVariable, Environment, Request, Variable};
     use super::Db;
-    use crate::cmd::models as cmd;
     use std::convert::TryInto;
 
     // create an in-memory database for testing
@@ -108,7 +107,7 @@ mod test {
     #[tokio::test]
     async fn test_env_get_set() {
         let db = test_db().await;
-        let env: Environment = cmd::Environment::new("foo").into();
+        let env: DbEnvironment = Environment::new("foo").into();
         env.save(db.pool()).await.expect("could not set");
 
         let got: Environment = sqlx::query_as("SELECT * FROM environments")
@@ -121,30 +120,30 @@ mod test {
     #[tokio::test]
     async fn test_var_get_set() {
         let db = test_db().await;
-        let var = cmd::Variable::new("foo", "env", "value", "source");
-        let db_var: Variable = var.clone().into();
+        let var = Variable::new("foo", "env", "value", "source");
+        let db_var: DbVariable = var.clone().into();
         db_var.save(db.pool()).await.expect("could not set");
 
-        let got: Variable = sqlx::query_as("SELECT * FROM variables")
+        let got: DbVariable = sqlx::query_as("SELECT * FROM variables")
             .fetch_one(db.pool())
             .await
             .expect("could not get");
-        let got: cmd::Variable = got.into();
+        let got: Variable = got.into();
         assert_eq!(got, var);
     }
 
     #[tokio::test]
     async fn test_req_get_set() {
         let db = test_db().await;
-        let req = cmd::Request::new("foo", "GET", "url").expect("new failed");
-        let db_req: Request = req.clone().into();
+        let req = Request::new("foo", "GET", "url").expect("new failed");
+        let db_req: DbRequest = req.clone().into();
         db_req.save(db.pool()).await.expect("could not set");
 
-        let got: Request = sqlx::query_as("SELECT * FROM requests")
+        let got: DbRequest = sqlx::query_as("SELECT * FROM requests")
             .fetch_one(db.pool())
             .await
             .expect("could not get");
-        let got: cmd::Request = got.try_into().expect("db data did not parse");
+        let got: Request = got.try_into().expect("db data did not parse");
         assert_eq!(got, req);
     }
 }

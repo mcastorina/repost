@@ -1,6 +1,6 @@
 mod environment;
 mod request;
 mod variable;
-pub use environment::Environment;
-pub use request::Request;
-pub use variable::Variable;
+pub use environment::{DbEnvironment, Environment};
+pub use request::{DbRequest, Request};
+pub use variable::{DbVariable, Variable};
