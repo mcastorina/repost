@@ -1,5 +1,5 @@
 use super::variable::VarString;
-use reqwest::Method;
+use reqwest::{Body, Method};
 use sqlx::{Error, FromRow, SqlitePool};
 use std::convert::{TryFrom, TryInto};
 
@@ -31,8 +31,8 @@ impl DbRequest {
     }
 }
 
-impl<'a> From<Request<'a>> for DbRequest {
-    fn from(req: Request<'a>) -> Self {
+impl From<Request> for DbRequest {
+    fn from(req: Request) -> Self {
         // TODO: headers and body
         Self {
             name: req.name.into(),
@@ -45,7 +45,7 @@ impl<'a> From<Request<'a>> for DbRequest {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Request<'a> {
+pub struct Request {
     /// Name of the request
     pub name: String,
     /// HTTP method type
@@ -55,18 +55,18 @@ pub struct Request<'a> {
     /// HTTP header key-value pairs
     pub headers: Vec<(VarString, VarString)>,
     /// HTTP request body
-    pub body: Option<RequestBody<'a>>,
+    pub body: Option<RequestBody>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum RequestBody<'a> {
+pub enum RequestBody {
     /// A blob of bytes
-    Blob(&'a [u8]),
+    Blob(Vec<u8>),
     /// A body that contains a variable string
     Payload(VarString),
 }
 
-impl<'a> Request<'a> {
+impl Request {
     /// Create a new request object. Please note that method is case sensitive.
     pub fn new<N, M, U>(name: N, method: M, url: U) -> Self
     where
@@ -87,6 +87,7 @@ impl<'a> Request<'a> {
         }
     }
 
+    /// Add a single header key-value pair to the request.
     pub fn header<K, V>(mut self, key: K, value: V) -> Self
     where
         K: Into<VarString>,
@@ -96,6 +97,7 @@ impl<'a> Request<'a> {
         self
     }
 
+    /// Add many header key-value pairs to the request.
     pub fn headers<K, V>(mut self, headers: Vec<(K, V)>) -> Self
     where
         K: Into<VarString>,
@@ -106,9 +108,32 @@ impl<'a> Request<'a> {
         }
         self
     }
+
+    /// Set the request body to exact data.
+    /// This function is recommended if you don't intend to use variables in the request body.
+    pub fn body_raw<B>(mut self, body: B) -> Self
+    where
+        B: Into<Body>,
+    {
+        self.body = body
+            .into()
+            .as_bytes()
+            .map(|body| RequestBody::Blob(body.to_owned()));
+        self
+    }
+
+    /// Set the request body to a variable string.
+    /// Bodies set by this function will be subject to variable replacement.
+    pub fn body<B>(mut self, body: B) -> Self
+    where
+        B: Into<VarString>,
+    {
+        self.body = Some(RequestBody::Payload(body.into()));
+        self
+    }
 }
 
-impl<'a> TryFrom<DbRequest> for Request<'a> {
+impl TryFrom<DbRequest> for Request {
     type Error = ();
     fn try_from(req: DbRequest) -> Result<Self, Self::Error> {
         // TODO: headers and body
