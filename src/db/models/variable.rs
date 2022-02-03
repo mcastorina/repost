@@ -1,6 +1,7 @@
 use super::Environment;
 use chrono::{DateTime, Local};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use sqlx::{Error, FromRow, SqlitePool};
 use std::collections::HashSet;
 use std::fmt::{self, Display, Formatter};
@@ -85,10 +86,10 @@ impl From<DbVariable> for Variable {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
 /// A string that contains {variables}.
 /// Variables may not be nested, and variable names begin with an alphanumeric character and
 /// contains alphanumeric, and `-` characters.
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct VarString {
     /// Source string containing variables
     source: String,

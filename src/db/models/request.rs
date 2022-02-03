@@ -1,5 +1,6 @@
 use super::variable::VarString;
 use reqwest::{Body, Method};
+use serde_json;
 use sqlx::{Error, FromRow, SqlitePool};
 use std::convert::{TryFrom, TryInto};
 
@@ -10,20 +11,22 @@ pub struct DbRequest {
     pub method: String,
     pub url: String,
     pub headers: String,
-    pub body: Vec<u8>,
+    pub body: Option<Vec<u8>>,
+    pub body_kind: Option<String>,
 }
 
 impl DbRequest {
     pub async fn save(&self, pool: &SqlitePool) -> Result<(), Error> {
         sqlx::query(
             "INSERT INTO requests
-                (name, method, url, headers, body)
-                VALUES (?, ?, ?, ?, ?);",
+                (name, method, url, headers, body_kind, body)
+                VALUES (?, ?, ?, ?, ?, ?);",
         )
         .bind(self.name.as_str())
         .bind(self.method.as_str())
         .bind(self.url.as_str())
         .bind(self.headers.as_str())
+        .bind(&self.body_kind)
         .bind(&self.body)
         .execute(pool)
         .await?;
@@ -33,13 +36,23 @@ impl DbRequest {
 
 impl From<Request> for DbRequest {
     fn from(req: Request) -> Self {
-        // TODO: headers and body
+        let kind = |rb: &RequestBody| {
+            match rb {
+                RequestBody::Blob(_) => "raw",
+                RequestBody::Payload(_) => "var",
+            }
+            .to_string()
+        };
         Self {
             name: req.name.into(),
             method: req.method.to_string(),
             url: req.url.to_string(),
-            headers: String::new(),
-            body: vec![],
+            // Serialization can fail if `T`'s implementation of `Serialize` decides to fail, or if
+            // `T` contains a map with non-string keys. We are serializing a vector of tuples with
+            // known types, which should never fail and can be safely unwrapped.
+            headers: serde_json::to_string(&req.headers).unwrap(),
+            body_kind: req.body.as_ref().map(kind),
+            body: req.body.map(|body| body.as_bytes()),
         }
     }
 }
@@ -66,6 +79,15 @@ pub enum RequestBody {
     Payload(VarString),
 }
 
+impl RequestBody {
+    fn as_bytes(self) -> Vec<u8> {
+        match self {
+            Self::Blob(body) => body,
+            Self::Payload(v) => v.to_string().as_bytes().to_owned(),
+        }
+    }
+}
+
 impl Request {
     /// Create a new request object. Please note that method is case sensitive.
     pub fn new<N, M, U>(name: N, method: M, url: U) -> Self
@@ -75,7 +97,6 @@ impl Request {
         <M as TryInto<Method>>::Error: std::fmt::Debug,
         U: Into<VarString>,
     {
-        // TODO: headers and body
         Self {
             name: name.into(),
             // Method::TryInto returns Infallible so it's okay to unwrap
@@ -136,13 +157,26 @@ impl Request {
 impl TryFrom<DbRequest> for Request {
     type Error = ();
     fn try_from(req: DbRequest) -> Result<Self, Self::Error> {
-        // TODO: headers and body
+        let headers = serde_json::from_str(&req.headers).map_err(|_| ())?;
+        let body_kind = req.body_kind.as_deref();
+        let body = req
+            .body
+            .map(|body| match body_kind {
+                Some("raw") => Ok(RequestBody::Blob(body)),
+                Some("var") => String::from_utf8(body)
+                    .map(|b| RequestBody::Payload(b.into()))
+                    .map_err(|_| "not UTF-8"),
+                Some(_) => Err("expected 'raw' or 'var' body kind"),
+                None => Err("found body, but missing it's kind"),
+            })
+            .transpose()
+            .map_err(|_| ())?;
         Ok(Self {
             name: req.name.into(),
             method: req.method.parse().map_err(|_| ())?,
             url: req.url.into(),
-            headers: vec![],
-            body: None,
+            headers,
+            body,
         })
     }
 }

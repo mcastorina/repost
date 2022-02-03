@@ -75,7 +75,8 @@ impl Db {
                 method      TEXT NOT NULL,
                 url         TEXT NOT NULL,
                 headers     TEXT,
-                body        TEXT
+                body_kind   TEXT,
+                body        BLOB
             );
             ",
         )
@@ -135,7 +136,9 @@ mod test {
     #[tokio::test]
     async fn test_req_get_set() {
         let db = test_db().await;
-        let req = Request::new("foo", "GET", "url");
+        let req = Request::new("name", "method", "url")
+            .header("foo", "bar")
+            .body("baz");
         let db_req: DbRequest = req.clone().into();
         db_req.save(db.pool()).await.expect("could not set");
 
