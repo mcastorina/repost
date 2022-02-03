@@ -135,7 +135,7 @@ mod test {
     #[tokio::test]
     async fn test_req_get_set() {
         let db = test_db().await;
-        let req = Request::new("foo", "GET", "url").expect("new failed");
+        let req = Request::new("foo", "GET", "url");
         let db_req: DbRequest = req.clone().into();
         db_req.save(db.pool()).await.expect("could not set");
 

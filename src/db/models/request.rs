@@ -36,7 +36,7 @@ impl<'a> From<Request<'a>> for DbRequest {
         // TODO: headers and body
         Self {
             name: req.name.into(),
-            method: req.method.as_str().to_string(),
+            method: req.method.to_string(),
             url: req.url.to_string(),
             headers: String::new(),
             body: vec![],
@@ -53,7 +53,7 @@ pub struct Request<'a> {
     /// HTTP url string including protocol and parameters
     pub url: VarString,
     /// HTTP header key-value pairs
-    pub headers: Vec<(String, VarString)>,
+    pub headers: Vec<(VarString, VarString)>,
     /// HTTP request body
     pub body: Option<RequestBody<'a>>,
 }
@@ -67,20 +67,44 @@ pub enum RequestBody<'a> {
 }
 
 impl<'a> Request<'a> {
-    pub fn new<N, M, U>(name: N, method: M, url: U) -> Result<Self, ()>
+    /// Create a new request object. Please note that method is case sensitive.
+    pub fn new<N, M, U>(name: N, method: M, url: U) -> Self
     where
         N: Into<String>,
         M: TryInto<Method>,
+        <M as TryInto<Method>>::Error: std::fmt::Debug,
         U: Into<VarString>,
     {
         // TODO: headers and body
-        Ok(Self {
+        Self {
             name: name.into(),
-            method: method.try_into().map_err(|_| ())?,
+            // Method::TryInto returns Infallible so it's okay to unwrap
+            // unfortunately, From<&str> is not implemented for Method
+            method: method.try_into().unwrap(),
             url: url.into(),
             headers: vec![],
             body: None,
-        })
+        }
+    }
+
+    pub fn header<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<VarString>,
+        V: Into<VarString>,
+    {
+        self.headers.push((key.into(), value.into()));
+        self
+    }
+
+    pub fn headers<K, V>(mut self, headers: Vec<(K, V)>) -> Self
+    where
+        K: Into<VarString>,
+        V: Into<VarString>,
+    {
+        for (k, v) in headers {
+            self = self.header(k, v)
+        }
+        self
     }
 }
 
@@ -95,5 +119,45 @@ impl<'a> TryFrom<DbRequest> for Request<'a> {
             headers: vec![],
             body: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Method, Request};
+    use std::str::FromStr;
+
+    macro_rules! method {
+        ($m:expr) => {
+            Request::new("name", $m, "url").method
+        };
+    }
+
+    #[test]
+    fn method() {
+        assert_eq!(method!(Method::GET), Method::GET);
+        assert_eq!(method!("GET"), Method::GET);
+        assert_eq!(method!("get"), Method::from_str("get").unwrap());
+        assert_eq!(method!("foo"), Method::from_str("foo").unwrap());
+    }
+
+    #[test]
+    fn headers() {
+        assert_eq!(
+            Request::new("foo", "bar", "baz")
+                .header("foo", "bar")
+                .header("bar", "baz")
+                .headers
+                .len(),
+            2
+        );
+        assert_eq!(
+            Request::new("foo", "bar", "baz")
+                .header("foo", "bar")
+                .headers(vec![("foo", "bar"), ("bar", "baz")])
+                .headers
+                .len(),
+            3
+        );
     }
 }
