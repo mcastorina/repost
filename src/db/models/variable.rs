@@ -16,37 +16,10 @@ pub struct DbVariable {
     pub timestamp: DateTime<Local>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Variable {
-    pub name: String,
-    pub env: Environment,
-    pub value: Option<String>,
-    pub source: String,
-    pub timestamp: DateTime<Local>,
-}
-
-impl DbVariable {
-    pub async fn save(&self, pool: &SqlitePool) -> Result<(), Error> {
-        sqlx::query(
-            "INSERT INTO variables
-                (name, env, value, source, timestamp)
-                VALUES (?, ?, ?, ?, ?);",
-        )
-        .bind(self.name.as_str())
-        .bind(self.env.as_str())
-        .bind(self.value.as_ref())
-        .bind(self.source.as_str())
-        .bind(self.timestamp)
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
-}
-
 impl<'a> From<Variable> for DbVariable {
     fn from(var: Variable) -> Self {
         Self {
-            id: 0,
+            id: var.id.unwrap_or(0),
             name: var.name.into(),
             env: var.env.name.into(),
             value: var.value.map(|cow| cow.into()),
@@ -54,6 +27,16 @@ impl<'a> From<Variable> for DbVariable {
             timestamp: var.timestamp,
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Variable {
+    pub id: Option<i32>,
+    pub name: String,
+    pub env: Environment,
+    pub value: Option<String>,
+    pub source: String,
+    pub timestamp: DateTime<Local>,
 }
 
 impl Variable {
@@ -65,6 +48,7 @@ impl Variable {
         S: Into<String>,
     {
         Self {
+            id: None,
             name: name.into(),
             env: env.into(),
             value: Some(value.into()),
@@ -72,11 +56,52 @@ impl Variable {
             timestamp: Local::now(),
         }
     }
+
+    pub async fn save(self, pool: &SqlitePool) -> Result<(), Error> {
+        match self.id {
+            Some(id) => self.update(id, pool).await?,
+            None => self.create(pool).await?,
+        };
+        Ok(())
+    }
+
+    async fn create(self, pool: &SqlitePool) -> Result<(), Error> {
+        sqlx::query(
+            "INSERT INTO variables
+                (name, env, value, source, timestamp)
+                VALUES (?, ?, ?, ?, ?);",
+        )
+        .bind(self.name.as_str())
+        .bind(self.env.as_ref())
+        .bind(self.value.as_ref())
+        .bind(self.source.as_str())
+        .bind(self.timestamp)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn update(self, id: i32, pool: &SqlitePool) -> Result<(), Error> {
+        sqlx::query(
+            "UPDATE variables SET
+                (name, env, value, source, timestamp) = (?, ?, ?, ?, ?)
+                WHERE id = ?;",
+        )
+        .bind(self.name.as_str())
+        .bind(self.env.as_ref())
+        .bind(self.value.as_ref())
+        .bind(self.source.as_str())
+        .bind(self.timestamp)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
 }
 
 impl From<DbVariable> for Variable {
     fn from(var: DbVariable) -> Self {
         Self {
+            id: Some(var.id),
             name: var.name.into(),
             env: var.env.into(),
             value: var.value.map(|s| s.into()),

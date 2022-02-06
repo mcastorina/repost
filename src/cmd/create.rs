@@ -10,7 +10,7 @@ pub async fn environment(db: &Db, name: &str) -> Result<(), Error> {
 }
 
 pub async fn variable(db: &Db, name: &str, env: &str, value: &str) -> Result<(), Error> {
-    let var: db::DbVariable = db::Variable::new(name, env, value, "user").into();
+    let var: db::Variable = db::Variable::new(name, env, value, "user");
     var.save(db.pool()).await
 }
 

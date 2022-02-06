@@ -15,25 +15,6 @@ pub struct DbRequest {
     pub body_kind: Option<String>,
 }
 
-impl DbRequest {
-    pub async fn save(&self, pool: &SqlitePool) -> Result<(), Error> {
-        sqlx::query(
-            "INSERT INTO requests
-                (name, method, url, headers, body_kind, body)
-                VALUES (?, ?, ?, ?, ?, ?);",
-        )
-        .bind(self.name.as_str())
-        .bind(self.method.as_str())
-        .bind(self.url.as_str())
-        .bind(self.headers.as_str())
-        .bind(&self.body_kind)
-        .bind(&self.body)
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
-}
-
 impl From<Request> for DbRequest {
     fn from(req: Request) -> Self {
         let kind = |rb: &RequestBody| {
@@ -151,6 +132,24 @@ impl Request {
     {
         self.body = Some(RequestBody::Payload(body.into()));
         self
+    }
+
+    pub async fn save(self, pool: &SqlitePool) -> Result<(), Error> {
+        let db_req: DbRequest = self.into();
+        sqlx::query(
+            "INSERT INTO requests
+                (name, method, url, headers, body_kind, body)
+                VALUES (?, ?, ?, ?, ?, ?);",
+        )
+        .bind(db_req.name.as_str())
+        .bind(db_req.method.as_str())
+        .bind(db_req.url.as_str())
+        .bind(db_req.headers.as_str())
+        .bind(&db_req.body_kind)
+        .bind(&db_req.body)
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 }
 

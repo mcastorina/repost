@@ -108,7 +108,7 @@ mod test {
     #[tokio::test]
     async fn test_env_get_set() {
         let db = test_db().await;
-        let env: DbEnvironment = Environment::new("foo").into();
+        let env = Environment::new("foo");
         env.save(db.pool()).await.expect("could not set");
 
         let got: Environment = sqlx::query_as("SELECT * FROM environments")
@@ -122,14 +122,19 @@ mod test {
     async fn test_var_get_set() {
         let db = test_db().await;
         let var = Variable::new("foo", "env", "value", "source");
-        let db_var: DbVariable = var.clone().into();
-        db_var.save(db.pool()).await.expect("could not set");
+        var.clone().save(db.pool()).await.expect("could not set");
 
         let got: DbVariable = sqlx::query_as("SELECT * FROM variables")
             .fetch_one(db.pool())
             .await
             .expect("could not get");
-        let got: Variable = got.into();
+        let mut got: Variable = got.into();
+
+        // when we get a variable from the database, it's ID will be set
+        assert!(got.id.is_some());
+
+        // set to None for the rest of the comparison
+        got.id = None;
         assert_eq!(got, var);
     }
 
@@ -139,8 +144,7 @@ mod test {
         let req = Request::new("name", "method", "url")
             .header("foo", "bar")
             .body("baz");
-        let db_req: DbRequest = req.clone().into();
-        db_req.save(db.pool()).await.expect("could not set");
+        req.clone().save(db.pool()).await.expect("could not set");
 
         let got: DbRequest = sqlx::query_as("SELECT * FROM requests")
             .fetch_one(db.pool())
