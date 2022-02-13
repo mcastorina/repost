@@ -136,6 +136,7 @@ impl Request {
 
     pub async fn save(self, pool: &SqlitePool) -> Result<(), Error> {
         let db_req: DbRequest = self.into();
+        // TODO: update on conflict
         sqlx::query(
             "INSERT INTO requests
                 (name, method, url, headers, body_kind, body)

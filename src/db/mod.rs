@@ -3,6 +3,8 @@ pub mod models;
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{self, Error, Sqlite, SqlitePool};
 
+use std::path::{Path, PathBuf};
+
 /// Db object for describing the current workspace and storing all
 /// data in. This struct uses a sqlite database to store objects to.
 pub struct Db {
@@ -10,6 +12,7 @@ pub struct Db {
     pub name: String,
 
     /// Path to sqlite database file
+    // TODO: use PathBuf (blocked by custom Errors)
     path: String,
 
     /// Pool of connections
@@ -88,7 +91,7 @@ impl Db {
 
 #[cfg(test)]
 mod test {
-    use super::models::{DbEnvironment, DbRequest, DbVariable, Environment, Request, Variable};
+    use super::models::{DbRequest, DbVariable, Environment, Request, Variable};
     use super::Db;
     use std::convert::TryInto;
 
