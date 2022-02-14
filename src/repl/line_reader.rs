@@ -9,6 +9,8 @@ use shlex;
 use crate::db::models::Environment;
 use crate::db::Db;
 
+use tokio::runtime::Handle;
+
 pub struct LineReader {
     reader: Editor<CommandCompleter>,
 }
@@ -29,7 +31,7 @@ impl LineReader {
     pub fn set_completer(&mut self, app: &App<'static>, db: &Db) {
         self.reader.set_helper(Some(CommandCompleter {
             app: app.clone(),
-            db: Some(db.clone()),
+            db: db.clone(),
         }));
     }
 
@@ -63,7 +65,7 @@ impl LineReader {
 #[derive(Helper, Validator, Highlighter, Hinter)]
 struct CommandCompleter {
     app: App<'static>,
-    db: Option<Db>,
+    db: Db,
 }
 
 impl Completer for CommandCompleter {
@@ -91,16 +93,20 @@ impl Completer for CommandCompleter {
             app = child.unwrap();
         }
         // TODO: flags and db queries
-        // if let Some(db) = &self.db {
-        //     let pool = db.pool().clone();
-        //     tokio::spawn(async move {
-        //         let got: Vec<Environment> = sqlx::query_as("SELECT * FROM environments")
-        //             .fetch_all(&pool)
-        //             .await
-        //             .expect("could not get");
-        //         dbg!(got);
-        //     });
-        // }
+        // use message passing to get a result?
+        {
+            let pool = self.db.pool().clone();
+            let envs = tokio::task::block_in_place(move || {
+                Handle::current().block_on(async {
+                    let got: Vec<Environment> = sqlx::query_as("SELECT * FROM environments")
+                        .fetch_all(&pool)
+                        .await
+                        .expect("could not get");
+                    got
+                })
+            });
+            dbg!(envs);
+        }
         let candidates: Vec<&str> = app
             .get_subcommands()
             .map(|x| x.get_name())

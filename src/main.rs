@@ -6,7 +6,7 @@ async fn main() {
     let mut input = String::new();
 
     loop {
-        if repl.get_input(&mut input).await.is_none() {
+        if repl.get_input(&mut input).is_none() {
             break;
         }
 

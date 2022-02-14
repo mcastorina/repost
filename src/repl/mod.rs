@@ -32,7 +32,7 @@ impl Repl {
         }
     }
 
-    pub async fn get_input(&mut self, input: &mut String) -> Option<()> {
+    pub fn get_input(&mut self, input: &mut String) -> Option<()> {
         self.line_reader.read_line(input, "> ")
     }
 
