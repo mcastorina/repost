@@ -6,21 +6,31 @@ use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use clap::App;
 use shlex;
 
+use crate::db::models::Environment;
+use crate::db::Db;
+
 pub struct LineReader {
     reader: Editor<CommandCompleter>,
 }
 
 impl LineReader {
-    pub fn new(app: App<'static>) -> Self {
+    pub fn new() -> Self {
         let config = Config::builder()
             .completion_type(CompletionType::List)
             .edit_mode(EditMode::Vi)
             .output_stream(OutputStreamType::Stdout)
             .build();
 
-        let mut rl: Editor<CommandCompleter> = Editor::with_config(config);
-        rl.set_helper(Some(CommandCompleter { app }));
-        Self { reader: rl }
+        Self {
+            reader: Editor::with_config(config),
+        }
+    }
+
+    pub fn set_completer(&mut self, app: &App<'static>, db: &Db) {
+        self.reader.set_helper(Some(CommandCompleter {
+            app: app.clone(),
+            db: Some(db.clone()),
+        }));
     }
 
     pub fn read_line(&mut self, input: &mut String, prompt: &str) -> Option<()> {
@@ -53,6 +63,7 @@ impl LineReader {
 #[derive(Helper, Validator, Highlighter, Hinter)]
 struct CommandCompleter {
     app: App<'static>,
+    db: Option<Db>,
 }
 
 impl Completer for CommandCompleter {
@@ -80,6 +91,16 @@ impl Completer for CommandCompleter {
             app = child.unwrap();
         }
         // TODO: flags and db queries
+        // if let Some(db) = &self.db {
+        //     let pool = db.pool().clone();
+        //     tokio::spawn(async move {
+        //         let got: Vec<Environment> = sqlx::query_as("SELECT * FROM environments")
+        //             .fetch_all(&pool)
+        //             .await
+        //             .expect("could not get");
+        //         dbg!(got);
+        //     });
+        // }
         let candidates: Vec<&str> = app
             .get_subcommands()
             .map(|x| x.get_name())

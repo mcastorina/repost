@@ -6,11 +6,11 @@ use clap::{AppSettings, Parser, Subcommand};
 #[clap(global_setting(AppSettings::DisableVersionFlag))]
 pub struct Command {
     #[clap(subcommand)]
-    command: Cmd,
+    pub command: Cmd,
 }
 
 #[derive(Debug, Subcommand)]
-enum Cmd {
+pub enum Cmd {
     #[clap(subcommand)]
     Print(PrintCmd),
 }
@@ -19,7 +19,7 @@ enum Cmd {
 #[clap(about = "Print resources")]
 #[clap(visible_aliases = &["get", "show", "p"])]
 #[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
-enum PrintCmd {
+pub enum PrintCmd {
     Requests(PrintRequestsCmd),
     Variables(PrintVariablesCmd),
     Environments(PrintEnvironmentsCmd),
@@ -29,19 +29,19 @@ enum PrintCmd {
 #[derive(Debug, Parser)]
 #[clap(about = "Print requests")]
 #[clap(visible_aliases = &["request", "reqs", "req", "r"])]
-struct PrintRequestsCmd {}
+pub struct PrintRequestsCmd {}
 
 #[derive(Debug, Parser)]
 #[clap(about = "Print variables")]
 #[clap(visible_aliases = &["variable", "vars", "var", "v"])]
-struct PrintVariablesCmd {}
+pub struct PrintVariablesCmd {}
 
 #[derive(Debug, Parser)]
 #[clap(about = "Print environments")]
 #[clap(visible_aliases = &["environment", "envs", "env", "e"])]
-struct PrintEnvironmentsCmd {}
+pub struct PrintEnvironmentsCmd {}
 
 #[derive(Debug, Parser)]
 #[clap(about = "Print workspaces")]
 #[clap(visible_aliases = &["workspace", "ws", "w"])]
-struct PrintWorkspacesCmd {}
+pub struct PrintWorkspacesCmd {}

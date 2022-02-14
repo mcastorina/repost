@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 /// Db object for describing the current workspace and storing all
 /// data in. This struct uses a sqlite database to store objects to.
+#[derive(Clone)]
 pub struct Db {
     /// Name of the workspace
     pub name: String,
