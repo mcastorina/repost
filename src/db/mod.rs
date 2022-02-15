@@ -90,6 +90,54 @@ impl Db {
     }
 }
 
+// Macros to make querying more ergonomic
+// TODO: make generic over a type
+
+macro_rules! query_as_environment {
+    ($query:expr) => {{
+        let got: Vec<crate::db::models::DbEnvironment> = $query;
+        crate::db::vec_into!(got, crate::db::models::Environment)
+    }};
+}
+pub(crate) use query_as_environment;
+
+macro_rules! query_as_variable {
+    ($query:expr) => {{
+        let got: Vec<crate::db::models::DbVariable> = $query;
+        crate::db::vec_into!(got, crate::db::models::Variable)
+    }};
+}
+pub(crate) use query_as_variable;
+
+macro_rules! query_as_request {
+    ($query:expr) => {{
+        let got: Vec<crate::db::models::DbRequest> = $query;
+        crate::db::vec_into!(got, crate::db::models::Request)
+    }};
+}
+pub(crate) use query_as_request;
+
+// Convert a Vector<DbObject> into a Vector<Object>
+// and log errors to stderr, as this indicates a corrupted
+// or improperly migrated database.
+macro_rules! vec_into {
+    ($got:expr, $kind:ty) => {
+        $got.into_iter()
+            .filter_map(|db_obj| {
+                let obj: Result<$kind, _> = db_obj.try_into();
+                match obj {
+                    Ok(obj) => Some(obj),
+                    Err(err) => {
+                        eprintln!("Error converting DbObject into Object: {:?}", err);
+                        None
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+}
+pub(crate) use vec_into;
+
 #[cfg(test)]
 mod test {
     use super::models::{DbRequest, DbVariable, Environment, Request, Variable};

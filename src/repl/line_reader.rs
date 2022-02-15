@@ -28,9 +28,9 @@ impl LineReader {
         }
     }
 
-    pub fn set_completer(&mut self, app: &App<'static>, db: &Db) {
+    pub fn set_completer(&mut self, app: App<'static>, db: &Db) {
         self.reader.set_helper(Some(CommandCompleter {
-            app: app.clone(),
+            app,
             db: db.clone(),
         }));
     }
@@ -105,7 +105,7 @@ impl Completer for CommandCompleter {
                     got
                 })
             });
-            dbg!(envs);
+            // dbg!(envs);
         }
         let candidates: Vec<&str> = app
             .get_subcommands()
