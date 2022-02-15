@@ -95,11 +95,10 @@ impl Completer for CommandCompleter {
         // TODO: flags and db queries
         // use message passing to get a result?
         {
-            let pool = self.db.pool().clone();
-            let envs = tokio::task::block_in_place(move || {
+            let envs = tokio::task::block_in_place(|| {
                 Handle::current().block_on(async {
                     let got: Vec<Environment> = sqlx::query_as("SELECT * FROM environments")
-                        .fetch_all(&pool)
+                        .fetch_all(self.db.pool())
                         .await
                         .expect("could not get");
                     got

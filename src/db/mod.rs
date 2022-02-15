@@ -1,8 +1,9 @@
 pub mod models;
 
 use sqlx::migrate::MigrateDatabase;
-use sqlx::{self, Error, Sqlite, SqlitePool};
+use sqlx::{self, Sqlite, SqlitePool};
 
+use crate::error::Result;
 use std::path::{Path, PathBuf};
 
 /// Db object for describing the current workspace and storing all
@@ -23,7 +24,7 @@ pub struct Db {
 impl Db {
     /// Open new connection to `path` and create it if it does
     /// not exist.
-    pub async fn new<T, U>(name: T, path: U) -> Result<Self, Error>
+    pub async fn new<T, U>(name: T, path: U) -> Result<Self>
     where
         T: Into<String>,
         U: Into<String>,
@@ -40,7 +41,7 @@ impl Db {
 
     /// Set the workspace to `name` and create `name.db` if it does
     /// not exist.
-    pub async fn set_workspace(&mut self, name: &str) -> Result<(), Error> {
+    pub async fn set_workspace(&mut self, name: &str) -> Result<()> {
         *self = Self::new(name, format!("{}.db", name)).await?;
         Ok(())
     }
@@ -54,7 +55,7 @@ impl Db {
     /// Try to load the connection pool from a path to the sqlite
     /// database file. This function creates the database file if
     /// it does not exist.
-    async fn load_pool(path: &str) -> Result<SqlitePool, Error> {
+    async fn load_pool(path: &str) -> Result<SqlitePool> {
         if !Sqlite::database_exists(path).await? {
             Sqlite::create_database(path).await?
         }
@@ -62,7 +63,7 @@ impl Db {
     }
 
     /// Try to create all tables required in the database file.
-    async fn create_tables(&self) -> Result<(), Error> {
+    async fn create_tables(&self) -> Result<()> {
         sqlx::query(
             "
             CREATE TABLE IF NOT EXISTS environments (name TEXT PRIMARY KEY NOT NULL);
@@ -129,7 +130,7 @@ macro_rules! vec_into {
     ($got:expr, $kind:ty) => {
         $got.into_iter()
             .filter_map(|db_obj| {
-                let obj: Result<$kind, _> = db_obj.try_into();
+                let obj: std::result::Result<$kind, _> = db_obj.try_into();
                 match obj {
                     Ok(obj) => Some(obj),
                     Err(err) => {

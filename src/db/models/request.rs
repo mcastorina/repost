@@ -1,7 +1,8 @@
 use super::variable::VarString;
+use crate::error::Error;
 use reqwest::{Body, Method};
 use serde_json;
-use sqlx::{Error, FromRow, SqlitePool};
+use sqlx::{FromRow, SqlitePool};
 use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug, FromRow, PartialEq)]
@@ -134,7 +135,7 @@ impl Request {
         self
     }
 
-    pub async fn save(self, pool: &SqlitePool) -> Result<(), Error> {
+    pub async fn save(self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
         let db_req: DbRequest = self.into();
         // TODO: update on conflict
         sqlx::query(
@@ -155,9 +156,9 @@ impl Request {
 }
 
 impl TryFrom<DbRequest> for Request {
-    type Error = ();
+    type Error = Error;
     fn try_from(req: DbRequest) -> Result<Self, Self::Error> {
-        let headers = serde_json::from_str(&req.headers).map_err(|_| ())?;
+        let headers = serde_json::from_str(&req.headers)?;
         let body_kind = req.body_kind.as_deref();
         let body = req
             .body
@@ -165,15 +166,14 @@ impl TryFrom<DbRequest> for Request {
                 Some("raw") => Ok(RequestBody::Blob(body)),
                 Some("var") => String::from_utf8(body)
                     .map(|b| RequestBody::Payload(b.into()))
-                    .map_err(|_| "not UTF-8"),
-                Some(_) => Err("expected 'raw' or 'var' body kind"),
-                None => Err("found body, but missing it's kind"),
+                    .map_err(|e| e.into()),
+                Some(k) => Err(Error::InvalidBodyKind(k.to_string())),
+                None => Err(Error::MissingBodyKind),
             })
-            .transpose()
-            .map_err(|_| ())?;
+            .transpose()?;
         Ok(Self {
             name: req.name.into(),
-            method: req.method.parse().map_err(|_| ())?,
+            method: req.method.parse()?,
             url: req.url.into(),
             headers,
             body,

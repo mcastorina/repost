@@ -8,6 +8,8 @@ use command::{Cmd, Command, PrintCmd};
 use line_reader::LineReader;
 use std::convert::TryInto;
 
+use crate::error::Result;
+
 /// Repl object for handling readline editing, a database,
 /// and executing commands.
 pub struct Repl {
@@ -17,16 +19,13 @@ pub struct Repl {
 
 impl Repl {
     /// Create a new Repl struct with a Db and LineReader struct.
-    pub async fn new() -> Self {
+    pub async fn new() -> Result<Self> {
         let mut app = Command::into_app();
         app._build_all();
-        let db = Db::new("repost", "/tmp/repost.db").await.unwrap();
+        let db = Db::new("repost", "/tmp/repost.db").await?;
         let mut editor = LineReader::new();
         editor.set_completer(app, &db);
-        Self {
-            editor,
-            db,
-        }
+        Ok(Self { editor, db })
     }
 
     /// Read stdin into input using the LineReader.
@@ -36,7 +35,7 @@ impl Repl {
     }
 
     /// Execute a command line.
-    pub async fn execute(&mut self, input: &str) -> Result<(), clap::Error> {
+    pub async fn execute(&mut self, input: &str) -> Result<()> {
         let args = shlex::split(input).unwrap_or_default();
         // TODO: this may not always be a Command struct (for context-aware commands)
         let cmd = Command::try_parse_from(args)?;
