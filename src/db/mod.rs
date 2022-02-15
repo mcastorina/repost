@@ -93,6 +93,8 @@ impl Db {
 // Macros to make querying more ergonomic
 // TODO: make generic over a type
 
+/// Convenience macro for querying for environments and converting
+/// from a Vec<DbEnvironment> to a Vec<Environment>.
 macro_rules! query_as_environment {
     ($query:expr) => {{
         let got: Vec<crate::db::models::DbEnvironment> = $query;
@@ -101,6 +103,8 @@ macro_rules! query_as_environment {
 }
 pub(crate) use query_as_environment;
 
+/// Convenience macro for querying for variables and converting
+/// from a Vec<DbVariable> to a Vec<Variable>.
 macro_rules! query_as_variable {
     ($query:expr) => {{
         let got: Vec<crate::db::models::DbVariable> = $query;
@@ -109,6 +113,8 @@ macro_rules! query_as_variable {
 }
 pub(crate) use query_as_variable;
 
+/// Convenience macro for querying for requests and converting
+/// from a Vec<DbRequest> to a Vec<Request>.
 macro_rules! query_as_request {
     ($query:expr) => {{
         let got: Vec<crate::db::models::DbRequest> = $query;
@@ -117,9 +123,8 @@ macro_rules! query_as_request {
 }
 pub(crate) use query_as_request;
 
-// Convert a Vector<DbObject> into a Vector<Object>
-// and log errors to stderr, as this indicates a corrupted
-// or improperly migrated database.
+/// Convert a Vector<DbObject> into a Vector<Object> and log errors to stderr, as this indicates a
+/// corrupted or improperly migrated database. Requires importing std::convert::TryInto trait.
 macro_rules! vec_into {
     ($got:expr, $kind:ty) => {
         $got.into_iter()
