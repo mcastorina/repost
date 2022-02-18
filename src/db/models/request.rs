@@ -1,4 +1,5 @@
 use super::variable::VarString;
+use super::DisplayTable;
 use crate::error::Error;
 use reqwest::{Body, Method};
 use serde_json;
@@ -18,13 +19,6 @@ pub struct DbRequest {
 
 impl From<Request> for DbRequest {
     fn from(req: Request) -> Self {
-        let kind = |rb: &RequestBody| {
-            match rb {
-                RequestBody::Blob(_) => "raw",
-                RequestBody::Payload(_) => "var",
-            }
-            .to_string()
-        };
         Self {
             name: req.name.into(),
             method: req.method.to_string(),
@@ -33,7 +27,7 @@ impl From<Request> for DbRequest {
             // `T` contains a map with non-string keys. We are serializing a vector of tuples with
             // known types, which should never fail and can be safely unwrapped.
             headers: serde_json::to_string(&req.headers).unwrap(),
-            body_kind: req.body.as_ref().map(kind),
+            body_kind: req.body.as_ref().map(|b| b.kind().to_string()),
             body: req.body.map(|body| body.as_bytes()),
         }
     }
@@ -66,6 +60,13 @@ impl RequestBody {
         match self {
             Self::Blob(body) => body,
             Self::Payload(v) => v.to_string().as_bytes().to_owned(),
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        match &self {
+            RequestBody::Blob(_) => "raw",
+            RequestBody::Payload(_) => "var",
         }
     }
 }
@@ -178,6 +179,65 @@ impl TryFrom<DbRequest> for Request {
             headers,
             body,
         })
+    }
+}
+
+// impl DisplayTable for Request {
+//     const HEADER: &'static [&'static str] = &["name", "method", "url", "headers", "body?"];
+
+//     fn fmt(&self) -> Vec<Cell> {
+//         let headers = self
+//             .headers
+//             .iter()
+//             .flat_map(|(k, v)| [k.as_str(), ": ", v.as_str()])
+//             .fold(String::new(), |s, h| s + h + "\n");
+//         let headers = headers.trim();
+
+//         vec![
+//             Cell::new(&self.name),
+//             Cell::new(&self.method),
+//             Cell::new(&self.url),
+//             Cell::new(headers),
+//             Cell::new(&self.body.as_ref().map(|b| b.kind()).unwrap_or_default()),
+//         ]
+//     }
+// }
+
+pub struct Requests(pub Vec<Request>);
+
+use comfy_table::{Cell, Table};
+use std::fmt::{self, Display, Formatter};
+impl Display for Requests {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        // generate table
+        let mut table = Table::new();
+        table
+            .load_preset(super::format::TABLE_FORMAT)
+            .set_table_width(80)
+            .set_header(vec!["name", "method", "url", "headers", "body?"]);
+        // add rows from the vector
+        for req in self.0.iter() {
+            let headers = req
+                .headers
+                .iter()
+                .flat_map(|(k, v)| [k.as_str(), ": ", v.as_str()])
+                .fold(String::new(), |s, h| s + h + "\n");
+            let headers = headers.trim();
+            table.add_row(vec![
+                Cell::new(&req.name),
+                Cell::new(&req.method),
+                Cell::new(&req.url),
+                Cell::new(headers),
+                Cell::new(&req.body.as_ref().map(|b| b.kind()).unwrap_or_default()),
+            ]);
+        }
+        // print a blank line
+        writeln!(f)?;
+        // indent each row by two spaces
+        for line in table.to_string().split('\n') {
+            writeln!(f, "  {}", line)?;
+        }
+        Ok(())
     }
 }
 

@@ -123,6 +123,12 @@ pub struct VarString {
     vars: HashSet<String>,
 }
 
+impl VarString {
+    pub fn as_str(&self) -> &str {
+        self.source.as_str()
+    }
+}
+
 impl<T> From<T> for VarString
 where
     T: Into<String>,

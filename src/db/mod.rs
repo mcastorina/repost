@@ -3,18 +3,14 @@ pub mod models;
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{self, Sqlite, SqlitePool};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use std::path::{Path, PathBuf};
 
 /// Db object for describing the current workspace and storing all
 /// data in. This struct uses a sqlite database to store objects to.
 #[derive(Clone)]
 pub struct Db {
-    /// Name of the workspace
-    pub name: String,
-
-    /// Path to sqlite database file
-    // TODO: use PathBuf (blocked by custom Errors)
+    /// Sqlite database path string
     path: String,
 
     /// Pool of connections
@@ -24,26 +20,17 @@ pub struct Db {
 impl Db {
     /// Open new connection to `path` and create it if it does
     /// not exist.
-    pub async fn new<T, U>(name: T, path: U) -> Result<Self>
+    pub async fn new<P>(path: P) -> Result<Self>
     where
-        T: Into<String>,
-        U: Into<String>,
+        P: Into<String>,
     {
         let path = path.into();
-        let mut db = Self {
+        let db = Self {
             pool: Db::load_pool(&path).await?,
-            name: name.into(),
             path,
         };
         db.create_tables().await?;
         Ok(db)
-    }
-
-    /// Set the workspace to `name` and create `name.db` if it does
-    /// not exist.
-    pub async fn set_workspace(&mut self, name: &str) -> Result<()> {
-        *self = Self::new(name, format!("{}.db", name)).await?;
-        Ok(())
     }
 
     /// Return a reference to the connection pool for executing sqlite
@@ -54,7 +41,8 @@ impl Db {
 
     /// Try to load the connection pool from a path to the sqlite
     /// database file. This function creates the database file if
-    /// it does not exist.
+    /// it does not exist. In addition to filepaths, path may also
+    /// represent an in-memory connection such as `file:db?mode=memory`.
     async fn load_pool(path: &str) -> Result<SqlitePool> {
         if !Sqlite::database_exists(path).await? {
             Sqlite::create_database(path).await?

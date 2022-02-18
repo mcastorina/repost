@@ -8,6 +8,7 @@ use command::{Cmd, Command, PrintCmd};
 use line_reader::LineReader;
 use std::convert::TryInto;
 
+use crate::db::models::DisplayTable;
 use crate::error::Result;
 
 /// Repl object for handling readline editing, a database,
@@ -22,7 +23,7 @@ impl Repl {
     pub async fn new() -> Result<Self> {
         let mut app = Command::into_app();
         app._build_all();
-        let db = Db::new("repost", "/tmp/repost.db").await?;
+        let db = Db::new("/tmp/repost.db").await?;
         let mut editor = LineReader::new();
         editor.set_completer(app, &db);
         Ok(Self { editor, db })
@@ -41,28 +42,31 @@ impl Repl {
         let cmd = Command::try_parse_from(args)?;
         match cmd.command {
             Cmd::Print(PrintCmd::Requests(_)) => {
-                let got = db::query_as_request!(sqlx::query_as("SELECT * FROM requests")
-                    .fetch_all(self.db.pool())
-                    .await
-                    // FIXME: error handling
-                    .expect("could not get"));
-                dbg!(got);
+                let got = db::query_as_request!(
+                    sqlx::query_as("SELECT * FROM requests")
+                        .fetch_all(self.db.pool())
+                        .await?
+                );
+                // got is Vec<Request>
+                // got.as_table() is a Wrapper(Vec<Request>)
+                // Wrapper(Vec<Request>) impl Display
+                println!("{}", crate::db::models::Requests(got));
             }
             Cmd::Print(PrintCmd::Variables(_)) => {
-                let got = db::query_as_variable!(sqlx::query_as("SELECT * FROM variables")
-                    .fetch_all(self.db.pool())
-                    .await
-                    // FIXME: error handling
-                    .expect("could not get"));
+                let got = db::query_as_variable!(
+                    sqlx::query_as("SELECT * FROM variables")
+                        .fetch_all(self.db.pool())
+                        .await?
+                );
                 dbg!(got);
             }
             Cmd::Print(PrintCmd::Environments(_)) => {
-                let got = db::query_as_environment!(sqlx::query_as("SELECT * FROM environments")
-                    .fetch_all(self.db.pool())
-                    .await
-                    // FIXME: error handling
-                    .expect("could not get"));
-                dbg!(got);
+                let got = db::query_as_environment!(
+                    sqlx::query_as("SELECT * FROM environments")
+                        .fetch_all(self.db.pool())
+                        .await?
+                );
+                println!("{}", crate::db::models::Environments(got));
             }
             Cmd::Print(PrintCmd::Workspaces(_)) => {}
         }
