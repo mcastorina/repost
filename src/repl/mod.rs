@@ -47,10 +47,7 @@ impl Repl {
                         .fetch_all(self.db.pool())
                         .await?
                 );
-                // got is Vec<Request>
-                // got.as_table() is a Wrapper(Vec<Request>)
-                // Wrapper(Vec<Request>) impl Display
-                println!("{}", crate::db::models::Requests(got));
+                got.print();
             }
             Cmd::Print(PrintCmd::Variables(_)) => {
                 let got = db::query_as_variable!(
@@ -58,7 +55,7 @@ impl Repl {
                         .fetch_all(self.db.pool())
                         .await?
                 );
-                dbg!(got);
+                got.print();
             }
             Cmd::Print(PrintCmd::Environments(_)) => {
                 let got = db::query_as_environment!(
@@ -66,7 +63,7 @@ impl Repl {
                         .fetch_all(self.db.pool())
                         .await?
                 );
-                println!("{}", crate::db::models::Environments(got));
+                got.print();
             }
             Cmd::Print(PrintCmd::Workspaces(_)) => {}
         }
