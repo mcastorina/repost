@@ -22,4 +22,10 @@ pub enum Error {
 
     #[error("InvalidMethod: {0}")]
     InvalidMethod(#[from] http::method::InvalidMethod),
+
+    #[error("ConfigError: Non-UTF-8 data directory found")]
+    ConfigDataToStr,
+
+    #[error("IOError: {0}")]
+    IOError(#[from] std::io::Error),
 }

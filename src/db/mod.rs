@@ -5,7 +5,6 @@ use sqlx::migrate::MigrateDatabase;
 use sqlx::{self, Sqlite, SqlitePool};
 
 use crate::error::{Error, Result};
-use std::path::{Path, PathBuf};
 
 /// Db object for describing the current workspace and storing all
 /// data in. This struct uses a sqlite database to store objects to.

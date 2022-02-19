@@ -1,9 +1,14 @@
-use repost::Repl;
 use repost::Result;
+use repost::{Repl, ReplConfig};
+
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut repl = Repl::new().await?;
+    let mut repl = Repl::new(ReplConfig {
+        data_dir: PathBuf::from("/tmp"),
+    })
+    .await?;
     let mut input = String::new();
 
     loop {
