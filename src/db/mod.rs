@@ -1,4 +1,5 @@
 pub mod models;
+pub use models::DisplayTable;
 
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{self, Sqlite, SqlitePool};

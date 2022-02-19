@@ -6,9 +6,7 @@ use crate::db::Db;
 use clap::{IntoApp, Parser};
 use command::{Cmd, Command, PrintCmd};
 use line_reader::LineReader;
-use std::convert::TryInto;
 
-use crate::db::models::DisplayTable;
 use crate::error::Result;
 
 /// Repl object for handling readline editing, a database,
@@ -40,33 +38,6 @@ impl Repl {
         let args = shlex::split(input).unwrap_or_default();
         // TODO: this may not always be a Command struct (for context-aware commands)
         let cmd = Command::try_parse_from(args)?;
-        match cmd.command {
-            Cmd::Print(PrintCmd::Requests(_)) => {
-                let got = db::query_as_request!(
-                    sqlx::query_as("SELECT * FROM requests")
-                        .fetch_all(self.db.pool())
-                        .await?
-                );
-                got.print();
-            }
-            Cmd::Print(PrintCmd::Variables(_)) => {
-                let got = db::query_as_variable!(
-                    sqlx::query_as("SELECT * FROM variables")
-                        .fetch_all(self.db.pool())
-                        .await?
-                );
-                got.print();
-            }
-            Cmd::Print(PrintCmd::Environments(_)) => {
-                let got = db::query_as_environment!(
-                    sqlx::query_as("SELECT * FROM environments")
-                        .fetch_all(self.db.pool())
-                        .await?
-                );
-                got.print();
-            }
-            Cmd::Print(PrintCmd::Workspaces(_)) => {}
-        }
-        Ok(())
+        cmd.execute(&self.db).await
     }
 }
