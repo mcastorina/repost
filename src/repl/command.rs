@@ -1,5 +1,6 @@
 use super::Repl;
 use crate::db::{self, DisplayTable};
+use crate::db::models::Request;
 use crate::error::Result;
 
 use std::convert::TryInto;
@@ -20,6 +21,8 @@ pub struct Command {
 pub enum Cmd {
     #[clap(subcommand)]
     Print(PrintCmd),
+    #[clap(subcommand)]
+    Create(CreateCmd),
 }
 
 #[derive(Debug, Subcommand)]
@@ -31,6 +34,15 @@ pub enum PrintCmd {
     Variables(PrintVariablesCmd),
     Environments(PrintEnvironmentsCmd),
     Workspaces(PrintWorkspacesCmd),
+}
+
+#[derive(Debug, Subcommand)]
+#[clap(about = "Print resources")]
+#[clap(visible_aliases = &["new", "add", "c"])]
+#[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
+pub enum CreateCmd {
+    Request(CreateRequestsCmd),
+    Variable(CreateVariablesCmd),
 }
 
 #[derive(Debug, Parser)]
@@ -53,6 +65,33 @@ pub struct PrintEnvironmentsCmd {}
 #[clap(visible_aliases = &["workspace", "ws", "w"])]
 pub struct PrintWorkspacesCmd {}
 
+#[derive(Debug, Parser)]
+#[clap(about = "Create request")]
+#[clap(visible_aliases = &["req", "r"])]
+pub struct CreateRequestsCmd {
+    #[clap(help = "Name of the request")]
+    name: String,
+
+    #[clap(help = "HTTP request URL")]
+    url: String,
+
+    #[clap(help = "HTTP request method (default inferred from name)")]
+    #[clap(long = "method")]
+    #[clap(short = 'm')]
+    method: Option<String>,
+
+    #[clap(help = "HTTP request headers")]
+    #[clap(long = "header")]
+    #[clap(short = 'H')]
+    // TODO: validator
+    headers: Vec<String>,
+}
+
+#[derive(Debug, Parser)]
+#[clap(about = "Create variables")]
+#[clap(visible_aliases = &["var", "v"])]
+pub struct CreateVariablesCmd {}
+
 impl Command {
     pub async fn execute(self, repl: &mut Repl) -> Result<()> {
         self.command.execute(repl).await
@@ -63,6 +102,7 @@ impl Cmd {
     pub async fn execute(self, repl: &mut Repl) -> Result<()> {
         match self {
             Self::Print(print) => print.execute(repl).await,
+            Self::Create(create) => create.execute(repl).await,
         }
     }
 }
@@ -123,5 +163,20 @@ impl<'w> DisplayTable for WorkspaceTable<'w> {
         for ws in &self.0 {
             table.add_row(&[ws]);
         }
+    }
+}
+
+impl CreateCmd {
+    pub async fn execute(self, repl: &mut Repl) -> Result<()> {
+        match self {
+            Self::Request(args) => {
+                dbg!(&args);
+                Request::new(args.name, "GET", args.url);
+            }
+            Self::Variable(args) => {
+                dbg!(args);
+            }
+        }
+        Ok(())
     }
 }

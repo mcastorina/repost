@@ -146,6 +146,15 @@ where
     }
 }
 
+use std::str::FromStr;
+use std::convert::Infallible;
+impl FromStr for VarString {
+    type Err = Infallible;
+    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+        Ok(s.into())
+    }
+}
+
 impl Display for VarString {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "{}", self.source)

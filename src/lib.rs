@@ -1,4 +1,3 @@
-mod cmd;
 mod db;
 mod error;
 mod repl;

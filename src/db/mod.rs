@@ -140,7 +140,7 @@ mod test {
 
     // create an in-memory database for testing
     async fn test_db() -> Db {
-        Db::new("testdb", "file:memdb?mode=memory&cache=shared")
+        Db::new("file:memdb?mode=memory&cache=shared")
             .await
             .expect("could not create database")
     }
