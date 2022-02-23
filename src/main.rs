@@ -20,5 +20,6 @@ async fn main() -> Result<()> {
             eprintln!("[!] {}", x);
         }
     }
+
     Ok(())
 }

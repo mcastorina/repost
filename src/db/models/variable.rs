@@ -146,8 +146,8 @@ where
     }
 }
 
-use std::str::FromStr;
 use std::convert::Infallible;
+use std::str::FromStr;
 impl FromStr for VarString {
     type Err = Infallible;
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {

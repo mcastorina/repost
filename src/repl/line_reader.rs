@@ -11,6 +11,9 @@ use crate::db::Db;
 
 use tokio::runtime::Handle;
 
+use super::Command;
+use clap::Parser;
+
 pub struct LineReader {
     reader: Editor<CommandCompleter>,
 }
@@ -84,14 +87,28 @@ impl Completer for CommandCompleter {
         last_token.pop().unwrap();
 
         // recurse through subcommands
-        let mut app = &self.app;
-        for tok in tokens {
-            let child = app.find_subcommand(&tok);
-            if child.is_none() {
-                return Ok((pos, vec![]));
+        // try to parse the command
+        let candidates: Vec<String> = if let Ok(cmd) = Command::try_parse_from(tokens.clone()) {
+            // cmd.arg_candidates(repl)
+            tokio::task::block_in_place(|| {
+                Handle::current().block_on(async { cmd.arg_candidates(&self.db).await })
+            })
+            .unwrap_or_default()
+        } else {
+            // otherwise find possible subcommands from App
+            let mut app = &self.app;
+            for tok in tokens {
+                // TODO: pattern match
+                let child = app.find_subcommand(&tok);
+                if child.is_none() {
+                    continue;
+                }
+                app = child.unwrap();
             }
-            app = child.unwrap();
-        }
+            app.get_subcommands()
+                .map(|x| x.get_name().to_string())
+                .collect()
+        };
         // TODO: flags and db queries
         // use message passing to get a result?
         {
@@ -106,18 +123,26 @@ impl Completer for CommandCompleter {
             });
             // dbg!(envs);
         }
-        let candidates: Vec<&str> = app
-            .get_subcommands()
-            .map(|x| x.get_name())
-            .filter(|x| x.starts_with(&last_token))
-            .collect();
+        // TODO:
+        // * check if the last_token starts with --
+        // * check if the last token starts with -
+        // * check if the last token starts with empty
+        //   * check for positional args
+        //   * check for options
+        // * delegate to sub-functions for special casing
+        //   * name will autocomplete to 'get-' 'create-' etc. (or names from DB)
+        //   * url will autocomplete to 'https://' (or urls from DB)
+        //   * --method will complete to case-insensitive GET, POST, etc.
+        //   * --header will complete to a list of common headers
+        // dbg!(app.get_opts().collect::<Vec<_>>());
         Ok((
             pos - last_token.len(),
             candidates
                 .into_iter()
+                .filter(|x| x.starts_with(&last_token))
                 .map(|cmd| Pair {
-                    display: String::from(cmd),
                     replacement: format!("{} ", cmd),
+                    display: cmd,
                 })
                 .collect(),
         ))

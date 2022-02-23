@@ -1,6 +1,6 @@
 use super::Repl;
-use crate::db::{self, DisplayTable};
 use crate::db::models::Request;
+use crate::db::{self, Db, DisplayTable};
 use crate::error::Result;
 
 use std::convert::TryInto;
@@ -10,7 +10,7 @@ use clap::{AppSettings, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[clap(setting(AppSettings::NoBinaryName))]
-#[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
+// #[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
 #[clap(global_setting(AppSettings::DisableVersionFlag))]
 pub struct Command {
     #[clap(subcommand)]
@@ -28,7 +28,7 @@ pub enum Cmd {
 #[derive(Debug, Subcommand)]
 #[clap(about = "Print resources")]
 #[clap(visible_aliases = &["get", "show", "p"])]
-#[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
+// #[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
 pub enum PrintCmd {
     Requests(PrintRequestsCmd),
     Variables(PrintVariablesCmd),
@@ -39,7 +39,7 @@ pub enum PrintCmd {
 #[derive(Debug, Subcommand)]
 #[clap(about = "Print resources")]
 #[clap(visible_aliases = &["new", "add", "c"])]
-#[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
+// #[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
 pub enum CreateCmd {
     Request(CreateRequestsCmd),
     Variable(CreateVariablesCmd),
@@ -70,10 +70,10 @@ pub struct PrintWorkspacesCmd {}
 #[clap(visible_aliases = &["req", "r"])]
 pub struct CreateRequestsCmd {
     #[clap(help = "Name of the request")]
-    name: String,
+    name: Option<String>,
 
     #[clap(help = "HTTP request URL")]
-    url: String,
+    url: Option<String>,
 
     #[clap(help = "HTTP request method (default inferred from name)")]
     #[clap(long = "method")]
@@ -96,6 +96,9 @@ impl Command {
     pub async fn execute(self, repl: &mut Repl) -> Result<()> {
         self.command.execute(repl).await
     }
+    pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        self.command.arg_candidates(db).await
+    }
 }
 
 impl Cmd {
@@ -103,6 +106,12 @@ impl Cmd {
         match self {
             Self::Print(print) => print.execute(repl).await,
             Self::Create(create) => create.execute(repl).await,
+        }
+    }
+    pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        match self {
+            Self::Print(print) => print.arg_candidates(db).await,
+            Self::Create(create) => create.arg_candidates(db).await,
         }
     }
 }
@@ -153,6 +162,9 @@ impl PrintCmd {
         }
         Ok(())
     }
+    pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        todo!()
+    }
 }
 
 struct WorkspaceTable<'w>(Vec<&'w str>);
@@ -166,17 +178,101 @@ impl<'w> DisplayTable for WorkspaceTable<'w> {
     }
 }
 
+use std::collections::HashSet;
+
 impl CreateCmd {
     pub async fn execute(self, repl: &mut Repl) -> Result<()> {
         match self {
             Self::Request(args) => {
                 dbg!(&args);
-                Request::new(args.name, "GET", args.url);
+                Request::new(
+                    args.name.unwrap_or_default(),
+                    "GET",
+                    args.url.unwrap_or_default(),
+                );
             }
             Self::Variable(args) => {
                 dbg!(args);
             }
         }
         Ok(())
+    }
+    pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        match self {
+            Self::Request(request) => request.arg_candidates(db).await,
+            Self::Variable(variable) => variable.arg_candidates(db).await,
+        }
+    }
+}
+impl CreateRequestsCmd {
+    pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        match (&self.name, &self.url) {
+            (None, _) => self.name_candidates(db).await,
+            (_, None) => self.url_candidates(db).await,
+            _ => Ok(vec![]),
+        }
+    }
+
+    async fn name_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        // candidates for NAME
+        let prefixes = &["create", "update", "get", "delete"];
+        let names: Vec<String> = sqlx::query_scalar("SELECT name FROM requests")
+            .fetch_all(db.pool())
+            .await?;
+        // candidates are of type {prefix}-{unique-names}
+        let name_set: HashSet<String> = names
+            .iter()
+            .filter_map(|full_name| full_name.split_once('-'))
+            .map(|(_, name)| name.to_string())
+            .collect();
+
+        if name_set.len() == 0 {
+            // TODO: use prefixes slice
+            return Ok(vec![
+                "create-".to_string(),
+                "update-".to_string(),
+                "get-".to_string(),
+                "delete-".to_string(),
+            ]);
+        }
+
+        // generate all names and do set difference with existing names
+        let candidates: HashSet<_> = prefixes
+            .iter()
+            .map(|prefix| {
+                name_set
+                    .iter()
+                    .map(move |name| format!("{}-{}", prefix, name))
+            })
+            .flatten()
+            .collect();
+
+        // TODO: lots of clones happening here which is probably unnecessary
+        Ok(candidates
+            .difference(&names.into_iter().collect())
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+    async fn url_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        let name_query = self
+            .name
+            .as_ref()
+            // if name is some (it should be), then query for requests that end in the same name
+            .and_then(|name| name.split_once('-').map(|(_, name)| format!("%-{}", name)))
+            // otherwise, get all urls
+            .unwrap_or_else(|| "%".to_string());
+
+        let candidates: Vec<String> =
+            sqlx::query_scalar("SELECT DISTINCT url FROM requests WHERE name LIKE ?")
+                .bind(name_query)
+                .fetch_all(db.pool())
+                .await?;
+        Ok(candidates)
+    }
+}
+impl CreateVariablesCmd {
+    pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        todo!()
     }
 }
