@@ -81,7 +81,15 @@ impl Completer for CommandCompleter {
         _ctx: &Context<'_>,
     ) -> Result<(usize, Vec<Self::Candidate>)> {
         // split line; add an extra character at the end to not ignore trailing whitespace
-        let mut tokens = shlex::split(&format!("{}_", &line[..pos])).unwrap_or_default();
+        let mut tokens = shlex::split(&format!("{}_", &line[..pos])).unwrap_or_else(|| {
+            // this may happen when there is an unbalanced quote
+            format!("{}_", &line[..pos])
+                .split(' ')
+                .into_iter()
+                // replace double with single quote because completions use single quote
+                .map(|s| s.replace('"', "'"))
+                .collect()
+        });
         let mut last_token = tokens.pop().unwrap_or_default();
         // remove the extra character
         last_token.pop().unwrap();
