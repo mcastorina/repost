@@ -11,7 +11,7 @@ use crate::db::Db;
 
 use tokio::runtime::Handle;
 
-use super::Command;
+use super::RootCmdCompleter;
 use clap::Parser;
 
 pub struct LineReader {
@@ -88,27 +88,28 @@ impl Completer for CommandCompleter {
 
         // recurse through subcommands
         // try to parse the command
-        let candidates: Vec<String> = if let Ok(cmd) = Command::try_parse_from(tokens.clone()) {
-            // cmd.arg_candidates(repl)
-            tokio::task::block_in_place(|| {
-                Handle::current().block_on(async { cmd.arg_candidates(&self.db).await })
-            })
-            .unwrap_or_default()
-        } else {
-            // otherwise find possible subcommands from App
-            let mut app = &self.app;
-            for tok in tokens {
-                // TODO: pattern match
-                let child = app.find_subcommand(&tok);
-                if child.is_none() {
-                    continue;
+        let candidates: Vec<String> =
+            if let Ok(cmd) = RootCmdCompleter::try_parse_from(tokens.clone()) {
+                // cmd.arg_candidates(repl)
+                tokio::task::block_in_place(|| {
+                    Handle::current().block_on(async { cmd.arg_candidates(&self.db).await })
+                })
+                .unwrap_or_default()
+            } else {
+                // otherwise find possible subcommands from App
+                let mut app = &self.app;
+                for tok in tokens {
+                    // TODO: pattern match
+                    let child = app.find_subcommand(&tok);
+                    if child.is_none() {
+                        continue;
+                    }
+                    app = child.unwrap();
                 }
-                app = child.unwrap();
-            }
-            app.get_subcommands()
-                .map(|x| x.get_name().to_string())
-                .collect()
-        };
+                app.get_subcommands()
+                    .map(|x| x.get_name().to_string())
+                    .collect()
+            };
         // TODO: flags and db queries
         // use message passing to get a result?
         {
