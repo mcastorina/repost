@@ -86,44 +86,54 @@ impl Completer for CommandCompleter {
         // remove the extra character
         last_token.pop().unwrap();
 
-        // recurse through subcommands
-        // try to parse the command
+        // find possible subcommands from App
+        let mut app = &self.app;
+        for tok in &tokens {
+            match app.find_subcommand(tok) {
+                None => continue,
+                Some(child) => app = child,
+            }
+        }
+
         let candidates: Vec<String> =
-            if let Ok(cmd) = RootCmdCompleter::try_parse_from(tokens.clone()) {
-                // cmd.arg_candidates(repl)
-                tokio::task::block_in_place(|| {
-                    Handle::current().block_on(async { cmd.arg_candidates(&self.db).await })
-                })
-                .unwrap_or_default()
-            } else {
-                // otherwise find possible subcommands from App
-                let mut app = &self.app;
-                for tok in tokens {
-                    // TODO: pattern match
-                    let child = app.find_subcommand(&tok);
-                    if child.is_none() {
-                        continue;
-                    }
-                    app = child.unwrap();
+            // try to parse the command
+            if let Ok(cmd) = RootCmdCompleter::try_parse_from(&tokens) {
+                if last_token.starts_with('-') {
+                    // this is probably a flag or option, so we can get that from App
+                    // TODO: better completions
+                    app.get_opts().filter_map(|arg|
+                        arg.get_long().map(|long|
+                            format!("--{}", long)
+                        ).or(arg.get_short().map(|short|
+                            format!("-{}", short)
+                        ))
+                    ).collect()
+                } else {
+                    tokio::task::block_in_place(|| {
+                        Handle::current().block_on(async { cmd.arg_candidates(&self.db).await })
+                    })
+                    .unwrap_or_default()
                 }
+            } else {
+                // if the last word is an option
+                let last_word = tokens.last();
+                if last_word.filter(|s| s.starts_with('-')).is_some() {
+                    // try again without the last word
+                    if let Ok(cmd) = RootCmdCompleter::try_parse_from(&tokens[..tokens.len()-1]) {
+                        tokio::task::block_in_place(|| {
+                            Handle::current().block_on(async { cmd.opt_candidates(last_word.unwrap(), &self.db).await })
+                        })
+                        .unwrap_or_default()
+                    } else {
+                        todo!()
+                    }
+                } else {
+                // otherwise, use the current app subcommand names
                 app.get_subcommands()
                     .map(|x| x.get_name().to_string())
                     .collect()
+                }
             };
-        // TODO: flags and db queries
-        // use message passing to get a result?
-        {
-            let envs = tokio::task::block_in_place(|| {
-                Handle::current().block_on(async {
-                    let got: Vec<Environment> = sqlx::query_as("SELECT * FROM environments")
-                        .fetch_all(self.db.pool())
-                        .await
-                        .expect("could not get");
-                    got
-                })
-            });
-            // dbg!(envs);
-        }
         // TODO:
         // * check if the last_token starts with --
         // * check if the last token starts with -
@@ -135,7 +145,6 @@ impl Completer for CommandCompleter {
         //   * url will autocomplete to 'https://' (or urls from DB)
         //   * --method will complete to case-insensitive GET, POST, etc.
         //   * --header will complete to a list of common headers
-        // dbg!(app.get_opts().collect::<Vec<_>>());
         Ok((
             pos - last_token.len(),
             candidates

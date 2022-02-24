@@ -15,6 +15,9 @@ async fn main() -> Result<()> {
         if repl.get_input(&mut input).is_none() {
             break;
         }
+        if input == "" {
+            continue;
+        }
 
         if let Err(x) = repl.execute(&input).await {
             eprintln!("[!] {}", x);

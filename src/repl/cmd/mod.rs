@@ -130,6 +130,9 @@ impl RootCmdCompleter {
     pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
         self.command.arg_candidates(db).await
     }
+    pub async fn opt_candidates(&self, opt: &str, db: &Db) -> Result<Vec<String>> {
+        self.command.opt_candidates(opt, db).await
+    }
 }
 
 impl CmdCompleter {
@@ -139,10 +142,19 @@ impl CmdCompleter {
             Self::Create(create) => create.arg_candidates(db).await,
         }
     }
+    pub async fn opt_candidates(&self, opt: &str, db: &Db) -> Result<Vec<String>> {
+        match self {
+            Self::Print(print) => print.opt_candidates(opt, db).await,
+            Self::Create(create) => create.opt_candidates(opt, db).await,
+        }
+    }
 }
 
 impl PrintCmdCompleter {
     pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        todo!()
+    }
+    pub async fn opt_candidates(&self, opt: &str, db: &Db) -> Result<Vec<String>> {
         todo!()
     }
 }
@@ -152,6 +164,12 @@ impl CreateCmdCompleter {
         match self {
             Self::Request(request) => request.arg_candidates(db).await,
             Self::Variable(variable) => variable.arg_candidates(db).await,
+        }
+    }
+    pub async fn opt_candidates(&self, opt: &str, db: &Db) -> Result<Vec<String>> {
+        match self {
+            Self::Request(request) => request.opt_candidates(opt, db).await,
+            Self::Variable(variable) => variable.opt_candidates(opt, db).await,
         }
     }
 }

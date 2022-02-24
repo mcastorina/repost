@@ -28,4 +28,7 @@ pub enum Error {
 
     #[error("IOError: {0}")]
     IOError(#[from] std::io::Error),
+
+    #[error("ParseError: {0}")]
+    ParseError(&'static str),
 }

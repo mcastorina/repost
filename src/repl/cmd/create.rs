@@ -1,6 +1,6 @@
 use super::Repl;
-use crate::db::Db;
-use crate::error::Result;
+use crate::db::{self, Db};
+use crate::error::{Error, Result};
 
 use std::collections::HashSet;
 
@@ -30,7 +30,17 @@ pub struct CreateRequestCmd {
 
 impl CreateRequestCmd {
     pub async fn execute(self, repl: &mut Repl) -> Result<()> {
-        todo!()
+        // TODO: smart method inference
+        let method = self.method.unwrap_or_else(|| "GET".to_string());
+        let mut req = db::models::Request::new(self.name, method.as_str(), self.url);
+        for header in self.headers {
+            let (k, v) = header
+                .split_once(':')
+                .ok_or(Error::ParseError("Missing ':' in header string"))?;
+            req = req.header(k, v);
+        }
+        req.save(repl.db.pool()).await?;
+        Ok(())
     }
 }
 
@@ -64,7 +74,7 @@ pub struct CreateRequestCmdCompleter {
     #[clap(help = "HTTP request method (default inferred from name)")]
     #[clap(long = "method")]
     #[clap(short = 'm')]
-    method: Option<Option<String>>,
+    method: Option<String>,
 
     #[clap(help = "HTTP request headers")]
     #[clap(long = "header")]
@@ -77,6 +87,13 @@ impl CreateRequestCmdCompleter {
         match (&self.name, &self.url) {
             (None, _) => self.name_candidates(db).await,
             (_, None) => self.url_candidates(db).await,
+            _ => Ok(vec![]),
+        }
+    }
+    pub async fn opt_candidates(&self, opt: &str, db: &Db) -> Result<Vec<String>> {
+        match opt {
+            "-m" | "--method" => self.method_candidates(db).await,
+            "-H" | "--header" => self.header_candidates(db).await,
             _ => Ok(vec![]),
         }
     }
@@ -122,6 +139,7 @@ impl CreateRequestCmdCompleter {
             .cloned()
             .collect())
     }
+
     async fn url_candidates(&self, db: &Db) -> Result<Vec<String>> {
         let name_query = self
             .name
@@ -138,6 +156,44 @@ impl CreateRequestCmdCompleter {
                 .await?;
         Ok(candidates)
     }
+
+    async fn method_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        Ok(vec![
+            "GET".to_string(),
+            "POST".to_string(),
+            "PUT".to_string(),
+            "PATCH".to_string(),
+            "DELETE".to_string(),
+            "HEAD".to_string(),
+        ])
+    }
+
+    async fn header_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        // TODO: add some common headers, but prioritize headers already in the DB
+        let name_query = self
+            .name
+            .as_ref()
+            // if name is some, then query for requests that end in the same name
+            .and_then(|name| name.split_once('-').map(|(_, name)| format!("%-{}", name)))
+            // otherwise, get all headers
+            .unwrap_or_else(|| "%".to_string());
+
+        // TODO: do a set difference with headers we already have
+        let candidates = db::query_as_request!(
+            sqlx::query_as("SELECT * FROM requests WHERE name LIKE ?")
+                .bind(name_query)
+                .fetch_all(db.pool())
+                .await?
+        )
+        .into_iter()
+        .flat_map(|req| {
+            req.headers
+                .into_iter()
+                .map(|(k, v)| format!("'{}: {}'", k, v))
+        })
+        .collect();
+        Ok(candidates)
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -147,6 +203,9 @@ pub struct CreateVariableCmdCompleter {}
 
 impl CreateVariableCmdCompleter {
     pub async fn arg_candidates(&self, db: &Db) -> Result<Vec<String>> {
+        todo!()
+    }
+    pub async fn opt_candidates(&self, opt: &str, db: &Db) -> Result<Vec<String>> {
         todo!()
     }
 }
