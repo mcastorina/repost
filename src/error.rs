@@ -5,9 +5,6 @@ pub enum Error {
     #[error("DbError: {0}")]
     DbError(#[from] sqlx::Error),
 
-    #[error("ClapError: {0}")]
-    ClapError(#[from] clap::Error),
-
     #[error("JSONError: {0}")]
     JSONError(#[from] serde_json::Error),
 

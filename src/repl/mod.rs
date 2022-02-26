@@ -1,15 +1,12 @@
-mod cmd;
 mod config;
 mod line_reader;
+mod parser;
 
 pub use config::ReplConfig;
 
 use crate::db::Db;
 use crate::error::{Error, Result};
-use cmd::{RootCmd, RootCmdCompleter};
 use line_reader::LineReader;
-
-use clap::{IntoApp, Parser};
 
 /// Repl object for handling readline editing, a database,
 /// and executing commands.
@@ -25,12 +22,9 @@ impl Repl {
         // build db
         let path = conf.data_dir.join("repost.db");
         let db = Db::new(path.to_str().ok_or(Error::ConfigDataToStr)?).await?;
-        // build app for editor completions
-        let mut app = RootCmd::into_app();
-        app._build_all();
         // build editor
         let mut editor = LineReader::new();
-        editor.set_completer(app, &db);
+        editor.set_completer(&db);
 
         Ok(Self { conf, db, editor })
     }
@@ -43,9 +37,6 @@ impl Repl {
 
     /// Execute a command line.
     pub async fn execute(&mut self, input: &str) -> Result<()> {
-        let args = shlex::split(input).unwrap_or_default();
-        // TODO: this may not always be a Command struct (for context-aware commands)
-        let cmd = RootCmd::try_parse_from(args)?;
-        cmd.execute(self).await
+        todo!()
     }
 }
