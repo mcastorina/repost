@@ -1,15 +1,12 @@
 use nom::{
     branch::{alt, permutation},
-    bytes::complete::{
-        tag, take_till1,
-    },
+    bytes::complete::{escaped, escaped_transform, tag, take_till, take_till1, take_until},
     character::complete::{
-        alpha1, alphanumeric1, digit1, line_ending, not_line_ending, space0, space1,
+        alpha1, alphanumeric1, digit0, digit1, line_ending, none_of, not_line_ending, one_of,
+        space0, space1,
     },
-    character::{
-        is_space,
-    },
-    combinator::{map, map_res, opt, recognize, not, eof, all_consuming, peek, verify},
+    character::is_space,
+    combinator::{all_consuming, eof, map, map_res, not, opt, peek, recognize, value, verify},
     multi::{many0, separated_list0},
     sequence::{delimited, pair, preceded, terminated, tuple},
     IResult,
@@ -39,6 +36,14 @@ enum CmdKind {
 
     CreateRequest,
     CreateVariable,
+}
+
+fn eol(input: &str) -> IResult<&str, &str> {
+    alt((terminated(tag("--"), eow), eof))(input)
+}
+
+fn eow(input: &str) -> IResult<&str, &str> {
+    alt((space1, eof))(input)
 }
 
 fn print(input: &str) -> IResult<&str, &str> {
@@ -84,7 +89,9 @@ fn workspace(input: &str) -> IResult<&str, &str> {
 fn cmd_kind(input: &str) -> IResult<&str, CmdKind> {
     alt((
         map(tuple((print, space1, requests)), |_| CmdKind::PrintRequests),
-        map(tuple((print, space1, variables)), |_| CmdKind::PrintVariables),
+        map(tuple((print, space1, variables)), |_| {
+            CmdKind::PrintVariables
+        }),
         map(tuple((print, space1, environments)), |_| {
             CmdKind::PrintEnvironments
         }),
@@ -92,33 +99,46 @@ fn cmd_kind(input: &str) -> IResult<&str, CmdKind> {
             CmdKind::PrintWorkspaces
         }),
         map(tuple((create, space1, request)), |_| CmdKind::CreateRequest),
-        map(tuple((create, space1, variable)), |_| CmdKind::CreateVariable),
+        map(tuple((create, space1, variable)), |_| {
+            CmdKind::CreateVariable
+        }),
     ))(input)
 }
 
+fn any_string(input: &str) -> IResult<&str, &str> {
+    let esc_single = escaped(none_of("\\\'"), '\\', tag("'"));
+    let esc_double = escaped(none_of("\\\""), '\\', tag("\""));
+    let esc_space = escaped(none_of("\\ \t"), '\\', one_of(" \t"));
+    terminated(
+        alt((
+            delimited(tag("'"), alt((esc_single, tag(""))), tag("'")),
+            delimited(tag("\""), alt((esc_double, tag(""))), tag("\"")),
+            esc_space,
+        )),
+        eow,
+    )(input)
+}
+
 fn string(input: &str) -> IResult<&str, &str> {
-    // TODO: quoted strings
-    terminated(take_till1(|c| is_space(c as u8)), alt((space1, eof)))(input)
+    verify(any_string, |s: &str| !s.starts_with('-'))(input)
 }
 
 fn method_flag(input: &str) -> IResult<&str, &str> {
-    preceded(
-        tuple((alt((tag("--method"), tag("-m"))), space1)),
-        string
-    )(input)
+    preceded(tuple((alt((tag("--method"), tag("-m"))), space1)), string)(input)
 }
 
 fn create_request(input: &str) -> IResult<&str, CreateRequest> {
     let result = tuple((
-        create, space1, request, space1,
+        create, space1,
+        request, space1,
         permutation((
-            verify(string, |s: &str| !s.starts_with('-')), // name
-            verify(string, |s: &str| !s.starts_with('-')), // url
+            string, // name
+            string, // url
             opt(method_flag),
         )),
     ));
 
-    map(result, |(_, _, _, _, (name, url, method))| CreateRequest{
+    map(result, |(_, _, _, _, (name, url, method))| CreateRequest {
         name: name.to_string(),
         url: url.to_string(),
         method: method.map(|m| m.to_string()),
@@ -197,31 +217,45 @@ mod test {
 
     #[test]
     fn test_create_request() {
-        let without_method = CreateRequest{
+        let without_method = CreateRequest {
             name: "foo".to_string(),
             url: "bar".to_string(),
             method: None,
             headers: Vec::new(),
             body: None,
         };
-        assert_eq!(create_request("create req foo bar"), Ok(("", without_method.clone())));
-        assert_eq!(create_request("create req foo bar -m"), Ok(("-m", without_method.clone())));
+        assert_eq!(
+            create_request("create req foo bar"),
+            Ok(("", without_method.clone()))
+        );
+        assert_eq!(
+            create_request("create req foo bar -m"),
+            Ok(("-m", without_method.clone()))
+        );
 
-        let expected = CreateRequest{
+        let with_method = CreateRequest {
             name: "foo".to_string(),
             url: "bar".to_string(),
             method: Some("yay".to_string()),
             headers: Vec::new(),
             body: None,
         };
-        assert_eq!(create_request("create req foo bar -m yay"), Ok(("", expected.clone())));
-        assert_eq!(create_request("create req foo -m yay bar"), Ok(("", expected.clone())));
-        assert_eq!(create_request("create req -m yay foo bar"), Ok(("", expected.clone())));
+        assert_eq!(create_request("create req foo bar -m yay"), Ok(("", with_method.clone())));
+        assert_eq!(create_request("create req foo -m yay bar"), Ok(("", with_method.clone())));
+        assert_eq!(create_request("create req -m yay foo bar"), Ok(("", with_method.clone())));
     }
 
     #[test]
     fn test_string() {
         assert_eq!(string("foo"), Ok(("", "foo")));
+        assert_eq!(string("foo\\ bar"), Ok(("", "foo\\ bar")));
+        assert_eq!(string("foo\\  bar"), Ok(("bar", "foo\\ ")));
+        assert_eq!(string("'foo bar'"), Ok(("", "foo bar")));
+        assert_eq!(string(r#"'fo\'o'"#), Ok(("", r#"fo\'o"#)));
+        assert_eq!(string(r#""fo'o""#), Ok(("", r#"fo'o"#)));
+        assert_eq!(string(r#"'fo"o'"#), Ok(("", r#"fo"o"#)));
+        assert_eq!(string(r#""fo\"o""#), Ok(("", r#"fo\"o"#)));
+        assert_eq!(string(r#"''"#), Ok(("", "")));
         assert_eq!(string("foo "), Ok(("", "foo")));
         assert!(string(" foo ").is_err());
     }
