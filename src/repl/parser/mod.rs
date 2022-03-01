@@ -190,6 +190,121 @@ fn create_request(input: &str) -> IResult<&str, CreateRequest> {
     ))
 }
 
+use std::collections::HashMap;
+
+// Parse as much of the input as we can, given the legend.
+fn get_opts<'a>(
+    legend: &'static str,
+    input: &'a str,
+) -> IResult<&'a str, (HashMap<String, Option<String>>, Vec<String>)> {
+    let expects_value: HashMap<_, _> = legend
+        .split_ascii_whitespace()
+        .map(|entry| {
+            let mut name = entry.to_string();
+            if name.chars().last() == Some(':') {
+                name.pop();
+                (name, true)
+            } else {
+                (name, false)
+            }
+        })
+        .collect();
+
+    let mut rest = input;
+    let mut break_seen = false;
+    let mut args = Vec::new();
+    let mut opts = HashMap::new();
+    loop {
+        let s = any_string(rest);
+        if s.is_err() {
+            break;
+        }
+        let word;
+        (rest, word) = s.unwrap();
+
+        if break_seen {
+            args.push(word.to_string());
+            continue;
+        }
+        match kind(word) {
+            OptKind::Break => break_seen = true,
+            OptKind::None => args.push(word.to_string()),
+            OptKind::Long(s) | OptKind::Short(s) => {
+                if !expects_value.contains_key(&s) {
+                    // unexpected option: return an error or break?
+                    break;
+                }
+                // we can unwrap here because we check for contains_key first
+                if *expects_value.get(&s).unwrap() {
+                    if let Ok((r, value)) = string(rest) {
+                        rest = r;
+                        opts.insert(s, Some(value.to_string()));
+                    } else {
+                        // flag expects value but no value given
+                        break;
+                    }
+                } else {
+                    opts.insert(s, None);
+                }
+            }
+            OptKind::MultiShort(s) => {
+                todo!()
+            }
+        }
+    }
+    Ok((rest, (opts, args)))
+}
+
+fn long_opt(input: &str) -> IResult<&str, &str> {
+    preceded(tag("--"), string)(input)
+}
+
+fn short_opt(input: &str) -> IResult<&str, &str> {
+    preceded(tag("-"), verify(string, |s: &str| s.len() == 1))(input)
+}
+
+fn multi_short_opt(input: &str) -> IResult<&str, &str> {
+    preceded(tag("-"), string)(input)
+}
+
+fn break_opt(input: &str) -> IResult<&str, ()> {
+    value((), tuple((tag("--"), eow)))(input)
+}
+
+enum OptKind {
+    Long(String),
+    Short(String),
+    MultiShort(String),
+    Break,
+    None,
+}
+
+fn kind(s: &str) -> OptKind {
+    let mut iter = s.chars();
+    match (iter.next(), iter.next()) {
+        (Some('-'), Some('-')) => {
+            let s: String = iter.collect();
+            if s.len() == 0 {
+                OptKind::Break
+            } else {
+                OptKind::Long(s)
+            }
+        }
+        (Some('-'), Some(c)) => {
+            let mut s: String = iter.collect();
+            if s.len() == 0 {
+                OptKind::Short(c.to_string())
+            } else {
+                // prefix the already consumed char
+                s.insert(0, c);
+                OptKind::MultiShort(s)
+            }
+        }
+        (Some(_), _) => OptKind::None,
+        _ => unreachable!("kind should always be given a non-empty string"),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
