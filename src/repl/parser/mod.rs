@@ -127,27 +127,68 @@ fn method_flag(input: &str) -> IResult<&str, &str> {
     preceded(tuple((alt((tag("--method"), tag("-m"))), space1)), string)(input)
 }
 
-fn create_request(input: &str) -> IResult<&str, CreateRequest> {
-    let result = tuple((
-        create, space1,
-        request, space1,
-        permutation((
-            string, // name
-            string, // url
-            opt(method_flag),
-        )),
-    ));
-
-    map(result, |(_, _, _, _, (name, url, method))| CreateRequest {
-        name: name.to_string(),
-        url: url.to_string(),
-        method: method.map(|m| m.to_string()),
-        headers: Vec::new(),
-        body: None,
-    })(input)
+fn header_flag(input: &str) -> IResult<&str, &str> {
+    preceded(tuple((alt((tag("--header"), tag("-H"))), space1)), string)(input)
 }
 
+fn create_request(input: &str) -> IResult<&str, CreateRequest> {
+    // consume "create request " prefix
+    let (mut rest, _) = tuple((create, space1, request, space1))(input)?;
 
+    // continuously try to parse flags and arguments until we either
+    // run out of data or we can't parse anything
+    let mut method = None;
+    let mut headers = Vec::new();
+    let mut name = None;
+    let mut url = None;
+    // TODO:
+    //  * parse body
+    //  * parse `--` argument separator
+    loop {
+        if let Ok((r, m)) = method_flag(rest) {
+            rest = r;
+            // TODO: check if method is already Some
+            method = Some(m.to_string());
+            continue;
+        }
+
+        if let Ok((r, h)) = header_flag(rest) {
+            rest = r;
+            headers.push(h.to_string());
+            continue;
+        }
+
+        // at this point, whatever is left is not a method or header
+        // TODO: see if it's a flag or not
+        match (&name, &url) {
+            (Some(_), Some(_)) => (),
+            (None, _) => {
+                let (r, n) = string(rest)?;
+                rest = r;
+                name = Some(n.to_string());
+                continue;
+            }
+            (Some(_), None) => {
+                let (r, u) = string(rest)?;
+                rest = r;
+                url = Some(u.to_string());
+                continue;
+            }
+        }
+
+        break;
+    }
+    Ok((
+        rest,
+        CreateRequest {
+            name: name.unwrap(),
+            url: url.unwrap(),
+            method,
+            headers,
+            body: None,
+        },
+    ))
+}
 
 #[cfg(test)]
 mod test {
@@ -240,9 +281,34 @@ mod test {
             headers: Vec::new(),
             body: None,
         };
-        assert_eq!(create_request("create req foo bar -m yay"), Ok(("", with_method.clone())));
-        assert_eq!(create_request("create req foo -m yay bar"), Ok(("", with_method.clone())));
-        assert_eq!(create_request("create req -m yay foo bar"), Ok(("", with_method.clone())));
+        assert_eq!(
+            create_request("create req foo bar -m yay"),
+            Ok(("", with_method.clone()))
+        );
+        assert_eq!(
+            create_request("create req foo -m yay bar"),
+            Ok(("", with_method.clone()))
+        );
+        assert_eq!(
+            create_request("create req -m yay foo bar"),
+            Ok(("", with_method.clone()))
+        );
+
+        let with_headers = CreateRequest {
+            name: "foo".to_string(),
+            url: "bar".to_string(),
+            method: None,
+            headers: vec!["h1".to_string(), "h2".to_string()],
+            body: None,
+        };
+        assert_eq!(
+            create_request("c r -H h1 foo bar -H h2"),
+            Ok(("", with_headers.clone()))
+        );
+        assert_eq!(
+            create_request("c r foo bar -H h1 -H h2"),
+            Ok(("", with_headers.clone()))
+        );
     }
 
     #[test]
