@@ -1,6 +1,6 @@
 use nom::{
     branch::{alt, permutation},
-    bytes::complete::{escaped, escaped_transform, tag, take_till, take_till1, take_until},
+    bytes::complete::{escaped, escaped_transform, tag, take, take_till, take_till1, take_until},
     character::complete::{
         alpha1, alphanumeric1, digit0, digit1, line_ending, none_of, not_line_ending, one_of,
         space0, space1,
@@ -106,6 +106,9 @@ fn cmd_kind(input: &str) -> IResult<&str, CmdKind> {
 }
 
 fn any_string(input: &str) -> IResult<&str, &str> {
+    // return an error if the input is empty
+    take(1_usize)(input)?;
+
     let esc_single = escaped(none_of("\\\'"), '\\', tag("'"));
     let esc_double = escaped(none_of("\\\""), '\\', tag("\""));
     let esc_space = escaped(none_of("\\ \t"), '\\', one_of(" \t"));
@@ -196,7 +199,7 @@ use std::collections::HashMap;
 fn get_opts<'a>(
     input: &'a str,
     legend: &'static str,
-) -> IResult<&'a str, (Vec<(String, Option<String>)>, Vec<String>)> {
+) -> IResult<&'a str, (Vec<(&'a str, Option<&'a str>)>, Vec<&'a str>)> {
     let expects_value: HashMap<_, _> = legend
         .split_ascii_whitespace()
         .map(|entry| {
@@ -215,46 +218,51 @@ fn get_opts<'a>(
     let mut args = Vec::new();
     let mut opts = Vec::new();
     loop {
-        let s = any_string(rest);
-        if s.is_err() {
-            break;
-        }
-        let word;
-        (rest, word) = s.unwrap();
-
-        if word.len() == 0 && rest.len() == 0 {
-            // TODO: any_string should fail if the input is empty
-            break;
-        }
         if break_seen {
-            args.push(word.to_string());
+            if let Ok((r, mut v)) = many0(any_string)(rest) {
+                rest = r;
+                args.append(&mut v);
+                break;
+            } else {
+                unreachable!();
+            }
+        }
+        if let Ok((r, s)) = alt((long_opt, short_opt))(rest) {
+            rest = r;
+            if !expects_value.contains_key(s) {
+                todo!("flag is not part of legend");
+            }
+            if *expects_value.get(s).unwrap() {
+                if let Ok((r, v)) = string(rest) {
+                    rest = r;
+                    opts.push((s, Some(v)));
+                } else {
+                    todo!("value is not a valid string");
+                }
+            } else {
+                opts.push((s, None));
+            }
             continue;
         }
-        match kind(word) {
-            OptKind::Break => break_seen = true,
-            OptKind::None => args.push(word.to_string()),
-            OptKind::Long(s) | OptKind::Short(s) => {
-                if !expects_value.contains_key(&s) {
-                    // unexpected option: return an error or break?
-                    break;
-                }
-                // we can unwrap here because we check for contains_key first
-                if *expects_value.get(&s).unwrap() {
-                    if let Ok((r, value)) = string(rest) {
-                        rest = r;
-                        opts.push((s, Some(value.to_string())));
-                    } else {
-                        // flag expects value but no value given
-                        break;
-                    }
-                } else {
-                    opts.push((s, None));
-                }
-            }
-            OptKind::MultiShort(s) => {
-                todo!()
-            }
+
+        if let Ok((r, s)) = multi_short_opt(rest) {
+            rest = r;
+            todo!("unimplemented");
         }
+
+        if let Ok((r, _)) = break_opt(rest) {
+            rest = r;
+            break_seen = true;
+            continue;
+        }
+
+        if let Ok((r, arg)) = string(rest) {
+            rest = r;
+            args.push(arg);
+            continue;
+        }
+
+        break;
     }
     Ok((rest, (opts, args)))
 }
@@ -273,40 +281,6 @@ fn multi_short_opt(input: &str) -> IResult<&str, &str> {
 
 fn break_opt(input: &str) -> IResult<&str, ()> {
     value((), tuple((tag("--"), eow)))(input)
-}
-
-enum OptKind {
-    Long(String),
-    Short(String),
-    MultiShort(String),
-    Break,
-    None,
-}
-
-fn kind(s: &str) -> OptKind {
-    let mut iter = s.chars();
-    match (iter.next(), iter.next()) {
-        (Some('-'), Some('-')) => {
-            let s: String = iter.collect();
-            if s.len() == 0 {
-                OptKind::Break
-            } else {
-                OptKind::Long(s)
-            }
-        }
-        (Some('-'), Some(c)) => {
-            let mut s: String = iter.collect();
-            if s.len() == 0 {
-                OptKind::Short(c.to_string())
-            } else {
-                // prefix the already consumed char
-                s.insert(0, c);
-                OptKind::MultiShort(s)
-            }
-        }
-        (Some(_), _) => OptKind::None,
-        _ => unreachable!("kind should always be given a non-empty string"),
-    }
 }
 
 #[cfg(test)]
@@ -449,38 +423,17 @@ mod test {
     fn test_get_opts() {
         assert_eq!(
             get_opts("--foo --bar baz", "foo bar"),
-            Ok((
-                "",
-                (
-                    vec![("foo".to_string(), None), ("bar".to_string(), None)],
-                    vec!["baz".to_string()],
-                )
-            ))
+            Ok(("", (vec![("foo", None), ("bar", None)], vec!["baz"],)))
         );
 
         assert_eq!(
             get_opts("--foo --bar baz", "foo bar:"),
-            Ok((
-                "",
-                (
-                    vec![
-                        ("foo".to_string(), None),
-                        ("bar".to_string(), Some("baz".to_string()))
-                    ],
-                    vec![],
-                )
-            ))
+            Ok(("", (vec![("foo", None), ("bar", Some("baz"))], vec![],)))
         );
 
         assert_eq!(
             get_opts("--foo -- --bar baz", "foo bar:"),
-            Ok((
-                "",
-                (
-                    vec![("foo".to_string(), None)],
-                    vec!["--bar".to_string(), "baz".to_string()],
-                )
-            ))
+            Ok(("", (vec![("foo", None)], vec!["--bar", "baz"],)))
         );
 
         assert_eq!(
@@ -488,12 +441,8 @@ mod test {
             Ok((
                 "",
                 (
-                    vec![
-                        ("H".to_string(), Some("foo".to_string())),
-                        ("H".to_string(), Some("bar".to_string())),
-                        ("H".to_string(), Some("baz".to_string()))
-                    ],
-                    vec!["one".to_string(), "two".to_string()],
+                    vec![("H", Some("foo")), ("H", Some("bar")), ("H", Some("baz"))],
+                    vec!["one", "two"],
                 )
             ))
         );
