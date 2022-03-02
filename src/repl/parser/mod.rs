@@ -194,9 +194,9 @@ use std::collections::HashMap;
 
 // Parse as much of the input as we can, given the legend.
 fn get_opts<'a>(
-    legend: &'static str,
     input: &'a str,
-) -> IResult<&'a str, (HashMap<String, Option<String>>, Vec<String>)> {
+    legend: &'static str,
+) -> IResult<&'a str, (Vec<(String, Option<String>)>, Vec<String>)> {
     let expects_value: HashMap<_, _> = legend
         .split_ascii_whitespace()
         .map(|entry| {
@@ -213,7 +213,7 @@ fn get_opts<'a>(
     let mut rest = input;
     let mut break_seen = false;
     let mut args = Vec::new();
-    let mut opts = HashMap::new();
+    let mut opts = Vec::new();
     loop {
         let s = any_string(rest);
         if s.is_err() {
@@ -222,6 +222,10 @@ fn get_opts<'a>(
         let word;
         (rest, word) = s.unwrap();
 
+        if word.len() == 0 && rest.len() == 0 {
+            // TODO: any_string should fail if the input is empty
+            break;
+        }
         if break_seen {
             args.push(word.to_string());
             continue;
@@ -238,13 +242,13 @@ fn get_opts<'a>(
                 if *expects_value.get(&s).unwrap() {
                     if let Ok((r, value)) = string(rest) {
                         rest = r;
-                        opts.insert(s, Some(value.to_string()));
+                        opts.push((s, Some(value.to_string())));
                     } else {
                         // flag expects value but no value given
                         break;
                     }
                 } else {
-                    opts.insert(s, None);
+                    opts.push((s, None));
                 }
             }
             OptKind::MultiShort(s) => {
@@ -439,5 +443,59 @@ mod test {
         assert_eq!(string(r#"''"#), Ok(("", "")));
         assert_eq!(string("foo "), Ok(("", "foo")));
         assert!(string(" foo ").is_err());
+    }
+
+    #[test]
+    fn test_get_opts() {
+        assert_eq!(
+            get_opts("--foo --bar baz", "foo bar"),
+            Ok((
+                "",
+                (
+                    vec![("foo".to_string(), None), ("bar".to_string(), None)],
+                    vec!["baz".to_string()],
+                )
+            ))
+        );
+
+        assert_eq!(
+            get_opts("--foo --bar baz", "foo bar:"),
+            Ok((
+                "",
+                (
+                    vec![
+                        ("foo".to_string(), None),
+                        ("bar".to_string(), Some("baz".to_string()))
+                    ],
+                    vec![],
+                )
+            ))
+        );
+
+        assert_eq!(
+            get_opts("--foo -- --bar baz", "foo bar:"),
+            Ok((
+                "",
+                (
+                    vec![("foo".to_string(), None)],
+                    vec!["--bar".to_string(), "baz".to_string()],
+                )
+            ))
+        );
+
+        assert_eq!(
+            get_opts("-H foo one -H bar -H baz -- two", "header: H:"),
+            Ok((
+                "",
+                (
+                    vec![
+                        ("H".to_string(), Some("foo".to_string())),
+                        ("H".to_string(), Some("bar".to_string())),
+                        ("H".to_string(), Some("baz".to_string()))
+                    ],
+                    vec!["one".to_string(), "two".to_string()],
+                )
+            ))
+        );
     }
 }
