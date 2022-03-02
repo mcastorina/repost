@@ -109,9 +109,9 @@ fn any_string(input: &str) -> IResult<&str, &str> {
     // return an error if the input is empty
     take(1_usize)(input)?;
 
-    let esc_single = escaped(none_of("\\\'"), '\\', tag("'"));
+    let esc_single = escaped(none_of("\\'"), '\\', tag("'"));
     let esc_double = escaped(none_of("\\\""), '\\', tag("\""));
-    let esc_space = escaped(none_of("\\ \t"), '\\', one_of(" \t"));
+    let esc_space = escaped(none_of("\\ \t'\""), '\\', one_of(" \t'\""));
     terminated(
         alt((
             delimited(tag("'"), alt((esc_single, tag(""))), tag("'")),
@@ -402,6 +402,11 @@ mod test {
         assert_eq!(string(r#"''"#), Ok(("", "")));
         assert_eq!(string("foo "), Ok(("", "foo")));
         assert!(string(" foo ").is_err());
+
+        assert!(string("'foo").is_err());
+        assert!(string("fo'o").is_err());
+        assert!(string("foo'").is_err());
+        assert_eq!(string("foo\\'"), Ok(("", r#"foo\'"#)));
     }
 
     #[test]
