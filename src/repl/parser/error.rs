@@ -15,6 +15,8 @@ pub struct ParseState<'a> {
     pub last_option: Option<&'a str>,
     pub options: HashMap<&'a str, Vec<&'a str>>,
     pub args: Vec<&'a str>,
+    pub next: &'a str,
+    pub rest: &'a str,
 }
 
 impl<'a> ParseError<'a> {

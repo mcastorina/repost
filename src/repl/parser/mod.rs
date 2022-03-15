@@ -223,9 +223,11 @@ fn get_opts<'a>(
                     Failure(ParseError {
                         // TODO: remove clone
                         state: Some(ParseState {
-                            last_option: Some(s),
+                            last_option: Some(key),
                             options: opts.clone(),
                             args: args.clone(),
+                            next: any_string(rest).unwrap_or_default().1,
+                            rest: rest,
                         }),
                         message: None,
                     })
@@ -356,9 +358,49 @@ mod test {
                 assert_eq!(
                     err.state,
                     Some(ParseState {
-                        last_option: Some("m"),
+                        last_option: Some("method"),
                         options: HashMap::new(),
                         args: vec!["foo", "bar"],
+                        next: "",
+                        rest: "",
+                    })
+                )
+            }
+            _ => panic!("expected failure error"),
+        }
+
+        let result = create_request("create req foo bar --method --foo bar");
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            Failure(err) => {
+                assert_eq!(
+                    err.state,
+                    Some(ParseState {
+                        last_option: Some("method"),
+                        options: HashMap::new(),
+                        args: vec!["foo", "bar"],
+                        next: "--foo",
+                        rest: "--foo bar",
+                    })
+                )
+            }
+            _ => panic!("expected failure error"),
+        }
+
+        let result = create_request("create req foo bar --header 'Cont");
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            Failure(err) => {
+                assert_eq!(
+                    err.state,
+                    Some(ParseState {
+                        last_option: Some("header"),
+                        options: HashMap::new(),
+                        args: vec!["foo", "bar"],
+                        next: "",
+                        rest: "'Cont",
                     })
                 )
             }
@@ -470,5 +512,16 @@ mod test {
                 )
             ))
         );
+    }
+
+    #[test]
+    fn test_any_string() {
+        assert!(any_string("").is_err());
+        assert_eq!(any_string("1"), Ok(("", "1")));
+        assert_eq!(any_string("foo"), Ok(("", "foo")));
+        assert_eq!(any_string("foo bar"), Ok(("bar", "foo")));
+        assert_eq!(any_string("'foo bar'"), Ok(("", "foo bar")));
+        assert_eq!(any_string("foo\\ bar"), Ok(("", "foo\\ bar")));
+        // TODO: test unclosed quotes
     }
 }
