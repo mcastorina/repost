@@ -1,3 +1,7 @@
+mod error;
+
+use error::{IResult, ParseError, ParseState};
+use nom::Err::Failure;
 use nom::{
     branch::{alt, permutation},
     bytes::complete::{escaped, escaped_transform, tag, take, take_till, take_till1, take_until},
@@ -6,10 +10,9 @@ use nom::{
         space0, space1,
     },
     character::is_space,
-    combinator::{all_consuming, eof, map, map_res, not, opt, peek, recognize, value, verify},
+    combinator::{all_consuming, cut, eof, map, map_res, not, opt, peek, recognize, value, verify},
     multi::{many0, separated_list0},
     sequence::{delimited, pair, preceded, terminated, tuple},
-    IResult,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -38,55 +41,55 @@ enum CmdKind {
     CreateVariable,
 }
 
-fn eol(input: &str) -> IResult<&str, &str> {
+fn eol(input: &str) -> IResult<&str> {
     alt((terminated(tag("--"), eow), eof))(input)
 }
 
-fn eow(input: &str) -> IResult<&str, &str> {
+fn eow(input: &str) -> IResult<&str> {
     alt((space1, eof))(input)
 }
 
-fn print(input: &str) -> IResult<&str, &str> {
+fn print(input: &str) -> IResult<&str> {
     alt((tag("print"), tag("get"), tag("show"), tag("p")))(input)
 }
 
-fn create(input: &str) -> IResult<&str, &str> {
+fn create(input: &str) -> IResult<&str> {
     alt((tag("create"), tag("new"), tag("add"), tag("c")))(input)
 }
 
-fn requests(input: &str) -> IResult<&str, &str> {
+fn requests(input: &str) -> IResult<&str> {
     alt((tag("requests"), tag("reqs"), request))(input)
 }
 
-fn request(input: &str) -> IResult<&str, &str> {
+fn request(input: &str) -> IResult<&str> {
     alt((tag("request"), tag("req"), tag("r")))(input)
 }
 
-fn variables(input: &str) -> IResult<&str, &str> {
+fn variables(input: &str) -> IResult<&str> {
     alt((tag("variables"), tag("vars"), variable))(input)
 }
 
-fn variable(input: &str) -> IResult<&str, &str> {
+fn variable(input: &str) -> IResult<&str> {
     alt((tag("variable"), tag("var"), tag("v")))(input)
 }
 
-fn environments(input: &str) -> IResult<&str, &str> {
+fn environments(input: &str) -> IResult<&str> {
     alt((tag("environments"), tag("envs"), environment))(input)
 }
 
-fn environment(input: &str) -> IResult<&str, &str> {
+fn environment(input: &str) -> IResult<&str> {
     alt((tag("environment"), tag("env"), tag("e")))(input)
 }
 
-fn workspaces(input: &str) -> IResult<&str, &str> {
+fn workspaces(input: &str) -> IResult<&str> {
     alt((tag("workspaces"), workspace))(input)
 }
 
-fn workspace(input: &str) -> IResult<&str, &str> {
+fn workspace(input: &str) -> IResult<&str> {
     alt((tag("workspace"), tag("ws"), tag("w")))(input)
 }
 
-fn cmd_kind(input: &str) -> IResult<&str, CmdKind> {
+fn cmd_kind(input: &str) -> IResult<CmdKind> {
     alt((
         map(tuple((print, space1, requests)), |_| CmdKind::PrintRequests),
         map(tuple((print, space1, variables)), |_| {
@@ -105,7 +108,7 @@ fn cmd_kind(input: &str) -> IResult<&str, CmdKind> {
     ))(input)
 }
 
-fn any_string(input: &str) -> IResult<&str, &str> {
+fn any_string(input: &str) -> IResult<&str> {
     // return an error if the input is empty
     take(1_usize)(input)?;
 
@@ -122,19 +125,19 @@ fn any_string(input: &str) -> IResult<&str, &str> {
     )(input)
 }
 
-fn string(input: &str) -> IResult<&str, &str> {
+fn string(input: &str) -> IResult<&str> {
     verify(any_string, |s: &str| !s.starts_with('-'))(input)
 }
 
-fn method_flag(input: &str) -> IResult<&str, &str> {
+fn method_flag(input: &str) -> IResult<&str> {
     preceded(tuple((alt((tag("--method"), tag("-m"))), space1)), string)(input)
 }
 
-fn header_flag(input: &str) -> IResult<&str, &str> {
+fn header_flag(input: &str) -> IResult<&str> {
     preceded(tuple((alt((tag("--header"), tag("-H"))), space1)), string)(input)
 }
 
-fn create_request(input: &str) -> IResult<&str, CreateRequest> {
+fn create_request(input: &str) -> IResult<CreateRequest> {
     // consume "create request " prefix
     let (rest, _) = tuple((create, space1, request, space1))(input)?;
     let (rest, (mut opts, args)) = get_opts(rest, "method,m: header,H:")?;
@@ -150,13 +153,13 @@ fn create_request(input: &str) -> IResult<&str, CreateRequest> {
     let method = method.get(0);
 
     let headers = opts.remove("header").unwrap_or_default();
-    let headers = headers.into_iter().map(|v| v.unwrap().to_owned()).collect();
+    let headers = headers.into_iter().map(|v| v.to_owned()).collect();
     Ok((
         rest,
         CreateRequest {
             name: name.to_string(),
             url: url.to_string(),
-            method: method.map(|s| s.unwrap().to_owned()),
+            method: method.map(|m| m.to_string()),
             headers,
             body: None,
         },
@@ -169,7 +172,8 @@ use std::collections::HashMap;
 fn get_opts<'a>(
     input: &'a str,
     legend: &'static str,
-) -> IResult<&'a str, (HashMap<&'a str, Vec<Option<&'a str>>>, Vec<&'a str>)> {
+) -> IResult<'a, (HashMap<&'a str, Vec<&'a str>>, Vec<&'a str>)> {
+    // TODO: use slice of pairs
     let expects_value: HashMap<_, _> = legend
         .split_ascii_whitespace()
         .flat_map(|entry| {
@@ -215,16 +219,22 @@ fn get_opts<'a>(
             }
             let (key, expects_value) = expects_value.get(s).unwrap();
             if *expects_value {
-                if let Ok((r, v)) = string(rest) {
-                    rest = r;
-                    let vec = opts.entry(*key).or_insert(Vec::new());
-                    vec.push(Some(v));
-                } else {
-                    todo!("value is not a valid string");
-                }
-            } else {
+                let (r, v) = cut(string)(rest).map_err(|_| {
+                    Failure(ParseError {
+                        // TODO: remove clone
+                        state: Some(ParseState {
+                            last_option: Some(s),
+                            options: opts.clone(),
+                            args: args.clone(),
+                        }),
+                        message: None,
+                    })
+                })?;
+                rest = r;
                 let vec = opts.entry(*key).or_insert(Vec::new());
-                vec.push(None);
+                vec.push(v);
+            } else {
+                opts.entry(*key).or_insert(Vec::new());
             }
             continue;
         }
@@ -251,26 +261,28 @@ fn get_opts<'a>(
     Ok((rest, (opts, args)))
 }
 
-fn long_opt(input: &str) -> IResult<&str, &str> {
+fn long_opt(input: &str) -> IResult<&str> {
     preceded(tag("--"), string)(input)
 }
 
-fn short_opt(input: &str) -> IResult<&str, &str> {
+fn short_opt(input: &str) -> IResult<&str> {
     preceded(tag("-"), verify(string, |s: &str| s.len() == 1))(input)
 }
 
-fn multi_short_opt(input: &str) -> IResult<&str, &str> {
+fn multi_short_opt(input: &str) -> IResult<&str> {
     preceded(tag("-"), string)(input)
 }
 
-fn break_opt(input: &str) -> IResult<&str, ()> {
+fn break_opt(input: &str) -> IResult<()> {
     value((), tuple((tag("--"), eow)))(input)
 }
 
 #[cfg(test)]
 mod test {
+    use super::error::ParseState;
     use super::*;
     use maplit::hashmap;
+    use nom::Err::Failure;
 
     #[test]
     fn test_cmd_kind() {
@@ -335,6 +347,26 @@ mod test {
     }
 
     #[test]
+    fn test_create_request_fail() {
+        let result = create_request("create req foo bar -m");
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            Failure(err) => {
+                assert_eq!(
+                    err.state,
+                    Some(ParseState {
+                        last_option: Some("m"),
+                        options: HashMap::new(),
+                        args: vec!["foo", "bar"],
+                    })
+                )
+            }
+            _ => panic!("expected failure error"),
+        }
+    }
+
+    #[test]
     fn test_create_request() {
         let without_method = CreateRequest {
             name: "foo".to_string(),
@@ -347,10 +379,6 @@ mod test {
             create_request("create req foo bar"),
             Ok(("", without_method.clone()))
         );
-        // assert_eq!(
-        //     create_request("create req foo bar -m"),
-        //     Ok(("-m", without_method.clone()))
-        // );
 
         let with_method = CreateRequest {
             name: "foo".to_string(),
@@ -415,10 +443,7 @@ mod test {
             get_opts("--foo --bar baz", "foo bar"),
             Ok((
                 "",
-                (
-                    hashmap! {"foo" => vec![None], "bar" => vec![None]},
-                    vec!["baz"]
-                )
+                (hashmap! {"foo" => vec![], "bar" => vec![]}, vec!["baz"])
             ))
         );
 
@@ -426,16 +451,13 @@ mod test {
             get_opts("--foo --bar baz", "foo bar:"),
             Ok((
                 "",
-                (
-                    hashmap! {"foo" => vec![None], "bar" => vec![Some("baz")]},
-                    vec![]
-                )
+                (hashmap! {"foo" => vec![], "bar" => vec!["baz"]}, vec![])
             ))
         );
 
         assert_eq!(
             get_opts("--foo -- --bar baz", "foo bar:"),
-            Ok(("", (hashmap! {"foo" => vec![None]}, vec!["--bar", "baz"])))
+            Ok(("", (hashmap! {"foo" => vec![]}, vec!["--bar", "baz"])))
         );
 
         assert_eq!(
@@ -443,7 +465,7 @@ mod test {
             Ok((
                 "",
                 (
-                    hashmap! {"header" => vec![Some("foo"), Some("bar"), Some("baz")]},
+                    hashmap! {"header" => vec!["foo", "bar", "baz"]},
                     vec!["one", "two"],
                 )
             ))
