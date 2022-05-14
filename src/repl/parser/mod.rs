@@ -45,16 +45,18 @@ enum CmdKind {
     CreateVariable,
 }
 
-fn all<I, O, F>(
+fn all<'a, O, F>(
     mut parser: F,
     kind: ParseErrorKind,
-) -> impl FnMut(I) -> nom::IResult<I, O, ParseError<I>>
+) -> impl FnMut(&'a str) -> nom::IResult<&'a str, O, ParseError<&'a str>>
 where
-    F: nom::Parser<I, O, ParseError<I>>,
-    I: Copy,
+    F: nom::Parser<&'a str, O, ParseError<&'a str>>,
 {
-    move |input: I| match parser.parse(input.clone()) {
-        Err(_) => Err(nom::Err::Error(ParseError { kind, word: input })),
+    move |input: &str| match parser.parse(input.clone()) {
+        Err(_) => match word(input) {
+            Ok((_, word)) => Err(nom::Err::Error(ParseError { kind, word: word })),
+            _ => Err(nom::Err::Error(ParseError { kind, word: input })),
+        },
         rest => rest,
     }
 }
@@ -69,12 +71,29 @@ macro_rules! literal {
     }};
 }
 
+fn word(input: &str) -> IResult<&str> {
+    // return an error if the input is empty
+    take(1_usize)(input)?;
+
+    let esc_single = escaped(none_of("\\'"), '\\', tag("'"));
+    let esc_double = escaped(none_of("\\\""), '\\', tag("\""));
+    let esc_space = escaped(none_of("\\ \t'\""), '\\', one_of(" \t'\""));
+    terminated(
+        alt((
+            delimited(tag("'"), alt((esc_single, tag(""))), tag("'")),
+            delimited(tag("\""), alt((esc_double, tag(""))), tag("\"")),
+            esc_space,
+        )),
+        eow,
+    )(input)
+}
+
 fn eol(input: &str) -> IResult<&str> {
     alt((terminated(tag("--"), eow), eof))(input)
 }
 
 fn eow(input: &str) -> IResult<&str> {
-    alt((space1, eof))(input)
+    peek(alt((space1, eof)))(input)
 }
 
 literal!(print, "print", "get", "show", "p");
@@ -88,9 +107,59 @@ literal!(environment, "environment", "env", "e");
 literal!(workspaces, "workspaces");
 literal!(workspace, "workspace", "ws", "w");
 
-fn parse(input: &str) -> IResult<()> {
-    let (rest, _) = tuple((create, space1, request))(input)?;
-    Ok((rest, ()))
+fn verb(input: &str) -> IResult<CmdKind> {
+    // get the sub command
+    enum SubCmdKind {
+        Print,
+        Create,
+    }
+    let (rest, kind) = all(
+        alt((
+            map(print, |_| SubCmdKind::Print),
+            map(create, |_| SubCmdKind::Create),
+        )),
+        ParseErrorKind::Fixed(&["print", "get", "show", "p", "create", "new", "add", "c"]),
+    )(input)?;
+
+    // we expect at least one space
+    let (rest, _) = space1(rest)?;
+
+    // parse the second command based on the first
+    match kind {
+        SubCmdKind::Print => all(
+            alt((
+                map(alt((requests, request)), |_| {
+                    CmdKind::PrintRequests
+                }),
+                map(alt((variables, variable)), |_| {
+                    CmdKind::PrintVariables
+                }),
+                map(alt((environments, environment)), |_| {
+                    CmdKind::PrintEnvironments
+                }),
+                map(alt((workspaces, workspace)), |_| {
+                    CmdKind::PrintWorkspaces
+                }),
+            )),
+            ParseErrorKind::Fixed(&[
+                "requests", "reqs", "request", "req", "r",
+                "variables", "vars", "variable", "var", "v",
+                "environments", "envs", "environment", "env", "e",
+                "workspaces", "workspace", "ws", "w",
+            ]),
+        )(rest),
+        SubCmdKind::Create => all(
+            alt((
+                map(alt((requests, request)), |_| {
+                    CmdKind::CreateRequest
+                }),
+                map(alt((variables, variable)), |_| {
+                    CmdKind::CreateVariable
+                }),
+            )),
+            ParseErrorKind::Fixed(&["request", "req", "r", "variable", "var", "v"]),
+        )(rest),
+    }
 }
 
 #[cfg(test)]
@@ -111,6 +180,30 @@ mod test {
             Err(Error(ParseError {
                 kind: ParseErrorKind::Fixed(&["print", "get", "show", "p"]),
                 word: "gets"
+            }))
+        );
+    }
+
+    #[test]
+    fn test_verb() {
+        assert_eq!(verb("create request"), Ok(("", CmdKind::CreateRequest)));
+        assert_eq!(verb("c r"), Ok(("", CmdKind::CreateRequest)));
+        assert_eq!(verb("print ws"), Ok(("", CmdKind::PrintWorkspaces)));
+        assert_eq!(verb("show vars"), Ok(("", CmdKind::PrintVariables)));
+        assert_eq!(
+            verb("foo bar"),
+            Err(Error(ParseError {
+                kind: ParseErrorKind::Fixed(&[
+                    "print", "get", "show", "p", "create", "new", "add", "c",
+                ]),
+                word: "foo"
+            }))
+        );
+        assert_eq!(
+            verb("create bar"),
+            Err(Error(ParseError {
+                kind: ParseErrorKind::Fixed(&["request", "req", "r", "variable", "var", "v",]),
+                word: "bar"
             }))
         );
     }
