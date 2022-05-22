@@ -10,10 +10,11 @@ pub struct ParseError<I> {
     pub word: I,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParseErrorKind {
     Unknown,
     Fixed(&'static [&'static str]),
+    CreateRequest(super::CreateRequestBuilder),
 }
 
 impl<I> nom::error::ParseError<I> for ParseError<I> {

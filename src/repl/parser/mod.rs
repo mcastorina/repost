@@ -1,7 +1,7 @@
 mod error;
 
 use error::{IResult, ParseError, ParseErrorKind};
-use nom::Err::Failure;
+use nom::Err::{Error, Failure};
 use nom::{
     branch::{alt, permutation},
     bytes::complete::{escaped, escaped_transform, tag, take, take_till, take_till1, take_until},
@@ -54,8 +54,8 @@ where
 {
     move |input: &str| match parser.parse(input.clone()) {
         Err(_) => match word(input) {
-            Ok((_, word)) => Err(nom::Err::Error(ParseError { kind, word: word })),
-            _ => Err(nom::Err::Error(ParseError { kind, word: input })),
+            Ok((_, word)) => Err(Error(ParseError { kind: kind.clone(), word: word })),
+            _ => Err(Error(ParseError { kind: kind.clone(), word: input })),
         },
         rest => rest,
     }
@@ -128,18 +128,12 @@ fn verb(input: &str) -> IResult<CmdKind> {
     match kind {
         SubCmdKind::Print => all(
             alt((
-                map(alt((requests, request)), |_| {
-                    CmdKind::PrintRequests
-                }),
-                map(alt((variables, variable)), |_| {
-                    CmdKind::PrintVariables
-                }),
+                map(alt((requests, request)), |_| CmdKind::PrintRequests),
+                map(alt((variables, variable)), |_| CmdKind::PrintVariables),
                 map(alt((environments, environment)), |_| {
                     CmdKind::PrintEnvironments
                 }),
-                map(alt((workspaces, workspace)), |_| {
-                    CmdKind::PrintWorkspaces
-                }),
+                map(alt((workspaces, workspace)), |_| CmdKind::PrintWorkspaces),
             )),
             ParseErrorKind::Fixed(&[
                 "requests", "reqs", "request", "req", "r",
@@ -150,16 +144,47 @@ fn verb(input: &str) -> IResult<CmdKind> {
         )(rest),
         SubCmdKind::Create => all(
             alt((
-                map(alt((requests, request)), |_| {
-                    CmdKind::CreateRequest
-                }),
-                map(alt((variables, variable)), |_| {
-                    CmdKind::CreateVariable
-                }),
+                map(alt((requests, request)), |_| CmdKind::CreateRequest),
+                map(alt((variables, variable)), |_| CmdKind::CreateVariable),
             )),
             ParseErrorKind::Fixed(&["request", "req", "r", "variable", "var", "v"]),
         )(rest),
     }
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct CreateRequestBuilder {
+    name: Option<String>,
+    url: Option<String>,
+    method: Option<String>,
+    headers: Vec<String>,
+    // TODO: blob body
+    body: Option<String>,
+}
+
+impl TryFrom<CreateRequestBuilder> for CreateRequest {
+    type Error = ParseErrorKind;
+    fn try_from(builder: CreateRequestBuilder) -> Result<Self, Self::Error> {
+        todo!()
+    }
+}
+
+macro_rules! create_request_args_err {
+    ($parser:expr, $input:expr, $err:expr) => {
+        $parser($input).map_err(|_: nom::Err<ParseError<_>>| Error(ParseError{
+            word: $input,
+            kind: $err,
+        }))
+    };
+}
+
+fn create_request_args(input: &str) -> IResult<CreateRequest> {
+    let mut builder = CreateRequestBuilder::default();
+    // loop over each word
+    let (rest, arg) = create_request_args_err!(word, input, ParseErrorKind::CreateRequest(builder.clone()))?;
+    builder.name = Some(arg.to_string());
+    let (rest, _) = create_request_args_err!(space1, rest, ParseErrorKind::CreateRequest(builder.clone()))?;
+    todo!()
 }
 
 #[cfg(test)]
@@ -205,6 +230,48 @@ mod test {
                 kind: ParseErrorKind::Fixed(&["request", "req", "r", "variable", "var", "v",]),
                 word: "bar"
             }))
+        );
+        assert_eq!(
+            verb("create"),
+            Err(Error(ParseError {
+                kind: ParseErrorKind::Unknown,
+                word: "",
+            })),
+        );
+    }
+
+    #[test]
+    fn test_create_request_args() {
+        assert_eq!(
+            create_request_args(""),
+            Err(Error(ParseError {
+                word: "",
+                kind: ParseErrorKind::CreateRequest(
+                    CreateRequestBuilder {
+                        name: None,
+                        url: None,
+                        method: None,
+                        headers: vec![],
+                        body: None,
+                    }
+                )
+            })),
+        );
+
+        assert_eq!(
+            create_request_args("foo"),
+            Err(Error(ParseError {
+                word: "",
+                kind: ParseErrorKind::CreateRequest(
+                    CreateRequestBuilder {
+                        name: Some("foo".to_string()),
+                        url: None,
+                        method: None,
+                        headers: vec![],
+                        body: None,
+                    }
+                )
+            })),
         );
     }
 }
