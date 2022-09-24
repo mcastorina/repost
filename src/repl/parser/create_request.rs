@@ -1,6 +1,6 @@
 use super::IResult;
-use super::{CmdLineBuilder, Completion, ArgKey, OptKey};
 use super::{opt_header, opt_method};
+use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct CreateRequest {
@@ -20,22 +20,12 @@ pub struct CreateRequestBuilder {
     pub headers: Vec<String>,
     // TODO: blob body
     pub body: Option<String>,
-    pub completion: Option<CreateRequestCompletion>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum CreateRequestCompletion {
-    ArgName,
-    ArgURL,
-    OptKey,
-    HeaderValue,
-    MethodValue,
+    pub completion: Option<Completion>,
 }
 
 impl CmdLineBuilder for CreateRequestBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name, ArgKey::URL];
-    const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] =
-        &[opt_header, opt_method];
+    const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] = &[opt_header, opt_method];
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
         match key {
@@ -54,17 +44,8 @@ impl CmdLineBuilder for CreateRequestBuilder {
     }
     fn set_completion(&mut self, kind: Completion) {
         self.completion = match kind {
-            Completion::Arg => match (&self.name, &self.url) {
-                    (Some(_), Some(_)) => None,
-                    (None, _) => Some(CreateRequestCompletion::ArgName),
-                    (_, None) => Some(CreateRequestCompletion::ArgURL),
-                }
-            Completion::OptKey => Some(CreateRequestCompletion::OptKey),
-            Completion::OptValue(key) => Some(match key {
-                OptKey::Header => CreateRequestCompletion::HeaderValue,
-                OptKey::Method => CreateRequestCompletion::MethodValue,
-                _ => unreachable!(),
-            })
+            Completion::Arg(ArgKey::Unknown) => None,
+            _ => Some(kind),
         }
     }
 }
