@@ -31,6 +31,14 @@ pub enum Builder {
     CreateRequestBuilder(CreateRequestBuilder),
 }
 
+impl Builder {
+    pub fn opts(&self) -> &'static [OptKey] {
+        match self {
+            Self::CreateRequestBuilder(_) => CreateRequestBuilder::OPTS,
+        }
+    }
+}
+
 pub fn parse_command(input: &str) -> Result<Command, ()> {
     let (rest, kind) = parse_command_kind(input).map_err(|_| ())?;
     Ok(match kind {
@@ -198,7 +206,7 @@ pub enum CommandKey {
 }
 
 impl CommandKey {
-    fn completions<'a>(&'a self) -> &'static [&'static str] {
+    pub fn completions<'a>(&'a self) -> &'static [&'static str] {
         match self {
             CommandKey::Create => &["create", "new", "add", "c"],
             CommandKey::Request => &["request", "req", "r"],
@@ -226,7 +234,7 @@ pub enum ArgKey {
 }
 
 impl OptKey {
-    fn completions<'a>(&'a self) -> &'static [&'static str] {
+    pub fn completions<'a>(&'a self) -> &'static [&'static str] {
         match &self {
             OptKey::Header => &["--header", "-H"],
             OptKey::Method => &["--method", "-m"],
@@ -248,7 +256,7 @@ impl OptKey {
 
 trait CmdLineBuilder {
     const ARGS: &'static [ArgKey];
-    const OPT_PARSERS: &'static [OptKey];
+    const OPTS: &'static [OptKey];
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()>;
     fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()>;
     fn get_completion(&self, kind: Completion) -> Option<Completion>;
@@ -313,7 +321,7 @@ where
             continue;
         }
         // Try to parse any options.
-        for opt in B::OPT_PARSERS {
+        for opt in B::OPTS {
             match opt.parse(input) {
                 // Successfully parsed the option.
                 Ok(ret) => {
