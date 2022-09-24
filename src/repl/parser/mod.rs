@@ -774,5 +774,16 @@ mod test {
         assert_eq!(parse_command_kind("create foo ", false), Err(None));
         assert_eq!(parse_command_kind("foo bar", false), Err(None));
         assert_eq!(parse_command_kind("foo ", false), Err(None));
+        assert_eq!(
+            parse_command_kind("p v", false),
+            Ok(("", CommandKind::PrintVariables))
+        );
+        assert_eq!(
+            parse_command_kind("p v", true),
+            Err(Some((
+                "v",
+                Completion::Command(&[CommandKey::Requests, CommandKey::Variables])
+            )))
+        );
     }
 }
