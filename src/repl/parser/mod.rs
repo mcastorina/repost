@@ -32,30 +32,24 @@ pub enum Builder {
 }
 
 pub fn parse_command(input: &str) -> Result<Command, ()> {
-    enum Kind {
-        CreateRequest,
-    }
-    let (rest, kind) = alt((map(tuple((create, space1, request)), |_| {
-        Kind::CreateRequest
-    }),))(input)
-    .map_err(|_| ())?;
+    let (rest, kind) = parse_command_kind(input).map_err(|_| ())?;
     Ok(match kind {
-        Kind::CreateRequest => Command::CreateRequest(create_request(rest)?),
+        CommandKind::CreateRequest => Command::CreateRequest(create_request(rest)?),
     })
 }
 
-pub fn parse_completion(input: &str) -> Result<(Builder, (&str, Option<Completion>)), ()> {
-    enum Kind {
-        CreateRequest,
-    }
-    let (rest, kind) = alt((map(tuple((create, space1, request)), |_| {
-        Kind::CreateRequest
-    }),))(input)
-    .map_err(|_| ())?;
+pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, Completion)>), ()> {
+    let (rest, kind) = match parse_command_kind(input) {
+        Ok(ok) => ok,
+        Err(err) => return Ok((None, err)),
+    };
     Ok(match kind {
-        Kind::CreateRequest => {
+        CommandKind::CreateRequest => {
             let (s, (builder, completion)) = create_request_completion(rest).map_err(|_| ())?;
-            (Builder::CreateRequestBuilder(builder), (s, completion))
+            (
+                Some(Builder::CreateRequestBuilder(builder)),
+                completion.map(|c| (s, c)),
+            )
         }
     })
 }

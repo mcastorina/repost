@@ -70,9 +70,11 @@ impl Completer for CommandCompleter {
         pos: usize,
         _ctx: &Context<'_>,
     ) -> Result<(usize, Vec<Self::Candidate>)> {
-        let (builder, (s, completion)) =
-            parser::parse_completion(&line[..pos]).map_err(|_| ReadlineError::Interrupted)?;
-        dbg!(builder, (s, completion));
+        let (builder, completion) = match parser::parse_completion(&line[..pos]) {
+            Ok(ok) => ok,
+            Err(_) => return Ok((pos, vec![])),
+        };
+        dbg!(builder, completion);
         Ok((0, vec![]))
     }
 }
