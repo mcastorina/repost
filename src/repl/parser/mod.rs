@@ -1,6 +1,7 @@
 mod create_request;
 mod create_variable;
 mod error;
+mod print;
 
 use create_request::{CreateRequest, CreateRequestBuilder};
 use create_variable::{CreateVariable, CreateVariableBuilder};
@@ -22,17 +23,20 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     Parser,
 };
+use print::{PrintRequest, PrintRequestBuilder};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     CreateRequest(CreateRequest),
     CreateVariable(CreateVariable),
+    PrintRequest(PrintRequest),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Builder {
     CreateRequestBuilder(CreateRequestBuilder),
     CreateVariableBuilder(CreateVariableBuilder),
+    PrintRequestBuilder(PrintRequestBuilder),
 }
 
 impl Builder {
@@ -40,6 +44,7 @@ impl Builder {
         match self {
             Self::CreateRequestBuilder(_) => CreateRequestBuilder::OPTS,
             Self::CreateVariableBuilder(_) => CreateVariableBuilder::OPTS,
+            Self::PrintRequestBuilder(_) => PrintRequestBuilder::OPTS,
         }
     }
 }
@@ -52,6 +57,9 @@ pub fn parse_command(input: &str) -> Result<Command, ()> {
         }
         CommandKind::CreateVariable => {
             Command::CreateVariable(parse_subcommand::<CreateVariableBuilder>(rest)?.try_into()?)
+        }
+        CommandKind::PrintRequest => {
+            Command::PrintRequest(parse_subcommand::<PrintRequestBuilder>(rest)?.try_into()?)
         }
     })
 }
@@ -76,6 +84,13 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
                 completion.map(|c| (s, c)),
             )
         }
+        CommandKind::PrintRequest => {
+            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
+            (
+                Some(Builder::PrintRequestBuilder(builder)),
+                completion.map(|c| (s, c)),
+            )
+        }
     })
 }
 
@@ -86,15 +101,21 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
 enum CommandKind {
     CreateRequest,
     CreateVariable,
+    PrintRequest,
 }
 
 impl CommandKind {
-    const KINDS: &'static [Self] = &[Self::CreateRequest, Self::CreateVariable];
+    const KINDS: &'static [Self] = &[
+        Self::CreateRequest,
+        Self::CreateVariable,
+        Self::PrintRequest,
+    ];
     fn keys(&self) -> &'static [CommandKey] {
         use CommandKey::*;
         match self {
             Self::CreateRequest => &[Create, Request],
             Self::CreateVariable => &[Create, Variable],
+            Self::PrintRequest => &[Print, Request],
         }
     }
     fn parse(input: &str) -> Result<(&str, Self), ()> {
@@ -113,7 +134,7 @@ impl CommandKind {
 }
 
 // TODO: HashMap of CommandKey => &[CommandKey]
-const CMDS: &'static [CommandKey] = &[CommandKey::Create];
+const CMDS: &'static [CommandKey] = &[CommandKey::Create, CommandKey::Print];
 
 fn parse_command_kind(input: &str) -> Result<(&str, CommandKind), Option<(&str, Completion)>> {
     let input = strip_leading_space(input);
@@ -142,6 +163,7 @@ fn parse_command_kind(input: &str) -> Result<(&str, CommandKind), Option<(&str, 
 
     let sub_cmds: &'static [CommandKey] = match cmd {
         CommandKey::Create => &[CommandKey::Request, CommandKey::Variable],
+        CommandKey::Print => &[CommandKey::Request],
         _ => unreachable!(),
     };
 
@@ -264,9 +286,15 @@ impl OptKey {
 trait CmdLineBuilder: Default {
     const ARGS: &'static [ArgKey];
     const OPTS: &'static [OptKey];
-    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()>;
-    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()>;
-    fn get_completion(&self, kind: Completion) -> Option<Completion>;
+    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
+        Err(())
+    }
+    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()> {
+        Err(())
+    }
+    fn get_completion(&self, kind: Completion) -> Option<Completion> {
+        Some(kind)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

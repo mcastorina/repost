@@ -23,12 +23,6 @@ impl CmdLineBuilder for CreateVariableBuilder {
             _ => Err(()),
         }
     }
-    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()> {
-        Err(())
-    }
-    fn get_completion(&self, kind: Completion) -> Option<Completion> {
-        Some(kind)
-    }
 }
 
 impl TryFrom<CreateVariableBuilder> for CreateVariable {
