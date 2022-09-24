@@ -1,7 +1,8 @@
 mod create_request;
 mod create_variable;
 mod error;
-mod print;
+mod print_requests;
+mod print_variables;
 
 use create_request::{CreateRequest, CreateRequestBuilder};
 use create_variable::{CreateVariable, CreateVariableBuilder};
@@ -23,7 +24,8 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     Parser,
 };
-use print::{PrintRequests, PrintRequestsBuilder, PrintVariables, PrintVariablesBuilder};
+use print_requests::{PrintRequests, PrintRequestsBuilder};
+use print_variables::{PrintVariables, PrintVariablesBuilder};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
