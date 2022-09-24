@@ -122,6 +122,7 @@ enum OptKey {
 
 #[derive(Debug, PartialEq, Clone)]
 enum ArgKey {
+    Unknown,
     Name,
     URL,
 }
@@ -165,9 +166,9 @@ where
     let mut arg_key = || match B::ARGS.get(arg_count) {
         Some(key) => {
             arg_count += 1;
-            Ok(key.clone())
+            key.clone()
         }
-        _ => Err(nom::Err::Failure(ParseError::default()))
+        _ => ArgKey::Unknown,
     };
     'main : loop {
         input = trim_leading_space(input);
@@ -177,7 +178,7 @@ where
         // We encountered a '--' so everything should be interpreted as an argument.
         if double_dash {
             (input, arg) = word(input)?;
-            builder.add_arg(arg_key()?, arg).map_err(err)?;
+            builder.add_arg(arg_key(), arg).map_err(err)?;
             continue;
         }
         // Check for '--'.
@@ -189,7 +190,7 @@ where
         // Try to parse the argument as long as it doesn't start with '-'.
         if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
             (input, arg) = ret;
-            builder.add_arg(arg_key()?, arg).map_err(err)?;
+            builder.add_arg(arg_key(), arg).map_err(err)?;
             continue;
         }
         // Try to parse any options.
