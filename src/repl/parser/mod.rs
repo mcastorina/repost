@@ -60,6 +60,63 @@ pub fn parse_completion(input: &str) -> Result<(Builder, (&str, Option<Completio
     })
 }
 
+// Create: { Request, Variable }
+// Print: { Requests, Variables, Environments }
+
+#[derive(Debug, PartialEq, Clone)]
+enum CommandKind {
+    CreateRequest,
+}
+
+impl CommandKind {
+    fn parse(input: &str) -> Result<(&str, Self), ()> {
+        // TODO: Use CommandKey parsing for consistency.
+        alt((map(tuple((create, space1, request, space1)), |_| {
+            CommandKind::CreateRequest
+        }),))(input)
+        .map_err(|_| ())
+    }
+}
+
+// TODO: HashMap of CommandKey => &[CommandKey]
+const CMDS: &'static [CommandKey] = &[CommandKey::Create];
+
+fn parse_command_kind(input: &str) -> Result<(&str, CommandKind), Option<(&str, Completion)>> {
+    let input = strip_leading_space(input);
+    // Happy case.
+    if let Ok(cmd) = CommandKind::parse(input) {
+        return Ok(cmd);
+    }
+
+    // Error case. Figure out what the completion should be.
+    if input.len() == 0 {
+        return Err(Some((input, Completion::Command(CMDS))));
+    }
+
+    let (rest, cmd) = match CMDS.iter().filter_map(|cmd| cmd.parse(input).ok()).next() {
+        Some((rest, cmd)) => (rest, cmd),
+        None => {
+            return Err(match terminated(word, space1)(input) {
+                Ok(_) => None,
+                _ => Some((input, Completion::Command(CMDS))),
+            })
+        }
+    };
+
+    let (rest, _) =
+        space1(rest).map_err(|_: nom::Err<ParseError<_>>| (input, Completion::Command(CMDS)))?;
+
+    let sub_cmds: &'static [CommandKey] = match cmd {
+        CommandKey::Create => &[CommandKey::Request],
+        _ => unreachable!(),
+    };
+
+    Err(match terminated(word, space1)(rest) {
+        Ok(_) => None,
+        _ => Some((rest, Completion::Command(sub_cmds))),
+    })
+}
+
 fn all<'a, O, F>(
     mut parser: F,
     kind: ParseErrorKind,
@@ -86,7 +143,7 @@ macro_rules! literal {
     ($name:ident, $($( $lit:expr )+$(,)?)*) => {
         fn $name(input: &str) -> IResult<&str> {
         all(
-            terminated(alt(($($( tag($lit), )*)*)), eow),
+            alt(($($( terminated(tag($lit), eow), )*)*)),
             ParseErrorKind::Fixed(&[ $($( $lit, )*)* ]),
         )(input)
     }};
@@ -141,6 +198,27 @@ literal!(workspaces, "workspaces");
 literal!(workspace, "workspace", "ws", "w");
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum CommandKey {
+    Create,
+    Request,
+}
+
+impl CommandKey {
+    fn completions<'a>(&'a self) -> &'static [&'static str] {
+        match self {
+            CommandKey::Create => &["create", "new", "add", "c"],
+            CommandKey::Request => &["request", "req", "r"],
+        }
+    }
+    fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {
+        match self {
+            CommandKey::Create => map(create, |_| self.to_owned())(input),
+            CommandKey::Request => map(request, |_| self.to_owned())(input),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum OptKey {
     Header,
     Method,
@@ -161,21 +239,17 @@ impl OptKey {
         }
     }
     fn parse<'a>(&'a self, input: &'a str) -> IResult<&str> {
-        parse_opt(input, self.completions())
-    }
-}
-
-fn parse_opt<'a>(input: &'a str, variants: &'static [&'static str]) -> IResult<'a, &'a str> {
-    for variant in variants {
-        if let Ok((rest, _)) = terminated(tag(*variant), eoo)(input) {
-            let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
-            return match sep {
-                "=" => cut(word)(rest),
-                _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
-            };
+        for variant in self.completions() {
+            if let Ok((rest, _)) = terminated(tag(*variant), eoo)(input) {
+                let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
+                return match sep {
+                    "=" => cut(word)(rest),
+                    _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
+                };
+            }
         }
+        Err(nom::Err::Error(ParseError::default()))
     }
-    Err(nom::Err::Error(ParseError::default()))
 }
 
 trait CmdLineBuilder {
@@ -191,9 +265,10 @@ pub enum Completion {
     Arg(ArgKey),
     OptKey,
     OptValue(OptKey),
+    Command(&'static [CommandKey]),
 }
 
-fn trim_leading_space(s: &str) -> &str {
+fn strip_leading_space(s: &str) -> &str {
     space0::<_, ParseError<&str>>(s)
         .expect("stripping leading whitespace")
         .0
@@ -221,7 +296,7 @@ where
         _ => ArgKey::Unknown,
     };
     'main: loop {
-        input = trim_leading_space(input);
+        input = strip_leading_space(input);
         if done_parsing(input) {
             break;
         }
@@ -336,7 +411,7 @@ mod test {
             ("--header=--foo", "--foo"),
             ("-H=--foo", "--foo"),
         ];
-        let opt_header = |input: &'static str| parse_opt(input, &["--header", "-H"]);
+        let opt_header = |input: &'static str| OptKey::Header.parse(input);
         for (input, expected) in tests {
             assert_eq!(opt_header(input), Ok(("", *expected)));
         }
@@ -561,5 +636,51 @@ mod test {
             ))
         );
         assert!(matches!(create_request_completion("foo bar baz "), Err(_)));
+    }
+
+    #[test]
+    fn test_parse_command_kind() {
+        assert_eq!(
+            parse_command_kind("create request foo bar baz"),
+            Ok(("foo bar baz", CommandKind::CreateRequest))
+        );
+        assert_eq!(
+            parse_command_kind("c req foo bar baz"),
+            Ok(("foo bar baz", CommandKind::CreateRequest))
+        );
+        assert_eq!(
+            parse_command_kind("  c   req   foo bar baz"),
+            Ok(("foo bar baz", CommandKind::CreateRequest))
+        );
+        assert_eq!(
+            parse_command_kind("create request "),
+            Ok(("", CommandKind::CreateRequest))
+        );
+        assert_eq!(
+            parse_command_kind("create request"),
+            Err(Some((
+                "request",
+                Completion::Command(&[CommandKey::Request])
+            )))
+        );
+        assert_eq!(
+            parse_command_kind("create req"),
+            Err(Some(("req", Completion::Command(&[CommandKey::Request]))))
+        );
+        assert_eq!(
+            parse_command_kind("create foo"),
+            Err(Some(("foo", Completion::Command(&[CommandKey::Request]))))
+        );
+        assert_eq!(
+            parse_command_kind("foo"),
+            Err(Some(("foo", Completion::Command(super::CMDS))))
+        );
+        assert_eq!(
+            parse_command_kind(""),
+            Err(Some(("", Completion::Command(super::CMDS))))
+        );
+        assert_eq!(parse_command_kind("create foo "), Err(None));
+        assert_eq!(parse_command_kind("foo bar"), Err(None));
+        assert_eq!(parse_command_kind("foo "), Err(None));
     }
 }
