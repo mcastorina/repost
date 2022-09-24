@@ -141,6 +141,16 @@ pub struct CreateRequestBuilder {
     headers: Vec<String>,
     // TODO: blob body
     body: Option<String>,
+    completion: Option<CreateRequestCompletion>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum CreateRequestCompletion {
+    ArgName,
+    ArgURL,
+    OptKey,
+    HeaderValue,
+    MethodValue,
 }
 
 impl CreateRequestBuilder {
@@ -205,15 +215,35 @@ fn _create_request(mut input: &str, completion: bool) -> IResult<CreateRequestBu
             double_dash = true;
             continue;
         }
-        if let Ok(ret) = opt_header(input) {
-            (input, arg) = ret;
-            builder.add_header(arg).map_err(err)?;
-            continue;
+        match opt_header(input) {
+            Ok(ret) => {
+                (input, arg) = ret;
+                if completion && !predicate(input) {
+                    builder.completion = Some(CreateRequestCompletion::HeaderValue);
+                    return Ok((arg, builder));
+                }
+                builder.add_header(arg).map_err(err)?;
+                continue;
+            }
+            Err(ret @ Failure(_)) => {
+                return Err(ret);
+            }
+            _ => (),
         }
-        if let Ok(ret) = opt_method(input) {
-            (input, arg) = ret;
-            builder.add_method(arg).map_err(err)?;
-            continue;
+        match opt_method(input) {
+            Ok(ret) => {
+                (input, arg) = ret;
+                if completion && !predicate(input) {
+                    builder.completion = Some(CreateRequestCompletion::MethodValue);
+                    return Ok((arg, builder));
+                }
+                builder.add_method(arg).map_err(err)?;
+                continue;
+            }
+            Err(ret @ Failure(_)) => {
+                return Err(ret);
+            }
+            _ => (),
         }
         if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
             (input, arg) = ret;
@@ -224,6 +254,16 @@ fn _create_request(mut input: &str, completion: bool) -> IResult<CreateRequestBu
             kind: ParseErrorKind::Unknown,
             word: input,
         }))
+    }
+    if completion && builder.completion.is_none() {
+        builder.completion = match (double_dash, input.starts_with('-'), &builder.name, &builder.url) {
+            (false, true, Some(_), Some(_)) => Some(CreateRequestCompletion::OptKey),
+            (false, true, _, _) => Some(CreateRequestCompletion::OptKey),
+            (_, _, None, _) => Some(CreateRequestCompletion::ArgName),
+            (_, _, _, None) => Some(CreateRequestCompletion::ArgURL),
+            (true, _, Some(_), Some(_)) => None,
+            (false, false, Some(_), Some(_)) => None,
+        }
     }
     Ok((input, builder))
 }
@@ -273,6 +313,7 @@ mod test {
             method: None,
             headers: vec![],
             body: None,
+            completion: None,
         })));
         assert_eq!(create_request("foo -H yay bar"), Ok(("", CreateRequestBuilder{
             name: Some("foo".to_string()),
@@ -280,6 +321,7 @@ mod test {
             method: None,
             headers: vec!["yay".to_string()],
             body: None,
+            completion: None,
         })));
         assert_eq!(create_request("--method baz -- foo bar"), Ok(("", CreateRequestBuilder{
             name: Some("foo".to_string()),
@@ -287,6 +329,7 @@ mod test {
             method: Some("baz".to_string()),
             headers: vec![],
             body: None,
+            completion: None,
         })));
         assert_eq!(create_request("-- --foo --bar"), Ok(("", CreateRequestBuilder{
             name: Some("--foo".to_string()),
@@ -294,6 +337,7 @@ mod test {
             method: None,
             headers: vec![],
             body: None,
+            completion: None,
         })));
         assert!(matches!(create_request("foo bar baz"), Err(_)));
         assert!(matches!(create_request("--foo --bar"), Err(_)));
@@ -303,12 +347,21 @@ mod test {
 
     #[test]
     fn test_create_request_complete() {
+        assert_eq!(create_request_completion("foo"), Ok(("foo", CreateRequestBuilder{
+            name: None,
+            url: None,
+            method: None,
+            headers: vec![],
+            body: None,
+            completion: Some(CreateRequestCompletion::ArgName),
+        })));
         assert_eq!(create_request_completion("foo bar"), Ok(("bar", CreateRequestBuilder{
             name: Some("foo".to_string()),
             url: None,
             method: None,
             headers: vec![],
             body: None,
+            completion: Some(CreateRequestCompletion::ArgURL),
         })));
         assert_eq!(create_request_completion("foo "), Ok(("", CreateRequestBuilder{
             name: Some("foo".to_string()),
@@ -316,6 +369,7 @@ mod test {
             method: None,
             headers: vec![],
             body: None,
+            completion: Some(CreateRequestCompletion::ArgURL),
         })));
         assert_eq!(create_request_completion("foo -"), Ok(("-", CreateRequestBuilder{
             name: Some("foo".to_string()),
@@ -323,13 +377,40 @@ mod test {
             method: None,
             headers: vec![],
             body: None,
+            completion: Some(CreateRequestCompletion::OptKey),
         })));
-        assert_eq!(create_request_completion("foo -H "), Ok(("", CreateRequestBuilder{
+        assert_eq!(create_request_completion("foo -H f"), Ok(("f", CreateRequestBuilder{
             name: Some("foo".to_string()),
             url: None,
             method: None,
             headers: vec![],
             body: None,
+            completion: Some(CreateRequestCompletion::HeaderValue),
         })));
+        assert_eq!(create_request_completion("foo --he"), Ok(("--he", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: None,
+            method: None,
+            headers: vec![],
+            body: None,
+            completion: Some(CreateRequestCompletion::OptKey),
+        })));
+        assert_eq!(create_request_completion("-- --foo"), Ok(("--foo", CreateRequestBuilder{
+            name: None,
+            url: None,
+            method: None,
+            headers: vec![],
+            body: None,
+            completion: Some(CreateRequestCompletion::ArgName),
+        })));
+        assert_eq!(create_request_completion("foo bar baz"), Ok(("baz", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: Some("bar".to_string()),
+            method: None,
+            headers: vec![],
+            body: None,
+            completion: None,
+        })));
+        assert!(matches!(create_request_completion("foo bar baz "), Err(_)));
     }
 }
