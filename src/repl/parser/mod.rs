@@ -21,6 +21,25 @@ use nom::{
     Parser,
 };
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Command {
+    CreateRequest(CreateRequest),
+}
+
+pub fn parse_command(input: &str) -> Result<Command, ()> {
+    Ok(Command::CreateRequest(create_request(input)?))
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Builder {
+    CreateRequestBuilder(CreateRequestBuilder),
+}
+
+pub fn parse_completion(input: &str) -> Result<(Builder, (&str, Option<Completion>)), ()> {
+    let (s, (builder, completion)) = create_request_completion(input).map_err(|_| ())?;
+    Ok((Builder::CreateRequestBuilder(builder), (s, completion)))
+}
+
 fn all<'a, O, F>(
     mut parser: F,
     kind: ParseErrorKind,
@@ -54,14 +73,14 @@ macro_rules! literal {
 }
 
 macro_rules! opt {
-    ($name:ident, $key:expr, $($( $lit:expr )+$(,)?)*) => {
-        fn $name(input: &str) -> IResult<(OptKey, &str)> {
+    ($name:ident, $($( $lit:expr )+$(,)?)*) => {
+        fn $name(input: &str) -> IResult<&str> {
             let (rest, _) = terminated(alt(($($( tag($lit), )*)*)), eoo)(input)?;
             let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
             match sep {
                 "=" => cut(word)(rest),
                 _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
-            }.map(|(rest, val)| (rest, ($key, val)))
+            }
         }
     }
 }
@@ -127,12 +146,21 @@ pub enum ArgKey {
     URL,
 }
 
-opt!(opt_header, OptKey::Header, "--header", "-H");
-opt!(opt_method, OptKey::Method, "--method", "-m");
+impl OptKey {
+    fn parse<'a>(&'a self, input: &'a str) -> IResult<&str> {
+        match &self {
+            OptKey::Header => opt_header(input),
+            OptKey::Method => opt_method(input),
+        }
+    }
+}
+
+opt!(opt_header, "--header", "-H");
+opt!(opt_method, "--method", "-m");
 
 trait CmdLineBuilder {
     const ARGS: &'static [ArgKey];
-    const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>];
+    const OPT_PARSERS: &'static [OptKey];
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()>;
     fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()>;
     fn get_completion(&self, kind: Completion) -> Option<Completion>;
@@ -151,7 +179,7 @@ fn trim_leading_space(s: &str) -> &str {
         .0
 }
 
-fn parse<B>(mut input: &str, completion: bool) -> IResult<(B, Option<Completion>)>
+fn parse_subcommand<B>(mut input: &str, completion: bool) -> IResult<(B, Option<Completion>)>
 where
     B: CmdLineBuilder + Default,
 {
@@ -197,21 +225,25 @@ where
         }
         // Try to parse any options.
         for opt in B::OPT_PARSERS {
-            match opt(input) {
+            match opt.parse(input) {
                 // Successfully parsed the option.
                 Ok(ret) => {
-                    let key;
-                    (input, (key, arg)) = ret;
-                    if completion && done_parsing(input) {
-                        let completion = builder.get_completion(Completion::OptValue(key));
+                    (input, arg) = ret;
+                    let opt = opt.to_owned();
+                    if completion && input.len() == 0 {
+                        let completion = builder.get_completion(Completion::OptValue(opt));
                         return Ok((arg, (builder, completion)));
                     }
-                    builder.add_opt(key, arg).map_err(err)?;
+                    builder.add_opt(opt, arg).map_err(err)?;
                     continue 'main;
                 }
                 // Non-recoverable error (e.g. the key parsed but not the value).
                 Err(ret @ Failure(_)) => {
-                    return Err(ret);
+                    if !completion {
+                        return Err(ret);
+                    }
+                    let completion = builder.get_completion(Completion::OptValue(opt.to_owned()));
+                    return Ok(("", (builder, completion)));
                 }
                 // Recoverable error, do nothing and try the next parser.
                 _ => (),
@@ -234,14 +266,16 @@ where
     Ok((input, (builder, completion)))
 }
 
-fn create_request(input: &str) -> Result<CreateRequest, ()> {
-    let parser = |i| parse(i, false);
+pub fn create_request(input: &str) -> Result<CreateRequest, ()> {
+    let parser = |i| parse_subcommand(i, false);
     let (_, builder): (_, CreateRequestBuilder) = map(parser, |(b, _)| b)(input).map_err(|_| ())?;
     Ok(builder.try_into()?)
 }
 
-fn create_request_completion(input: &str) -> IResult<(CreateRequestBuilder, Option<Completion>)> {
-    parse(input, true)
+pub fn create_request_completion(
+    input: &str,
+) -> IResult<(CreateRequestBuilder, Option<Completion>)> {
+    parse_subcommand(input, true)
 }
 
 #[cfg(test)]
@@ -283,10 +317,12 @@ mod test {
             ("-H=--foo", "--foo"),
         ];
         for (input, expected) in tests {
-            assert_eq!(opt_header(input), Ok(("", (OptKey::Header, *expected))));
+            assert_eq!(opt_header(input), Ok(("", *expected)));
         }
         assert!(matches!(opt_header("-H"), Err(_)));
         assert!(matches!(opt_header("--header"), Err(_)));
+        assert!(matches!(opt_header("--header "), Err(_)));
+        assert!(matches!(opt_header("--header="), Err(_)));
         assert!(matches!(opt_header("--header -H"), Err(_)));
         assert!(matches!(opt_header("--header --foo"), Err(_)));
         assert!(matches!(opt_header("--oops"), Err(_)));
@@ -424,6 +460,22 @@ mod test {
             ))
         );
         assert_eq!(
+            create_request_completion("foo -H "),
+            Ok((
+                "",
+                (
+                    CreateRequestBuilder {
+                        name: Some("foo".to_string()),
+                        url: None,
+                        method: None,
+                        headers: vec![],
+                        body: None,
+                    },
+                    Some(Completion::OptValue(OptKey::Header))
+                ),
+            ))
+        );
+        assert_eq!(
             create_request_completion("foo --he"),
             Ok((
                 "--he",
@@ -468,6 +520,22 @@ mod test {
                         body: None,
                     },
                     None
+                ),
+            ))
+        );
+        assert_eq!(
+            create_request_completion("foo -H bar baz"),
+            Ok((
+                "baz",
+                (
+                    CreateRequestBuilder {
+                        name: Some("foo".to_string()),
+                        url: None,
+                        method: None,
+                        headers: vec!["bar".to_string()],
+                        body: None,
+                    },
+                    Some(Completion::Arg(ArgKey::URL))
                 ),
             ))
         );

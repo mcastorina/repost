@@ -24,7 +24,7 @@ pub struct CreateRequestBuilder {
 
 impl CmdLineBuilder for CreateRequestBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name, ArgKey::URL];
-    const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] = &[opt_header, opt_method];
+    const OPT_PARSERS: &'static [OptKey] = &[OptKey::Header, OptKey::Method];
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
         match key {

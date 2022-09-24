@@ -4,6 +4,8 @@ use rustyline::{error::ReadlineError, CompletionType, Config, Context, EditMode,
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
 use crate::db::Db;
+use crate::error::Error;
+use crate::repl::parser;
 
 pub struct LineReader {
     reader: Editor<CommandCompleter>,
@@ -68,6 +70,9 @@ impl Completer for CommandCompleter {
         pos: usize,
         _ctx: &Context<'_>,
     ) -> Result<(usize, Vec<Self::Candidate>)> {
+        let (builder, (s, completion)) =
+            parser::parse_completion(&line[..pos]).map_err(|_| ReadlineError::Interrupted)?;
+        dbg!(builder, (s, completion));
         Ok((0, vec![]))
     }
 }

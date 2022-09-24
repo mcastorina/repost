@@ -37,6 +37,8 @@ impl Repl {
 
     /// Execute a command line.
     pub async fn execute(&mut self, input: &str) -> Result<()> {
-        todo!()
+        let cmd = parser::parse_command(input).map_err(|_| Error::ParseError("foo"))?;
+        dbg!(cmd);
+        Ok(())
     }
 }
