@@ -55,7 +55,7 @@ impl Builder {
 }
 
 pub fn parse_command(input: &str) -> Result<Command, ()> {
-    let (rest, kind) = parse_command_kind(input).map_err(|_| ())?;
+    let (rest, kind) = parse_command_kind(input, false).map_err(|_| ())?;
     Ok(match kind {
         CommandKind::CreateRequest => {
             Command::CreateRequest(parse_subcommand::<CreateRequestBuilder>(rest)?.try_into()?)
@@ -73,7 +73,7 @@ pub fn parse_command(input: &str) -> Result<Command, ()> {
 }
 
 pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, Completion)>), ()> {
-    let (rest, kind) = match parse_command_kind(input) {
+    let (rest, kind) = match parse_command_kind(input, true) {
         Ok(ok) => ok,
         Err(err) => return Ok((None, err)),
     };
@@ -140,7 +140,8 @@ impl CommandKind {
         'main: for kind in Self::KINDS.into_iter() {
             let mut input = input;
             for key in kind.keys() {
-                input = match tuple((|i| key.parse(i), space1))(input) {
+                input = strip_leading_space(input);
+                input = match tuple((|i| key.parse(i), eow))(input) {
                     Ok((input, _)) => input,
                     _ => continue 'main,
                 }
@@ -154,11 +155,16 @@ impl CommandKind {
 // TODO: HashMap of CommandKey => &[CommandKey]
 const CMDS: &'static [CommandKey] = &[CommandKey::Create, CommandKey::Print];
 
-fn parse_command_kind(input: &str) -> Result<(&str, CommandKind), Option<(&str, Completion)>> {
+fn parse_command_kind(
+    input: &str,
+    completion: bool,
+) -> Result<(&str, CommandKind), Option<(&str, Completion)>> {
     let input = strip_leading_space(input);
     // Happy case.
-    if let Ok(cmd) = CommandKind::parse(input) {
-        return Ok(cmd);
+    if let Ok((rest, cmd)) = CommandKind::parse(input) {
+        if !(completion && rest.len() == 0) {
+            return Ok((strip_leading_space(rest), cmd));
+        }
     }
 
     // Error case. Figure out what the completion should be.
@@ -727,52 +733,46 @@ mod test {
     #[test]
     fn test_parse_command_kind() {
         assert_eq!(
-            parse_command_kind("create request foo bar baz"),
+            parse_command_kind("create request foo bar baz", false),
             Ok(("foo bar baz", CommandKind::CreateRequest))
         );
         assert_eq!(
-            parse_command_kind("c req foo bar baz"),
+            parse_command_kind("c req foo bar baz", false),
             Ok(("foo bar baz", CommandKind::CreateRequest))
         );
         assert_eq!(
-            parse_command_kind("  c   req   foo bar baz"),
+            parse_command_kind("  c   req   foo bar baz", false),
             Ok(("foo bar baz", CommandKind::CreateRequest))
         );
         assert_eq!(
-            parse_command_kind("create request "),
+            parse_command_kind("create request ", false),
             Ok(("", CommandKind::CreateRequest))
         );
         assert_eq!(
-            parse_command_kind("create request"),
-            Err(Some((
-                "request",
-                Completion::Command(&[CommandKey::Request, CommandKey::Variable])
-            )))
+            parse_command_kind("create request", false),
+            Ok(("", CommandKind::CreateRequest))
         );
         assert_eq!(
-            parse_command_kind("create req"),
-            Err(Some((
-                "req",
-                Completion::Command(&[CommandKey::Request, CommandKey::Variable])
-            )))
+            parse_command_kind("create req", false),
+            Ok(("", CommandKind::CreateRequest))
         );
         assert_eq!(
-            parse_command_kind("create foo"),
+            parse_command_kind("create foo", false),
             Err(Some((
                 "foo",
                 Completion::Command(&[CommandKey::Request, CommandKey::Variable])
             )))
         );
         assert_eq!(
-            parse_command_kind("foo"),
+            parse_command_kind("foo", false),
             Err(Some(("foo", Completion::Command(super::CMDS))))
         );
         assert_eq!(
-            parse_command_kind(""),
+            parse_command_kind("", false),
             Err(Some(("", Completion::Command(super::CMDS))))
         );
-        assert_eq!(parse_command_kind("create foo "), Err(None));
-        assert_eq!(parse_command_kind("foo bar"), Err(None));
-        assert_eq!(parse_command_kind("foo "), Err(None));
+        assert_eq!(parse_command_kind("create foo ", false), Err(None));
+        assert_eq!(parse_command_kind("foo bar", false), Err(None));
+        assert_eq!(parse_command_kind("foo ", false), Err(None));
     }
 }
