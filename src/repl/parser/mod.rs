@@ -1,4 +1,5 @@
 mod error;
+mod create_request;
 
 use error::{IResult, ParseError, ParseErrorKind};
 use nom::Err::{Error, Failure};
@@ -18,32 +19,7 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     Parser,
 };
-
-#[derive(Debug, PartialEq, Eq)]
-enum Cmd {
-    CreateRequest(CreateRequest),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct CreateRequest {
-    name: String,
-    url: String,
-    method: Option<String>,
-    headers: Vec<String>,
-    // TODO: blob body
-    body: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum CmdKind {
-    PrintRequests,
-    PrintVariables,
-    PrintEnvironments,
-    PrintWorkspaces,
-
-    CreateRequest,
-    CreateVariable,
-}
+use create_request::CreateRequestBuilder;
 
 fn all<'a, O, F>(
     mut parser: F,
@@ -205,44 +181,20 @@ literal!(environment, "environment", "env", "e");
 literal!(workspaces, "workspaces");
 literal!(workspace, "workspace", "ws", "w");
 
-opt!(opt_header, OptKey::Header, "--header", "-H");
-opt!(opt_method, OptKey::Method, "--method", "-m");
-
-parser!(_create_request, CreateRequestBuilder);
-
-#[derive(Debug, Default, PartialEq, Clone)]
-pub struct CreateRequestBuilder {
-    name: Option<String>,
-    url: Option<String>,
-    method: Option<String>,
-    headers: Vec<String>,
-    // TODO: blob body
-    body: Option<String>,
-    completion: Option<CreateRequestCompletion>,
-}
-
-trait OptParser {
-    const PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>];
-}
-
-impl OptParser for CreateRequestBuilder {
-    const PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] =
-        &[opt_header, opt_method];
-}
-
-#[derive(Debug, PartialEq, Clone)]
-enum CreateRequestCompletion {
-    ArgName,
-    ArgURL,
-    OptKey,
-    HeaderValue,
-    MethodValue,
-}
-
 #[derive(Debug, PartialEq, Clone)]
 enum OptKey {
     Header,
     Method,
+}
+
+opt!(opt_header, OptKey::Header, "--header", "-H");
+opt!(opt_method, OptKey::Method, "--method", "-m");
+
+trait CmdLineBuilder {
+    const PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>];
+    fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()>;
+    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()>;
+    fn set_completion(&mut self, kind: Completion);
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -252,56 +204,82 @@ enum Completion {
     OptValue(OptKey),
 }
 
-impl CreateRequestBuilder {
-    fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
-        match (&self.name, &self.url) {
-            (Some(_), Some(_)) => Err(()),
-            (None, _) => Ok(self.name = Some(arg.into())),
-            (_, None) => Ok(self.url = Some(arg.into())),
-        }
-    }
-    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()> {
-        match key {
-            OptKey::Header => self.headers.push(arg.into()),
-            OptKey::Method => self.method = Some(arg.into()),
-            _ => return Err(()),
-        }
-        Ok(())
-    }
-    fn set_completion(&mut self, kind: Completion) {
-        self.completion = match kind {
-            Completion::Arg => match (&self.name, &self.url) {
-                    (Some(_), Some(_)) => None,
-                    (None, _) => Some(CreateRequestCompletion::ArgName),
-                    (_, None) => Some(CreateRequestCompletion::ArgURL),
-                }
-            Completion::OptKey => Some(CreateRequestCompletion::OptKey),
-            Completion::OptValue(key) => Some(match key {
-                OptKey::Header => CreateRequestCompletion::HeaderValue,
-                OptKey::Method => CreateRequestCompletion::MethodValue,
-                _ => unreachable!(),
-            })
-        }
-    }
-}
-
-impl TryFrom<CreateRequestBuilder> for CreateRequest {
-    type Error = ParseErrorKind;
-    fn try_from(builder: CreateRequestBuilder) -> Result<Self, Self::Error> {
-        todo!()
-    }
-}
-
 fn trim_leading_space(s: &str) -> &str {
     space0::<_, ParseError<&str>>(s).expect("stripping leading whitespace").0
 }
 
+fn parse<B>(mut input: &str, completion: bool) -> IResult<B>
+where
+    B: CmdLineBuilder + Default
+{
+    let mut builder = B::default();
+    let mut double_dash = false;
+    let mut arg: &str;
+    let err = |_| nom::Err::Error(ParseError::default());
+    let done_parsing = if completion {
+        |s: &str| terminated(word, space1)(s).is_err()
+    } else {
+        |s: &str| s.len() == 0
+    };
+    'main : loop {
+        input = trim_leading_space(input);
+        if done_parsing(input) {
+            break;
+        }
+        if double_dash {
+            (input, arg) = word(input)?;
+            builder.add_arg(arg).map_err(err)?;
+            continue;
+        }
+        if let Ok(ret) = eol(input) {
+            (input, _) = ret;
+            double_dash = true;
+            continue;
+        }
+        for opt in B::PARSERS {
+            match opt(input) {
+                Ok(ret) => {
+                    let key;
+                    (input, (key, arg)) = ret;
+                    if completion && done_parsing(input) {
+                        builder.set_completion(Completion::OptValue(key));
+                        return Ok((arg, builder));
+                    }
+                    builder.add_opt(key, arg).map_err(err)?;
+                    continue 'main;
+                }
+                Err(ret @ Failure(_)) => {
+                    return Err(ret);
+                }
+                _ => (),
+            }
+        }
+        if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
+            (input, arg) = ret;
+            builder.add_arg(arg).map_err(err)?;
+            continue;
+        }
+        return Err(nom::Err::Error(ParseError{
+            kind: ParseErrorKind::Unknown,
+            word: input,
+        }))
+    }
+    if completion {
+        match (double_dash, input.starts_with('-')) {
+            (true, _) => builder.set_completion(Completion::Arg),
+            (_, true) => builder.set_completion(Completion::OptKey),
+            (_, false) => builder.set_completion(Completion::Arg),
+        }
+    }
+    Ok((input, builder))
+}
+
 fn create_request(mut input: &str) -> IResult<CreateRequestBuilder> {
-    _create_request(input, false)
+    parse(input, false)
 }
 
 fn create_request_completion(mut input: &str) -> IResult<CreateRequestBuilder> {
-    _create_request(input, true)
+    parse(input, true)
 }
 
 #[cfg(test)]
@@ -310,6 +288,7 @@ mod test {
     use super::{ParseError, ParseErrorKind};
     use maplit::hashmap;
     use nom::Err::{Error, Failure};
+    use super::create_request::*;
 
     #[test]
     fn test_print() {
