@@ -15,7 +15,6 @@ pub enum ParseErrorKind {
     #[default]
     Unknown,
     Fixed(&'static [&'static str]),
-    CreateRequest(super::CreateRequestBuilder),
 }
 
 impl<I> nom::error::ParseError<I> for ParseError<I> {

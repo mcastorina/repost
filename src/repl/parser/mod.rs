@@ -335,12 +335,10 @@ where
                     continue 'main;
                 }
                 // Non-recoverable error (e.g. the key parsed but not the value).
-                Err(ret @ Failure(_)) => {
-                    if !completion {
-                        return Err(ret);
-                    }
+                Err(ret @ Failure(_)) if !completion => return Err(ret),
+                Err(Failure(err)) if completion => {
                     let completion = builder.get_completion(Completion::OptValue(opt.to_owned()));
-                    return Ok(("", (builder, completion)));
+                    return Ok((err.word, (builder, completion)));
                 }
                 // Recoverable error, do nothing and try the next parser.
                 _ => (),
@@ -634,6 +632,22 @@ mod test {
                         body: None,
                     },
                     Some(Completion::Arg(ArgKey::URL))
+                ),
+            ))
+        );
+        assert_eq!(
+            create_request_completion("foo -H 'bar  "),
+            Ok((
+                "'bar  ",
+                (
+                    CreateRequestBuilder {
+                        name: Some("foo".to_string()),
+                        url: None,
+                        method: None,
+                        headers: vec![],
+                        body: None,
+                    },
+                    Some(Completion::OptValue(OptKey::Header))
                 ),
             ))
         );
