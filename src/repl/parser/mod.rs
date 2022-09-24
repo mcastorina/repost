@@ -23,20 +23,22 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     Parser,
 };
-use print::{PrintRequest, PrintRequestBuilder};
+use print::{PrintRequests, PrintRequestsBuilder, PrintVariables, PrintVariablesBuilder};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     CreateRequest(CreateRequest),
     CreateVariable(CreateVariable),
-    PrintRequest(PrintRequest),
+    PrintRequest(PrintRequests),
+    PrintVariable(PrintVariables),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Builder {
     CreateRequestBuilder(CreateRequestBuilder),
     CreateVariableBuilder(CreateVariableBuilder),
-    PrintRequestBuilder(PrintRequestBuilder),
+    PrintRequestsBuilder(PrintRequestsBuilder),
+    PrintVariablesBuilder(PrintVariablesBuilder),
 }
 
 impl Builder {
@@ -44,7 +46,8 @@ impl Builder {
         match self {
             Self::CreateRequestBuilder(_) => CreateRequestBuilder::OPTS,
             Self::CreateVariableBuilder(_) => CreateVariableBuilder::OPTS,
-            Self::PrintRequestBuilder(_) => PrintRequestBuilder::OPTS,
+            Self::PrintRequestsBuilder(_) => PrintRequestsBuilder::OPTS,
+            Self::PrintVariablesBuilder(_) => PrintVariablesBuilder::OPTS,
         }
     }
 }
@@ -58,8 +61,11 @@ pub fn parse_command(input: &str) -> Result<Command, ()> {
         CommandKind::CreateVariable => {
             Command::CreateVariable(parse_subcommand::<CreateVariableBuilder>(rest)?.try_into()?)
         }
-        CommandKind::PrintRequest => {
-            Command::PrintRequest(parse_subcommand::<PrintRequestBuilder>(rest)?.try_into()?)
+        CommandKind::PrintRequests => {
+            Command::PrintRequest(parse_subcommand::<PrintRequestsBuilder>(rest)?.try_into()?)
+        }
+        CommandKind::PrintVariables => {
+            Command::PrintVariable(parse_subcommand::<PrintVariablesBuilder>(rest)?.try_into()?)
         }
     })
 }
@@ -84,10 +90,17 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
                 completion.map(|c| (s, c)),
             )
         }
-        CommandKind::PrintRequest => {
+        CommandKind::PrintRequests => {
             let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
             (
-                Some(Builder::PrintRequestBuilder(builder)),
+                Some(Builder::PrintRequestsBuilder(builder)),
+                completion.map(|c| (s, c)),
+            )
+        }
+        CommandKind::PrintVariables => {
+            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
+            (
+                Some(Builder::PrintVariablesBuilder(builder)),
                 completion.map(|c| (s, c)),
             )
         }
@@ -101,21 +114,24 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
 enum CommandKind {
     CreateRequest,
     CreateVariable,
-    PrintRequest,
+    PrintRequests,
+    PrintVariables,
 }
 
 impl CommandKind {
     const KINDS: &'static [Self] = &[
         Self::CreateRequest,
         Self::CreateVariable,
-        Self::PrintRequest,
+        Self::PrintRequests,
+        Self::PrintVariables,
     ];
     fn keys(&self) -> &'static [CommandKey] {
         use CommandKey::*;
         match self {
             Self::CreateRequest => &[Create, Request],
             Self::CreateVariable => &[Create, Variable],
-            Self::PrintRequest => &[Print, Request],
+            Self::PrintRequests => &[Print, Requests],
+            Self::PrintVariables => &[Print, Variables],
         }
     }
     fn parse(input: &str) -> Result<(&str, Self), ()> {
@@ -163,7 +179,7 @@ fn parse_command_kind(input: &str) -> Result<(&str, CommandKind), Option<(&str, 
 
     let sub_cmds: &'static [CommandKey] = match cmd {
         CommandKey::Create => &[CommandKey::Request, CommandKey::Variable],
-        CommandKey::Print => &[CommandKey::Request],
+        CommandKey::Print => &[CommandKey::Requests, CommandKey::Variables],
         _ => unreachable!(),
     };
 
@@ -229,7 +245,9 @@ pub enum CommandKey {
     Create,
     Print,
     Request,
+    Requests,
     Variable,
+    Variables,
 }
 
 impl CommandKey {
@@ -238,7 +256,9 @@ impl CommandKey {
             CommandKey::Create => &["create", "new", "add", "c"],
             CommandKey::Print => &["print", "get", "show", "p"],
             CommandKey::Request => &["request", "req", "r"],
+            CommandKey::Requests => &["requests", "request", "reqs", "req", "r"],
             CommandKey::Variable => &["variable", "var", "v"],
+            CommandKey::Variables => &["variables", "variable", "vars", "var", "v"],
         }
     }
     fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {

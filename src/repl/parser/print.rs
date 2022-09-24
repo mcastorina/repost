@@ -1,16 +1,16 @@
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct PrintRequest {
+pub struct PrintRequests {
     pub filters: Vec<String>,
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct PrintRequestBuilder {
+pub struct PrintRequestsBuilder {
     pub filters: Vec<String>,
 }
 
-impl CmdLineBuilder for PrintRequestBuilder {
+impl CmdLineBuilder for PrintRequestsBuilder {
     const ARGS: &'static [ArgKey] = &[];
     const OPTS: &'static [OptKey] = &[];
 
@@ -22,10 +22,41 @@ impl CmdLineBuilder for PrintRequestBuilder {
     }
 }
 
-impl TryFrom<PrintRequestBuilder> for PrintRequest {
+impl TryFrom<PrintRequestsBuilder> for PrintRequests {
     type Error = ();
-    fn try_from(builder: PrintRequestBuilder) -> Result<Self, Self::Error> {
-        Ok(PrintRequest {
+    fn try_from(builder: PrintRequestsBuilder) -> Result<Self, Self::Error> {
+        Ok(PrintRequests {
+            filters: builder.filters,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PrintVariables {
+    pub filters: Vec<String>,
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct PrintVariablesBuilder {
+    pub filters: Vec<String>,
+}
+
+impl CmdLineBuilder for PrintVariablesBuilder {
+    const ARGS: &'static [ArgKey] = &[];
+    const OPTS: &'static [OptKey] = &[];
+
+    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
+        match key {
+            ArgKey::Unknown => Ok(self.filters.push(arg.into())),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<PrintVariablesBuilder> for PrintVariables {
+    type Error = ();
+    fn try_from(builder: PrintVariablesBuilder) -> Result<Self, Self::Error> {
+        Ok(PrintVariables {
             filters: builder.filters,
         })
     }
