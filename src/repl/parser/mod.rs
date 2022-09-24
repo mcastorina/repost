@@ -77,15 +77,88 @@ macro_rules! literal {
     }};
 }
 
-macro_rules! vopt {
-    ($name:ident, $($( $lit:expr )+$(,)?)*) => {
-        fn $name(input: &str) -> IResult<&str> {
+macro_rules! opt {
+    ($name:ident, $key:expr, $($( $lit:expr )+$(,)?)*) => {
+        fn $name(input: &str) -> IResult<(OptKey, &str)> {
             let (rest, _) = terminated(alt(($($( tag($lit), )*)*)), eoo)(input)?;
             let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
             match sep {
                 "=" => cut(word)(rest),
                 _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
+            }.map(|(rest, val)| (rest, ($key, val)))
+        }
+    }
+}
+
+macro_rules! flag {
+    ($name:ident, $($( $lit:expr )+$(,)?)*) => {
+        fn $name(input: &str) -> IResult<()> {
+            map(terminated(alt(($($( tag($lit), )*)*)), eow), |_| ())(input)
+        }
+    }
+}
+
+macro_rules! parser {
+    ($name:ident, $builder:ident, $($( $opt:expr )+$(,)?)*) => {
+        fn $name(mut input: &str, completion: bool) -> IResult<$builder> {
+            let mut builder = $builder::default();
+            let mut double_dash = false;
+            let mut arg: &str;
+            let err = |_| nom::Err::Error(ParseError::default());
+            let done_parsing = if completion {
+                |s: &str| terminated(word, space1)(s).is_err()
+            } else {
+                |s: &str| s.len() == 0
+            };
+            loop {
+                input = trim_leading_space(input);
+                if done_parsing(input) {
+                    break;
+                }
+                if double_dash {
+                    (input, arg) = word(input)?;
+                    builder.add_arg(arg).map_err(err)?;
+                    continue;
+                }
+                if let Ok(ret) = eol(input) {
+                    (input, _) = ret;
+                    double_dash = true;
+                    continue;
+                }
+                $($( match $opt(input) {
+                    Ok(ret) => {
+                        let key;
+                        (input, (key, arg)) = ret;
+                        if completion && done_parsing(input) {
+                            builder.set_completion(Completion::OptValue(key));
+                            return Ok((arg, builder));
+                        }
+                        builder.add_opt(key, arg).map_err(err)?;
+                        continue;
+                    }
+                    Err(ret @ Failure(_)) => {
+                        return Err(ret);
+                    }
+                    _ => (),
+                } )*)*
+                if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
+                    (input, arg) = ret;
+                    builder.add_arg(arg).map_err(err)?;
+                    continue;
+                }
+                return Err(nom::Err::Error(ParseError{
+                    kind: ParseErrorKind::Unknown,
+                    word: input,
+                }))
             }
+            if completion {
+                match (double_dash, input.starts_with('-')) {
+                    (true, _) => builder.set_completion(Completion::Arg),
+                    (_, true) => builder.set_completion(Completion::OptKey),
+                    (_, false) => builder.set_completion(Completion::Arg),
+                }
+            }
+            Ok((input, builder))
         }
     }
 }
@@ -130,8 +203,10 @@ literal!(environment, "environment", "env", "e");
 literal!(workspaces, "workspaces");
 literal!(workspace, "workspace", "ws", "w");
 
-vopt!(opt_header, "--header", "-H");
-vopt!(opt_method, "--method", "-m");
+opt!(opt_header, OptKey::Header, "--header", "-H");
+opt!(opt_method, OptKey::Method, "--method", "-m");
+
+parser!(_create_request, CreateRequestBuilder, opt_header, opt_method);
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct CreateRequestBuilder {
@@ -153,6 +228,19 @@ enum CreateRequestCompletion {
     MethodValue,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+enum OptKey {
+    Header,
+    Method,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum Completion {
+    Arg,
+    OptKey,
+    OptValue(OptKey),
+}
+
 impl CreateRequestBuilder {
     fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
         match (&self.name, &self.url) {
@@ -161,13 +249,28 @@ impl CreateRequestBuilder {
             (_, None) => Ok(self.url = Some(arg.into())),
         }
     }
-    fn add_header<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
-        self.headers.push(arg.into());
+    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()> {
+        match key {
+            OptKey::Header => self.headers.push(arg.into()),
+            OptKey::Method => self.method = Some(arg.into()),
+            _ => return Err(()),
+        }
         Ok(())
     }
-    fn add_method<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
-        self.method = Some(arg.into());
-        Ok(())
+    fn set_completion(&mut self, kind: Completion) {
+        self.completion = match kind {
+            Completion::Arg => match (&self.name, &self.url) {
+                    (Some(_), Some(_)) => None,
+                    (None, _) => Some(CreateRequestCompletion::ArgName),
+                    (_, None) => Some(CreateRequestCompletion::ArgURL),
+                }
+            Completion::OptKey => Some(CreateRequestCompletion::OptKey),
+            Completion::OptValue(key) => Some(match key {
+                OptKey::Header => CreateRequestCompletion::HeaderValue,
+                OptKey::Method => CreateRequestCompletion::MethodValue,
+                _ => unreachable!(),
+            })
+        }
     }
 }
 
@@ -178,94 +281,16 @@ impl TryFrom<CreateRequestBuilder> for CreateRequest {
     }
 }
 
+fn trim_leading_space(s: &str) -> &str {
+    space0::<_, ParseError<&str>>(s).expect("stripping leading whitespace").0
+}
+
 fn create_request(mut input: &str) -> IResult<CreateRequestBuilder> {
     _create_request(input, false)
 }
 
 fn create_request_completion(mut input: &str) -> IResult<CreateRequestBuilder> {
     _create_request(input, true)
-}
-
-fn trim_leading_space(s: &str) -> &str {
-    space0::<_, ParseError<&str>>(s).expect("stripping leading whitespace").0
-}
-
-fn _create_request(mut input: &str, completion: bool) -> IResult<CreateRequestBuilder> {
-    let mut builder = CreateRequestBuilder::default();
-    let mut double_dash = false;
-    let mut arg: &str;
-    let err = |_| nom::Err::Error(ParseError::default());
-    let predicate = if completion {
-        |s: &str| terminated(word, space1)(s).is_ok()
-    } else {
-        |s: &str| s.len() > 0
-    };
-    loop {
-        input = trim_leading_space(input);
-        if !predicate(input) {
-            break;
-        }
-        if double_dash {
-            (input, arg) = word(input)?;
-            builder.add_arg(arg).map_err(err)?;
-            continue;
-        }
-        if let Ok(ret) = eol(input) {
-            (input, _) = ret;
-            double_dash = true;
-            continue;
-        }
-        match opt_header(input) {
-            Ok(ret) => {
-                (input, arg) = ret;
-                if completion && !predicate(input) {
-                    builder.completion = Some(CreateRequestCompletion::HeaderValue);
-                    return Ok((arg, builder));
-                }
-                builder.add_header(arg).map_err(err)?;
-                continue;
-            }
-            Err(ret @ Failure(_)) => {
-                return Err(ret);
-            }
-            _ => (),
-        }
-        match opt_method(input) {
-            Ok(ret) => {
-                (input, arg) = ret;
-                if completion && !predicate(input) {
-                    builder.completion = Some(CreateRequestCompletion::MethodValue);
-                    return Ok((arg, builder));
-                }
-                builder.add_method(arg).map_err(err)?;
-                continue;
-            }
-            Err(ret @ Failure(_)) => {
-                return Err(ret);
-            }
-            _ => (),
-        }
-        if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
-            (input, arg) = ret;
-            builder.add_arg(arg).map_err(err)?;
-            continue;
-        }
-        return Err(nom::Err::Error(ParseError{
-            kind: ParseErrorKind::Unknown,
-            word: input,
-        }))
-    }
-    if completion && builder.completion.is_none() {
-        builder.completion = match (double_dash, input.starts_with('-'), &builder.name, &builder.url) {
-            (false, true, Some(_), Some(_)) => Some(CreateRequestCompletion::OptKey),
-            (false, true, _, _) => Some(CreateRequestCompletion::OptKey),
-            (_, _, None, _) => Some(CreateRequestCompletion::ArgName),
-            (_, _, _, None) => Some(CreateRequestCompletion::ArgURL),
-            (true, _, Some(_), Some(_)) => None,
-            (false, false, Some(_), Some(_)) => None,
-        }
-    }
-    Ok((input, builder))
 }
 
 #[cfg(test)]
@@ -292,12 +317,22 @@ mod test {
 
     #[test]
     fn test_header() {
-        assert_eq!(opt_header("-H foo"), Ok(("", "foo")));
-        assert_eq!(opt_header("--header foo"), Ok(("", "foo")));
-        assert_eq!(opt_header("-H=foo"), Ok(("", "foo")));
-        assert_eq!(opt_header("--header=foo"), Ok(("", "foo")));
-        assert_eq!(opt_header("--header=--foo"), Ok(("", "--foo")));
-        assert_eq!(opt_header("-H=--foo"), Ok(("", "--foo")));
+        struct test {
+            input: &'static str,
+            expected: &'static str,
+        }
+        let tests = &[
+            ("-H foo", "foo"),
+            ("-H foo", "foo"),
+            ("--header foo", "foo"),
+            ("-H=foo", "foo"),
+            ("--header=foo", "foo"),
+            ("--header=--foo", "--foo"),
+            ("-H=--foo", "--foo"),
+        ];
+        for (input, expected) in tests {
+            assert_eq!(opt_header(input), Ok(("", (OptKey::Header, *expected))));
+        }
         assert!(matches!(opt_header("-H"), Err(_)));
         assert!(matches!(opt_header("--header"), Err(_)));
         assert!(matches!(opt_header("--header -H"), Err(_)));
