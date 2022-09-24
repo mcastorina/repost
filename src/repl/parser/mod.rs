@@ -42,7 +42,9 @@ impl Builder {
 pub fn parse_command(input: &str) -> Result<Command, ()> {
     let (rest, kind) = parse_command_kind(input).map_err(|_| ())?;
     Ok(match kind {
-        CommandKind::CreateRequest => Command::CreateRequest(create_request(rest)?),
+        CommandKind::CreateRequest => {
+            Command::CreateRequest(parse_subcommand::<CreateRequestBuilder>(rest)?.try_into()?)
+        }
     })
 }
 
@@ -53,7 +55,7 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
     };
     Ok(match kind {
         CommandKind::CreateRequest => {
-            let (s, (builder, completion)) = create_request_completion(rest).map_err(|_| ())?;
+            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
             (
                 Some(Builder::CreateRequestBuilder(builder)),
                 completion.map(|c| (s, c)),
@@ -254,7 +256,7 @@ impl OptKey {
     }
 }
 
-trait CmdLineBuilder {
+trait CmdLineBuilder: Default {
     const ARGS: &'static [ArgKey];
     const OPTS: &'static [OptKey];
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()>;
@@ -276,9 +278,25 @@ fn strip_leading_space(s: &str) -> &str {
         .0
 }
 
-fn parse_subcommand<B>(mut input: &str, completion: bool) -> IResult<(B, Option<Completion>)>
+fn parse_subcommand<B>(input: &str) -> Result<B, ()>
 where
-    B: CmdLineBuilder + Default,
+    B: CmdLineBuilder,
+{
+    let parser = |i| _parse_subcommand(i, false);
+    let (_, builder): (_, B) = map(parser, |(b, _)| b)(input).map_err(|_| ())?;
+    Ok(builder)
+}
+
+fn parse_subcommand_completion<B>(input: &str) -> IResult<(B, Option<Completion>)>
+where
+    B: CmdLineBuilder,
+{
+    _parse_subcommand(input, true)
+}
+
+fn _parse_subcommand<B>(mut input: &str, completion: bool) -> IResult<(B, Option<Completion>)>
+where
+    B: CmdLineBuilder,
 {
     let mut builder = B::default();
     let mut double_dash = false;
@@ -361,18 +379,6 @@ where
     Ok((input, (builder, completion)))
 }
 
-pub fn create_request(input: &str) -> Result<CreateRequest, ()> {
-    let parser = |i| parse_subcommand(i, false);
-    let (_, builder): (_, CreateRequestBuilder) = map(parser, |(b, _)| b)(input).map_err(|_| ())?;
-    Ok(builder.try_into()?)
-}
-
-pub fn create_request_completion(
-    input: &str,
-) -> IResult<(CreateRequestBuilder, Option<Completion>)> {
-    parse_subcommand(input, true)
-}
-
 #[cfg(test)]
 mod test {
     use super::create_request::*;
@@ -426,6 +432,8 @@ mod test {
 
     #[test]
     fn test_create_request() {
+        let create_request =
+            |input| parse_subcommand::<CreateRequestBuilder>(input).and_then(|b| b.try_into());
         assert_eq!(
             create_request("foo bar"),
             Ok(CreateRequest {
@@ -475,6 +483,8 @@ mod test {
 
     #[test]
     fn test_create_request_complete() {
+        let create_request_completion =
+            |input| parse_subcommand_completion::<CreateRequestBuilder>(input);
         assert_eq!(
             create_request_completion("foo"),
             Ok((
