@@ -33,7 +33,7 @@ pub enum CreateRequestCompletion {
 }
 
 impl CmdLineBuilder for CreateRequestBuilder {
-    const PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] =
+    const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] =
         &[opt_header, opt_method];
 
     fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {

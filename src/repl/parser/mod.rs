@@ -124,7 +124,7 @@ opt!(opt_header, OptKey::Header, "--header", "-H");
 opt!(opt_method, OptKey::Method, "--method", "-m");
 
 trait CmdLineBuilder {
-    const PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>];
+    const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>];
     fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()>;
     fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()>;
     fn set_completion(&mut self, kind: Completion);
@@ -159,18 +159,28 @@ where
         if done_parsing(input) {
             break;
         }
+        // We encountered a '--' so everything should be interpreted as an argument.
         if double_dash {
             (input, arg) = word(input)?;
             builder.add_arg(arg).map_err(err)?;
             continue;
         }
+        // Check for '--'.
         if let Ok(ret) = eol(input) {
             (input, _) = ret;
             double_dash = true;
             continue;
         }
-        for opt in B::PARSERS {
+        // Try to parse the argument as long as it doesn't start with '-'.
+        if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
+            (input, arg) = ret;
+            builder.add_arg(arg).map_err(err)?;
+            continue;
+        }
+        // Try to parse any options.
+        for opt in B::OPT_PARSERS {
             match opt(input) {
+                // Successfully parsed the option.
                 Ok(ret) => {
                     let key;
                     (input, (key, arg)) = ret;
@@ -181,18 +191,16 @@ where
                     builder.add_opt(key, arg).map_err(err)?;
                     continue 'main;
                 }
+                // Non-recoverable error (e.g. the key parsed but not the value).
                 Err(ret @ Failure(_)) => {
                     return Err(ret);
                 }
+                // Recoverable error, do nothing and try the next parser.
                 _ => (),
             }
         }
-        if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
-            (input, arg) = ret;
-            builder.add_arg(arg).map_err(err)?;
-            continue;
-        }
-        return Err(nom::Err::Error(ParseError{
+        // Nothing successfully parsed the input, return an error.
+        return Err(nom::Err::Failure(ParseError{
             kind: ParseErrorKind::Unknown,
             word: input,
         }))
