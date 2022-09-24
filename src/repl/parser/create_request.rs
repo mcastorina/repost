@@ -20,7 +20,6 @@ pub struct CreateRequestBuilder {
     pub headers: Vec<String>,
     // TODO: blob body
     pub body: Option<String>,
-    pub completion: Option<Completion>,
 }
 
 impl CmdLineBuilder for CreateRequestBuilder {
@@ -42,8 +41,8 @@ impl CmdLineBuilder for CreateRequestBuilder {
         }
         Ok(())
     }
-    fn set_completion(&mut self, kind: Completion) {
-        self.completion = match kind {
+    fn get_completion(&self, kind: Completion) -> Option<Completion> {
+        match kind {
             Completion::Arg(ArgKey::Unknown) => None,
             _ => Some(kind),
         }
