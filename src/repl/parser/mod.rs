@@ -1,7 +1,9 @@
 mod create_request;
+mod create_variable;
 mod error;
 
 use create_request::{CreateRequest, CreateRequestBuilder};
+use create_variable::{CreateVariable, CreateVariableBuilder};
 use error::{IResult, ParseError, ParseErrorKind};
 use nom::Err::{Error, Failure};
 use nom::{
@@ -24,17 +26,20 @@ use nom::{
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     CreateRequest(CreateRequest),
+    CreateVariable(CreateVariable),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Builder {
     CreateRequestBuilder(CreateRequestBuilder),
+    CreateVariableBuilder(CreateVariableBuilder),
 }
 
 impl Builder {
     pub fn opts(&self) -> &'static [OptKey] {
         match self {
             Self::CreateRequestBuilder(_) => CreateRequestBuilder::OPTS,
+            Self::CreateVariableBuilder(_) => CreateVariableBuilder::OPTS,
         }
     }
 }
@@ -42,9 +47,8 @@ impl Builder {
 pub fn parse_command(input: &str) -> Result<Command, ()> {
     let (rest, kind) = parse_command_kind(input).map_err(|_| ())?;
     Ok(match kind {
-        CommandKind::CreateRequest => {
-            Command::CreateRequest(parse_subcommand::<CreateRequestBuilder>(rest)?.try_into()?)
-        }
+        CommandKind::CreateRequest => Command::CreateRequest(parse_subcommand::<CreateRequestBuilder>(rest)?.try_into()?),
+        CommandKind::CreateVariable => Command::CreateVariable(parse_subcommand::<CreateVariableBuilder>(rest)?.try_into()?),
     })
 }
 
@@ -61,6 +65,13 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
                 completion.map(|c| (s, c)),
             )
         }
+        CommandKind::CreateVariable => {
+            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
+            (
+                Some(Builder::CreateVariableBuilder(builder)),
+                completion.map(|c| (s, c)),
+            )
+        }
     })
 }
 
@@ -70,14 +81,16 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
 #[derive(Debug, PartialEq, Clone)]
 enum CommandKind {
     CreateRequest,
+    CreateVariable,
 }
 
 impl CommandKind {
     fn parse(input: &str) -> Result<(&str, Self), ()> {
         // TODO: Use CommandKey parsing for consistency.
-        alt((map(tuple((create, space1, request, space1)), |_| {
-            CommandKind::CreateRequest
-        }),))(input)
+        alt((
+            map(tuple((create, space1, request, space1)), |_|  CommandKind::CreateRequest ),
+            map(tuple((create, space1, variable, space1)), |_|  CommandKind::CreateVariable ),
+        ))(input)
         .map_err(|_| ())
     }
 }
@@ -111,7 +124,7 @@ fn parse_command_kind(input: &str) -> Result<(&str, CommandKind), Option<(&str, 
         space1(rest).map_err(|_: nom::Err<ParseError<_>>| (input, Completion::Command(CMDS)))?;
 
     let sub_cmds: &'static [CommandKey] = match cmd {
-        CommandKey::Create => &[CommandKey::Request],
+        CommandKey::Create => &[CommandKey::Request, CommandKey::Variable],
         _ => unreachable!(),
     };
 
@@ -205,6 +218,7 @@ literal!(workspace, "workspace", "ws", "w");
 pub enum CommandKey {
     Create,
     Request,
+    Variable,
 }
 
 impl CommandKey {
@@ -212,12 +226,14 @@ impl CommandKey {
         match self {
             CommandKey::Create => &["create", "new", "add", "c"],
             CommandKey::Request => &["request", "req", "r"],
+            CommandKey::Variable => &["variable", "var", "v"],
         }
     }
     fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {
         match self {
             CommandKey::Create => map(create, |_| self.to_owned())(input),
             CommandKey::Request => map(request, |_| self.to_owned())(input),
+            CommandKey::Variable => map(variable, |_| self.to_owned())(input),
         }
     }
 }

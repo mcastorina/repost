@@ -54,12 +54,12 @@ impl TryFrom<CreateRequestBuilder> for CreateRequest {
             (Some(_), Some(_)) => (),
             _ => return Err(()),
         }
-        return Ok(CreateRequest {
+        Ok(CreateRequest {
             name: builder.name.unwrap(),
             url: builder.url.unwrap(),
             headers: builder.headers,
             method: builder.method,
             body: builder.body,
-        });
+        })
     }
 }
