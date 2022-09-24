@@ -27,10 +27,7 @@ impl CmdLineBuilder for CreateVariableBuilder {
         Err(())
     }
     fn get_completion(&self, kind: Completion) -> Option<Completion> {
-        match kind {
-            Completion::Arg(ArgKey::Unknown) => None,
-            _ => Some(kind),
-        }
+        Some(kind)
     }
 }
 
