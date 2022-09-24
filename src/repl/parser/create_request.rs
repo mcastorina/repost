@@ -1,5 +1,3 @@
-use super::IResult;
-use super::{opt_header, opt_method};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
 
 #[derive(Debug, PartialEq, Eq, Clone)]

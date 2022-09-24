@@ -26,18 +26,36 @@ pub enum Command {
     CreateRequest(CreateRequest),
 }
 
-pub fn parse_command(input: &str) -> Result<Command, ()> {
-    Ok(Command::CreateRequest(create_request(input)?))
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Builder {
     CreateRequestBuilder(CreateRequestBuilder),
 }
 
+pub fn parse_command(input: &str) -> Result<Command, ()> {
+    enum Kind {
+        CreateRequest,
+    }
+    let (rest, kind) = alt((
+        map(tuple((create, space1, request)), |_| Kind::CreateRequest),
+    ))(input).map_err(|_| ())?;
+    Ok(match kind {
+        Kind::CreateRequest => Command::CreateRequest(create_request(rest)?),
+    })
+}
+
 pub fn parse_completion(input: &str) -> Result<(Builder, (&str, Option<Completion>)), ()> {
-    let (s, (builder, completion)) = create_request_completion(input).map_err(|_| ())?;
-    Ok((Builder::CreateRequestBuilder(builder), (s, completion)))
+    enum Kind {
+        CreateRequest,
+    }
+    let (rest, kind) = alt((
+        map(tuple((create, space1, request)), |_| Kind::CreateRequest),
+    ))(input).map_err(|_| ())?;
+    Ok(match kind {
+        Kind::CreateRequest => {
+            let (s, (builder, completion)) = create_request_completion(rest).map_err(|_| ())?;
+            (Builder::CreateRequestBuilder(builder), (s, completion))
+        }
+    })
 }
 
 fn all<'a, O, F>(
