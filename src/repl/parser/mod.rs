@@ -54,8 +54,14 @@ where
 {
     move |input: &str| match parser.parse(input.clone()) {
         Err(_) => match word(input) {
-            Ok((_, word)) => Err(Error(ParseError { kind: kind.clone(), word: word })),
-            _ => Err(Error(ParseError { kind: kind.clone(), word: input })),
+            Ok((_, word)) => Err(Error(ParseError {
+                kind: kind.clone(),
+                word: word,
+            })),
+            _ => Err(Error(ParseError {
+                kind: kind.clone(),
+                word: input,
+            })),
         },
         rest => rest,
     }
@@ -69,6 +75,19 @@ macro_rules! literal {
             ParseErrorKind::Fixed(&[ $($( $lit, )*)* ]),
         )(input)
     }};
+}
+
+macro_rules! vopt {
+    ($name:ident, $($( $lit:expr )+$(,)?)*) => {
+        fn $name(input: &str) -> IResult<&str> {
+            let (rest, _) = terminated(alt(($($( tag($lit), )*)*)), eoo)(input)?;
+            let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
+            match sep {
+                "=" => cut(word)(rest),
+                _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
+            }
+        }
+    }
 }
 
 fn word(input: &str) -> IResult<&str> {
@@ -96,6 +115,10 @@ fn eow(input: &str) -> IResult<&str> {
     peek(alt((space1, eof)))(input)
 }
 
+fn eoo(input: &str) -> IResult<&str> {
+    peek(alt((space1, tag("="), eof)))(input)
+}
+
 literal!(print, "print", "get", "show", "p");
 literal!(create, "create", "new", "add", "c");
 literal!(requests, "requests", "reqs");
@@ -107,50 +130,8 @@ literal!(environment, "environment", "env", "e");
 literal!(workspaces, "workspaces");
 literal!(workspace, "workspace", "ws", "w");
 
-fn verb(input: &str) -> IResult<CmdKind> {
-    // get the sub command
-    enum SubCmdKind {
-        Print,
-        Create,
-    }
-    let (rest, kind) = all(
-        alt((
-            map(print, |_| SubCmdKind::Print),
-            map(create, |_| SubCmdKind::Create),
-        )),
-        ParseErrorKind::Fixed(&["print", "get", "show", "p", "create", "new", "add", "c"]),
-    )(input)?;
-
-    // we expect at least one space
-    let (rest, _) = space1(rest)?;
-
-    // parse the second command based on the first
-    match kind {
-        SubCmdKind::Print => all(
-            alt((
-                map(alt((requests, request)), |_| CmdKind::PrintRequests),
-                map(alt((variables, variable)), |_| CmdKind::PrintVariables),
-                map(alt((environments, environment)), |_| {
-                    CmdKind::PrintEnvironments
-                }),
-                map(alt((workspaces, workspace)), |_| CmdKind::PrintWorkspaces),
-            )),
-            ParseErrorKind::Fixed(&[
-                "requests", "reqs", "request", "req", "r",
-                "variables", "vars", "variable", "var", "v",
-                "environments", "envs", "environment", "env", "e",
-                "workspaces", "workspace", "ws", "w",
-            ]),
-        )(rest),
-        SubCmdKind::Create => all(
-            alt((
-                map(alt((requests, request)), |_| CmdKind::CreateRequest),
-                map(alt((variables, variable)), |_| CmdKind::CreateVariable),
-            )),
-            ParseErrorKind::Fixed(&["request", "req", "r", "variable", "var", "v"]),
-        )(rest),
-    }
-}
+vopt!(opt_header, "--header", "-H");
+vopt!(opt_method, "--method", "-m");
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct CreateRequestBuilder {
@@ -162,6 +143,24 @@ pub struct CreateRequestBuilder {
     body: Option<String>,
 }
 
+impl CreateRequestBuilder {
+    fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
+        match (&self.name, &self.url) {
+            (Some(_), Some(_)) => Err(()),
+            (None, _) => Ok(self.name = Some(arg.into())),
+            (_, None) => Ok(self.url = Some(arg.into())),
+        }
+    }
+    fn add_header<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
+        self.headers.push(arg.into());
+        Ok(())
+    }
+    fn add_method<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
+        self.method = Some(arg.into());
+        Ok(())
+    }
+}
+
 impl TryFrom<CreateRequestBuilder> for CreateRequest {
     type Error = ParseErrorKind;
     fn try_from(builder: CreateRequestBuilder) -> Result<Self, Self::Error> {
@@ -169,22 +168,64 @@ impl TryFrom<CreateRequestBuilder> for CreateRequest {
     }
 }
 
-macro_rules! create_request_args_err {
-    ($parser:expr, $input:expr, $err:expr) => {
-        $parser($input).map_err(|_: nom::Err<ParseError<_>>| Error(ParseError{
-            word: $input,
-            kind: $err,
-        }))
-    };
+fn create_request(mut input: &str) -> IResult<CreateRequestBuilder> {
+    _create_request(input, false)
 }
 
-fn create_request_args(input: &str) -> IResult<CreateRequest> {
+fn create_request_completion(mut input: &str) -> IResult<CreateRequestBuilder> {
+    _create_request(input, true)
+}
+
+fn trim_leading_space(s: &str) -> &str {
+    space0::<_, ParseError<&str>>(s).expect("stripping leading whitespace").0
+}
+
+fn _create_request(mut input: &str, completion: bool) -> IResult<CreateRequestBuilder> {
     let mut builder = CreateRequestBuilder::default();
-    // loop over each word
-    let (rest, arg) = create_request_args_err!(word, input, ParseErrorKind::CreateRequest(builder.clone()))?;
-    builder.name = Some(arg.to_string());
-    let (rest, _) = create_request_args_err!(space1, rest, ParseErrorKind::CreateRequest(builder.clone()))?;
-    todo!()
+    let mut double_dash = false;
+    let mut arg: &str;
+    let err = |_| nom::Err::Error(ParseError::default());
+    let predicate = if completion {
+        |s: &str| terminated(word, space1)(s).is_ok()
+    } else {
+        |s: &str| s.len() > 0
+    };
+    loop {
+        input = trim_leading_space(input);
+        if !predicate(input) {
+            break;
+        }
+        if double_dash {
+            (input, arg) = word(input)?;
+            builder.add_arg(arg).map_err(err)?;
+            continue;
+        }
+        if let Ok(ret) = eol(input) {
+            (input, _) = ret;
+            double_dash = true;
+            continue;
+        }
+        if let Ok(ret) = opt_header(input) {
+            (input, arg) = ret;
+            builder.add_header(arg).map_err(err)?;
+            continue;
+        }
+        if let Ok(ret) = opt_method(input) {
+            (input, arg) = ret;
+            builder.add_method(arg).map_err(err)?;
+            continue;
+        }
+        if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
+            (input, arg) = ret;
+            builder.add_arg(arg).map_err(err)?;
+            continue;
+        }
+        return Err(nom::Err::Error(ParseError{
+            kind: ParseErrorKind::Unknown,
+            word: input,
+        }))
+    }
+    Ok((input, builder))
 }
 
 #[cfg(test)]
@@ -210,68 +251,85 @@ mod test {
     }
 
     #[test]
-    fn test_verb() {
-        assert_eq!(verb("create request"), Ok(("", CmdKind::CreateRequest)));
-        assert_eq!(verb("c r"), Ok(("", CmdKind::CreateRequest)));
-        assert_eq!(verb("print ws"), Ok(("", CmdKind::PrintWorkspaces)));
-        assert_eq!(verb("show vars"), Ok(("", CmdKind::PrintVariables)));
-        assert_eq!(
-            verb("foo bar"),
-            Err(Error(ParseError {
-                kind: ParseErrorKind::Fixed(&[
-                    "print", "get", "show", "p", "create", "new", "add", "c",
-                ]),
-                word: "foo"
-            }))
-        );
-        assert_eq!(
-            verb("create bar"),
-            Err(Error(ParseError {
-                kind: ParseErrorKind::Fixed(&["request", "req", "r", "variable", "var", "v",]),
-                word: "bar"
-            }))
-        );
-        assert_eq!(
-            verb("create"),
-            Err(Error(ParseError {
-                kind: ParseErrorKind::Unknown,
-                word: "",
-            })),
-        );
+    fn test_header() {
+        assert_eq!(opt_header("-H foo"), Ok(("", "foo")));
+        assert_eq!(opt_header("--header foo"), Ok(("", "foo")));
+        assert_eq!(opt_header("-H=foo"), Ok(("", "foo")));
+        assert_eq!(opt_header("--header=foo"), Ok(("", "foo")));
+        assert_eq!(opt_header("--header=--foo"), Ok(("", "--foo")));
+        assert_eq!(opt_header("-H=--foo"), Ok(("", "--foo")));
+        assert!(matches!(opt_header("-H"), Err(_)));
+        assert!(matches!(opt_header("--header"), Err(_)));
+        assert!(matches!(opt_header("--header -H"), Err(_)));
+        assert!(matches!(opt_header("--header --foo"), Err(_)));
+        assert!(matches!(opt_header("--oops"), Err(_)));
     }
 
     #[test]
-    fn test_create_request_args() {
-        assert_eq!(
-            create_request_args(""),
-            Err(Error(ParseError {
-                word: "",
-                kind: ParseErrorKind::CreateRequest(
-                    CreateRequestBuilder {
-                        name: None,
-                        url: None,
-                        method: None,
-                        headers: vec![],
-                        body: None,
-                    }
-                )
-            })),
-        );
+    fn test_create_request() {
+        assert_eq!(create_request("foo bar"), Ok(("", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: Some("bar".to_string()),
+            method: None,
+            headers: vec![],
+            body: None,
+        })));
+        assert_eq!(create_request("foo -H yay bar"), Ok(("", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: Some("bar".to_string()),
+            method: None,
+            headers: vec!["yay".to_string()],
+            body: None,
+        })));
+        assert_eq!(create_request("--method baz -- foo bar"), Ok(("", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: Some("bar".to_string()),
+            method: Some("baz".to_string()),
+            headers: vec![],
+            body: None,
+        })));
+        assert_eq!(create_request("-- --foo --bar"), Ok(("", CreateRequestBuilder{
+            name: Some("--foo".to_string()),
+            url: Some("--bar".to_string()),
+            method: None,
+            headers: vec![],
+            body: None,
+        })));
+        assert!(matches!(create_request("foo bar baz"), Err(_)));
+        assert!(matches!(create_request("--foo --bar"), Err(_)));
+        assert!(matches!(create_request("--foo"), Err(_)));
+        assert!(matches!(create_request("foo bar -X"), Err(_)));
+    }
 
-        assert_eq!(
-            create_request_args("foo"),
-            Err(Error(ParseError {
-                word: "",
-                kind: ParseErrorKind::CreateRequest(
-                    CreateRequestBuilder {
-                        name: Some("foo".to_string()),
-                        url: None,
-                        method: None,
-                        headers: vec![],
-                        body: None,
-                    }
-                )
-            })),
-        );
+    #[test]
+    fn test_create_request_complete() {
+        assert_eq!(create_request_completion("foo bar"), Ok(("bar", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: None,
+            method: None,
+            headers: vec![],
+            body: None,
+        })));
+        assert_eq!(create_request_completion("foo "), Ok(("", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: None,
+            method: None,
+            headers: vec![],
+            body: None,
+        })));
+        assert_eq!(create_request_completion("foo -"), Ok(("-", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: None,
+            method: None,
+            headers: vec![],
+            body: None,
+        })));
+        assert_eq!(create_request_completion("foo -H "), Ok(("", CreateRequestBuilder{
+            name: Some("foo".to_string()),
+            url: None,
+            method: None,
+            headers: vec![],
+            body: None,
+        })));
     }
 }

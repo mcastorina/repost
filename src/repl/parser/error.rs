@@ -4,14 +4,15 @@ use std::collections::HashMap;
 
 pub type IResult<'a, O> = nom::IResult<&'a str, O, ParseError<&'a str>>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ParseError<I> {
     pub kind: ParseErrorKind,
     pub word: I,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub enum ParseErrorKind {
+    #[default]
     Unknown,
     Fixed(&'static [&'static str]),
     CreateRequest(super::CreateRequestBuilder),
