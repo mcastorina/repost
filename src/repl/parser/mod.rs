@@ -89,17 +89,26 @@ enum CommandKind {
 }
 
 impl CommandKind {
+    const KINDS: &'static [Self] = &[Self::CreateRequest, Self::CreateVariable];
+    fn keys(&self) -> &'static [CommandKey] {
+        use CommandKey::*;
+        match self {
+            Self::CreateRequest => &[Create, Request],
+            Self::CreateVariable => &[Create, Variable],
+        }
+    }
     fn parse(input: &str) -> Result<(&str, Self), ()> {
-        // TODO: Use CommandKey parsing for consistency.
-        alt((
-            map(tuple((create, space1, request, space1)), |_| {
-                CommandKind::CreateRequest
-            }),
-            map(tuple((create, space1, variable, space1)), |_| {
-                CommandKind::CreateVariable
-            }),
-        ))(input)
-        .map_err(|_| ())
+        'main: for kind in Self::KINDS.into_iter() {
+            let mut input = input;
+            for key in kind.keys() {
+                input = match tuple((|i| key.parse(i), space1))(input) {
+                    Ok((input, _)) => input,
+                    _ => continue 'main,
+                }
+            }
+            return Ok((input, kind.to_owned()));
+        }
+        Err(())
     }
 }
 
@@ -164,24 +173,6 @@ where
     }
 }
 
-macro_rules! literal {
-    ($name:ident, $($( $lit:expr )+$(,)?)*) => {
-        fn $name(input: &str) -> IResult<&str> {
-        all(
-            alt(($($( terminated(tag($lit), eow), )*)*)),
-            ParseErrorKind::Fixed(&[ $($( $lit, )*)* ]),
-        )(input)
-    }};
-}
-
-macro_rules! flag {
-    ($name:ident, $($( $lit:expr )+$(,)?)*) => {
-        fn $name(input: &str) -> IResult<()> {
-            map(terminated(alt(($($( tag($lit), )*)*)), eow), |_| ())(input)
-        }
-    }
-}
-
 fn word(input: &str) -> IResult<&str> {
     // return an error if the input is empty
     take(1_usize)(input)?;
@@ -211,20 +202,10 @@ fn eoo(input: &str) -> IResult<&str> {
     peek(alt((space1, tag("="), eof)))(input)
 }
 
-literal!(print, "print", "get", "show", "p");
-literal!(create, "create", "new", "add", "c");
-literal!(requests, "requests", "reqs");
-literal!(request, "request", "req", "r");
-literal!(variables, "variables", "vars");
-literal!(variable, "variable", "var", "v");
-literal!(environments, "environments", "envs");
-literal!(environment, "environment", "env", "e");
-literal!(workspaces, "workspaces");
-literal!(workspace, "workspace", "ws", "w");
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum CommandKey {
     Create,
+    Print,
     Request,
     Variable,
 }
@@ -233,17 +214,16 @@ impl CommandKey {
     pub fn completions<'a>(&'a self) -> &'static [&'static str] {
         match self {
             CommandKey::Create => &["create", "new", "add", "c"],
+            CommandKey::Print => &["print", "get", "show", "p"],
             CommandKey::Request => &["request", "req", "r"],
             CommandKey::Variable => &["variable", "var", "v"],
         }
     }
-    // TODO: use self.completions() to parse
     fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {
-        match self {
-            CommandKey::Create => map(create, |_| self.to_owned())(input),
-            CommandKey::Request => map(request, |_| self.to_owned())(input),
-            CommandKey::Variable => map(variable, |_| self.to_owned())(input),
-        }
+        map(
+            |i| parse_literal(i, self.completions()),
+            |_| self.to_owned(),
+        )(input)
     }
 }
 
@@ -301,6 +281,16 @@ fn strip_leading_space(s: &str) -> &str {
     space0::<_, ParseError<&str>>(s)
         .expect("stripping leading whitespace")
         .0
+}
+
+fn parse_literal<'a>(input: &'a str, aliases: &'static [&'static str]) -> IResult<'a, &'a str> {
+    for alias in aliases.iter().cloned() {
+        let result = terminated(tag(alias), eow)(input);
+        if result.is_ok() {
+            return result;
+        }
+    }
+    Err(nom::Err::Error(ParseError::default()))
 }
 
 fn parse_subcommand<B>(input: &str) -> Result<B, ()>
@@ -414,17 +404,12 @@ mod test {
 
     #[test]
     fn test_print() {
+        let print = |i| parse_literal(i, CommandKey::Print.completions());
         assert_eq!(print("print"), Ok(("", "print")));
         assert_eq!(print("get"), Ok(("", "get")));
         assert_eq!(print("show"), Ok(("", "show")));
         assert_eq!(print("p"), Ok(("", "p")));
-        assert_eq!(
-            print("gets"),
-            Err(Error(ParseError {
-                kind: ParseErrorKind::Fixed(&["print", "get", "show", "p"]),
-                word: "gets"
-            }))
-        );
+        assert!(matches!(print("gets"), Err(_)));
     }
 
     #[test]
@@ -711,16 +696,22 @@ mod test {
             parse_command_kind("create request"),
             Err(Some((
                 "request",
-                Completion::Command(&[CommandKey::Request])
+                Completion::Command(&[CommandKey::Request, CommandKey::Variable])
             )))
         );
         assert_eq!(
             parse_command_kind("create req"),
-            Err(Some(("req", Completion::Command(&[CommandKey::Request]))))
+            Err(Some((
+                "req",
+                Completion::Command(&[CommandKey::Request, CommandKey::Variable])
+            )))
         );
         assert_eq!(
             parse_command_kind("create foo"),
-            Err(Some(("foo", Completion::Command(&[CommandKey::Request]))))
+            Err(Some((
+                "foo",
+                Completion::Command(&[CommandKey::Request, CommandKey::Variable])
+            )))
         );
         assert_eq!(
             parse_command_kind("foo"),
