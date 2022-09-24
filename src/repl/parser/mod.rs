@@ -120,12 +120,19 @@ enum OptKey {
     Method,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+enum ArgKey {
+    Name,
+    URL,
+}
+
 opt!(opt_header, OptKey::Header, "--header", "-H");
 opt!(opt_method, OptKey::Method, "--method", "-m");
 
 trait CmdLineBuilder {
+    const ARGS: &'static [ArgKey];
     const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>];
-    fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()>;
+    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()>;
     fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()>;
     fn set_completion(&mut self, kind: Completion);
 }
@@ -154,6 +161,14 @@ where
     } else {
         |s: &str| s.len() == 0
     };
+    let mut arg_count = 0;
+    let mut arg_key = || match B::ARGS.get(arg_count) {
+        Some(key) => {
+            arg_count += 1;
+            Ok(key.clone())
+        }
+        _ => Err(nom::Err::Failure(ParseError::default()))
+    };
     'main : loop {
         input = trim_leading_space(input);
         if done_parsing(input) {
@@ -162,7 +177,7 @@ where
         // We encountered a '--' so everything should be interpreted as an argument.
         if double_dash {
             (input, arg) = word(input)?;
-            builder.add_arg(arg).map_err(err)?;
+            builder.add_arg(arg_key()?, arg).map_err(err)?;
             continue;
         }
         // Check for '--'.
@@ -174,7 +189,7 @@ where
         // Try to parse the argument as long as it doesn't start with '-'.
         if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
             (input, arg) = ret;
-            builder.add_arg(arg).map_err(err)?;
+            builder.add_arg(arg_key()?, arg).map_err(err)?;
             continue;
         }
         // Try to parse any options.

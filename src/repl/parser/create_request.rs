@@ -1,5 +1,5 @@
 use super::IResult;
-use super::{CmdLineBuilder, Completion, OptKey};
+use super::{CmdLineBuilder, Completion, ArgKey, OptKey};
 use super::{opt_header, opt_method};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -33,14 +33,15 @@ pub enum CreateRequestCompletion {
 }
 
 impl CmdLineBuilder for CreateRequestBuilder {
+    const ARGS: &'static [ArgKey] = &[ArgKey::Name, ArgKey::URL];
     const OPT_PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] =
         &[opt_header, opt_method];
 
-    fn add_arg<S: Into<String>>(&mut self, arg: S) -> Result<(), ()> {
-        match (&self.name, &self.url) {
-            (Some(_), Some(_)) => Err(()),
-            (None, _) => Ok(self.name = Some(arg.into())),
-            (_, None) => Ok(self.url = Some(arg.into())),
+    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
+        match key {
+            ArgKey::Name => Ok(self.name = Some(arg.into())),
+            ArgKey::URL => Ok(self.url = Some(arg.into())),
+            _ => Err(()),
         }
     }
     fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()> {
