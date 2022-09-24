@@ -47,8 +47,12 @@ impl Builder {
 pub fn parse_command(input: &str) -> Result<Command, ()> {
     let (rest, kind) = parse_command_kind(input).map_err(|_| ())?;
     Ok(match kind {
-        CommandKind::CreateRequest => Command::CreateRequest(parse_subcommand::<CreateRequestBuilder>(rest)?.try_into()?),
-        CommandKind::CreateVariable => Command::CreateVariable(parse_subcommand::<CreateVariableBuilder>(rest)?.try_into()?),
+        CommandKind::CreateRequest => {
+            Command::CreateRequest(parse_subcommand::<CreateRequestBuilder>(rest)?.try_into()?)
+        }
+        CommandKind::CreateVariable => {
+            Command::CreateVariable(parse_subcommand::<CreateVariableBuilder>(rest)?.try_into()?)
+        }
     })
 }
 
@@ -88,8 +92,12 @@ impl CommandKind {
     fn parse(input: &str) -> Result<(&str, Self), ()> {
         // TODO: Use CommandKey parsing for consistency.
         alt((
-            map(tuple((create, space1, request, space1)), |_|  CommandKind::CreateRequest ),
-            map(tuple((create, space1, variable, space1)), |_|  CommandKind::CreateVariable ),
+            map(tuple((create, space1, request, space1)), |_| {
+                CommandKind::CreateRequest
+            }),
+            map(tuple((create, space1, variable, space1)), |_| {
+                CommandKind::CreateVariable
+            }),
         ))(input)
         .map_err(|_| ())
     }
@@ -229,6 +237,7 @@ impl CommandKey {
             CommandKey::Variable => &["variable", "var", "v"],
         }
     }
+    // TODO: use self.completions() to parse
     fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {
         match self {
             CommandKey::Create => map(create, |_| self.to_owned())(input),

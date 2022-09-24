@@ -83,7 +83,14 @@ impl Completer for CommandCompleter {
         let (prefix, candidates) = match completion {
             Some((prefix, Completion::Command(cmds))) => (
                 prefix,
-                cmds.iter().map(|cmd| cmd.completions()[0]).collect(),
+                cmds.iter()
+                    .filter_map(|cmd| {
+                        cmd.completions()
+                            .iter()
+                            .filter(|cand| cand.starts_with(prefix))
+                            .next()
+                    })
+                    .collect(),
             ),
             Some((prefix, Completion::OptKey)) => {
                 let builder = builder.unwrap();
@@ -93,7 +100,6 @@ impl Completer for CommandCompleter {
                         .opts()
                         .iter()
                         .flat_map(|opt| opt.completions())
-                        .copied()
                         .collect(),
                 )
             }
