@@ -35,9 +35,10 @@ pub fn parse_command(input: &str) -> Result<Command, ()> {
     enum Kind {
         CreateRequest,
     }
-    let (rest, kind) = alt((
-        map(tuple((create, space1, request)), |_| Kind::CreateRequest),
-    ))(input).map_err(|_| ())?;
+    let (rest, kind) = alt((map(tuple((create, space1, request)), |_| {
+        Kind::CreateRequest
+    }),))(input)
+    .map_err(|_| ())?;
     Ok(match kind {
         Kind::CreateRequest => Command::CreateRequest(create_request(rest)?),
     })
@@ -47,9 +48,10 @@ pub fn parse_completion(input: &str) -> Result<(Builder, (&str, Option<Completio
     enum Kind {
         CreateRequest,
     }
-    let (rest, kind) = alt((
-        map(tuple((create, space1, request)), |_| Kind::CreateRequest),
-    ))(input).map_err(|_| ())?;
+    let (rest, kind) = alt((map(tuple((create, space1, request)), |_| {
+        Kind::CreateRequest
+    }),))(input)
+    .map_err(|_| ())?;
     Ok(match kind {
         Kind::CreateRequest => {
             let (s, (builder, completion)) = create_request_completion(rest).map_err(|_| ())?;
@@ -88,19 +90,6 @@ macro_rules! literal {
             ParseErrorKind::Fixed(&[ $($( $lit, )*)* ]),
         )(input)
     }};
-}
-
-macro_rules! opt {
-    ($name:ident, $($( $lit:expr )+$(,)?)*) => {
-        fn $name(input: &str) -> IResult<&str> {
-            let (rest, _) = terminated(alt(($($( tag($lit), )*)*)), eoo)(input)?;
-            let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
-            match sep {
-                "=" => cut(word)(rest),
-                _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
-            }
-        }
-    }
 }
 
 macro_rules! flag {
@@ -165,16 +154,29 @@ pub enum ArgKey {
 }
 
 impl OptKey {
-    fn parse<'a>(&'a self, input: &'a str) -> IResult<&str> {
+    fn completions<'a>(&'a self) -> &'static [&'static str] {
         match &self {
-            OptKey::Header => opt_header(input),
-            OptKey::Method => opt_method(input),
+            OptKey::Header => &["--header", "-H"],
+            OptKey::Method => &["--method", "-m"],
         }
+    }
+    fn parse<'a>(&'a self, input: &'a str) -> IResult<&str> {
+        parse_opt(input, self.completions())
     }
 }
 
-opt!(opt_header, "--header", "-H");
-opt!(opt_method, "--method", "-m");
+fn parse_opt<'a>(input: &'a str, variants: &'static [&'static str]) -> IResult<'a, &'a str> {
+    for variant in variants {
+        if let Ok((rest, _)) = terminated(tag(*variant), eoo)(input) {
+            let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
+            return match sep {
+                "=" => cut(word)(rest),
+                _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
+            };
+        }
+    }
+    Err(nom::Err::Error(ParseError::default()))
+}
 
 trait CmdLineBuilder {
     const ARGS: &'static [ArgKey];
@@ -334,6 +336,7 @@ mod test {
             ("--header=--foo", "--foo"),
             ("-H=--foo", "--foo"),
         ];
+        let opt_header = |input: &'static str| parse_opt(input, &["--header", "-H"]);
         for (input, expected) in tests {
             assert_eq!(opt_header(input), Ok(("", *expected)));
         }
