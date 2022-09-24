@@ -99,7 +99,7 @@ macro_rules! flag {
 }
 
 macro_rules! parser {
-    ($name:ident, $builder:ident, $($( $opt:expr )+$(,)?)*) => {
+    ($name:ident, $builder:ident) => {
         fn $name(mut input: &str, completion: bool) -> IResult<$builder> {
             let mut builder = $builder::default();
             let mut double_dash = false;
@@ -110,7 +110,7 @@ macro_rules! parser {
             } else {
                 |s: &str| s.len() == 0
             };
-            loop {
+            'main : loop {
                 input = trim_leading_space(input);
                 if done_parsing(input) {
                     break;
@@ -125,22 +125,24 @@ macro_rules! parser {
                     double_dash = true;
                     continue;
                 }
-                $($( match $opt(input) {
-                    Ok(ret) => {
-                        let key;
-                        (input, (key, arg)) = ret;
-                        if completion && done_parsing(input) {
-                            builder.set_completion(Completion::OptValue(key));
-                            return Ok((arg, builder));
+                for opt in $builder::PARSERS {
+                    match opt(input) {
+                        Ok(ret) => {
+                            let key;
+                            (input, (key, arg)) = ret;
+                            if completion && done_parsing(input) {
+                                builder.set_completion(Completion::OptValue(key));
+                                return Ok((arg, builder));
+                            }
+                            builder.add_opt(key, arg).map_err(err)?;
+                            continue 'main;
                         }
-                        builder.add_opt(key, arg).map_err(err)?;
-                        continue;
+                        Err(ret @ Failure(_)) => {
+                            return Err(ret);
+                        }
+                        _ => (),
                     }
-                    Err(ret @ Failure(_)) => {
-                        return Err(ret);
-                    }
-                    _ => (),
-                } )*)*
+                }
                 if let Ok(ret) = verify(word, |s: &str| !s.starts_with('-'))(input) {
                     (input, arg) = ret;
                     builder.add_arg(arg).map_err(err)?;
@@ -206,7 +208,7 @@ literal!(workspace, "workspace", "ws", "w");
 opt!(opt_header, OptKey::Header, "--header", "-H");
 opt!(opt_method, OptKey::Method, "--method", "-m");
 
-parser!(_create_request, CreateRequestBuilder, opt_header, opt_method);
+parser!(_create_request, CreateRequestBuilder);
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct CreateRequestBuilder {
@@ -217,6 +219,15 @@ pub struct CreateRequestBuilder {
     // TODO: blob body
     body: Option<String>,
     completion: Option<CreateRequestCompletion>,
+}
+
+trait OptParser {
+    const PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>];
+}
+
+impl OptParser for CreateRequestBuilder {
+    const PARSERS: &'static [fn(&str) -> IResult<(OptKey, &str)>] =
+        &[opt_header, opt_method];
 }
 
 #[derive(Debug, PartialEq, Clone)]
