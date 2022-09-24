@@ -1,7 +1,7 @@
 mod create_request;
 mod error;
 
-use create_request::CreateRequestBuilder;
+use create_request::{CreateRequest, CreateRequestBuilder};
 use error::{IResult, ParseError, ParseErrorKind};
 use nom::Err::{Error, Failure};
 use nom::{
@@ -234,14 +234,13 @@ where
     Ok((input, (builder, completion)))
 }
 
-fn create_request(mut input: &str) -> IResult<CreateRequestBuilder> {
+fn create_request(input: &str) -> Result<CreateRequest, ()> {
     let parser = |i| parse(i, false);
-    map(parser, |(b, _)| b)(input)
+    let (_, builder): (_, CreateRequestBuilder) = map(parser, |(b, _)| b)(input).map_err(|_| ())?;
+    Ok(builder.try_into()?)
 }
 
-fn create_request_completion(
-    mut input: &str,
-) -> IResult<(CreateRequestBuilder, Option<Completion>)> {
+fn create_request_completion(input: &str) -> IResult<(CreateRequestBuilder, Option<Completion>)> {
     parse(input, true)
 }
 
@@ -297,60 +296,49 @@ mod test {
     fn test_create_request() {
         assert_eq!(
             create_request("foo bar"),
-            Ok((
-                "",
-                CreateRequestBuilder {
-                    name: Some("foo".to_string()),
-                    url: Some("bar".to_string()),
-                    method: None,
-                    headers: vec![],
-                    body: None,
-                }
-            ))
+            Ok(CreateRequest {
+                name: "foo".to_string(),
+                url: "bar".to_string(),
+                method: None,
+                headers: vec![],
+                body: None,
+            })
         );
         assert_eq!(
             create_request("foo -H yay bar"),
-            Ok((
-                "",
-                CreateRequestBuilder {
-                    name: Some("foo".to_string()),
-                    url: Some("bar".to_string()),
-                    method: None,
-                    headers: vec!["yay".to_string()],
-                    body: None,
-                }
-            ))
+            Ok(CreateRequest {
+                name: "foo".to_string(),
+                url: "bar".to_string(),
+                method: None,
+                headers: vec!["yay".to_string()],
+                body: None,
+            })
         );
         assert_eq!(
             create_request("--method baz -- foo bar"),
-            Ok((
-                "",
-                CreateRequestBuilder {
-                    name: Some("foo".to_string()),
-                    url: Some("bar".to_string()),
-                    method: Some("baz".to_string()),
-                    headers: vec![],
-                    body: None,
-                }
-            ))
+            Ok(CreateRequest {
+                name: "foo".to_string(),
+                url: "bar".to_string(),
+                method: Some("baz".to_string()),
+                headers: vec![],
+                body: None,
+            })
         );
         assert_eq!(
             create_request("-- --foo --bar"),
-            Ok((
-                "",
-                CreateRequestBuilder {
-                    name: Some("--foo".to_string()),
-                    url: Some("--bar".to_string()),
-                    method: None,
-                    headers: vec![],
-                    body: None,
-                }
-            ))
+            Ok(CreateRequest {
+                name: "--foo".to_string(),
+                url: "--bar".to_string(),
+                method: None,
+                headers: vec![],
+                body: None,
+            })
         );
         assert!(matches!(create_request("foo bar baz"), Err(_)));
         assert!(matches!(create_request("--foo --bar"), Err(_)));
         assert!(matches!(create_request("--foo"), Err(_)));
         assert!(matches!(create_request("foo bar -X"), Err(_)));
+        assert!(matches!(create_request("foo"), Err(_)));
     }
 
     #[test]

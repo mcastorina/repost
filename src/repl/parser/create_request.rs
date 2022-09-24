@@ -3,13 +3,13 @@ use super::{opt_header, opt_method};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-struct CreateRequest {
-    name: String,
-    url: String,
-    method: Option<String>,
-    headers: Vec<String>,
+pub struct CreateRequest {
+    pub name: String,
+    pub url: String,
+    pub method: Option<String>,
+    pub headers: Vec<String>,
     // TODO: blob body
-    body: Option<String>,
+    pub body: Option<String>,
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -52,6 +52,16 @@ impl CmdLineBuilder for CreateRequestBuilder {
 impl TryFrom<CreateRequestBuilder> for CreateRequest {
     type Error = ();
     fn try_from(builder: CreateRequestBuilder) -> Result<Self, Self::Error> {
-        todo!()
+        match (&builder.name, &builder.url) {
+            (Some(_), Some(_)) => (),
+            _ => return Err(()),
+        }
+        return Ok(CreateRequest {
+            name: builder.name.unwrap(),
+            url: builder.url.unwrap(),
+            headers: builder.headers,
+            method: builder.method,
+            body: builder.body,
+        });
     }
 }
