@@ -163,12 +163,66 @@ macro_rules! opt_keys {
     }
 }
 
+macro_rules! command_parsing {
+    ($($( $key:ident => [ $($( $subkey:ident )+$(,)?)* ] )+$(,)?)*) => {
+        // TODO: HashMap of CommandKey => &[CommandKey]
+        const CMDS: &'static [CommandKey] = &[ $($( CommandKey::$key, )*)* ];
+
+        fn parse_command_kind(
+            input: &str,
+            completion: bool,
+        ) -> Result<(&str, CommandKind), Option<(&str, Completion)>> {
+            let input = strip_leading_space(input);
+            // Happy case.
+            if let Ok((rest, cmd)) = CommandKind::parse(input) {
+                if !(completion && rest.len() == 0) {
+                    return Ok((strip_leading_space(rest), cmd));
+                }
+            }
+
+            // Error case. Figure out what the completion should be.
+            if input.len() == 0 {
+                return Err(Some((input, Completion::Command(CMDS))));
+            }
+
+            let (rest, cmd) = match CMDS.iter().filter_map(|cmd| cmd.parse(input).ok()).next() {
+                Some((rest, cmd)) => (rest, cmd),
+                None => {
+                    return Err(match terminated(word, space1)(input) {
+                        Ok(_) => None,
+                        _ => Some((input, Completion::Command(CMDS))),
+                    })
+                }
+            };
+
+            let (rest, _) =
+                space1(rest).map_err(|_: nom::Err<ParseError<_>>| (input, Completion::Command(CMDS)))?;
+
+            let sub_cmds: &'static [CommandKey] = match cmd {
+                $($( CommandKey::$key => &[ $($( CommandKey::$subkey, )*)* ], )*)*
+                _ => unreachable!(),
+            };
+
+            Err(match terminated(word, space1)(rest) {
+                Ok(_) => None,
+                _ => Some((rest, Completion::Command(sub_cmds))),
+            })
+        }
+
+    }
+}
+
 commands!(
     (Create Request) => (CreateRequest, CreateRequestBuilder),
     (Create Variable) => (CreateVariable, CreateVariableBuilder),
     (Print Requests) => (PrintRequests, PrintRequestsBuilder),
     (Print Variables) => (PrintVariables, PrintVariablesBuilder),
     (Print Environments) => (PrintEnvironments, PrintEnvironmentsBuilder),
+);
+
+command_parsing!(
+    Create => [Request, Variable],
+    Print => [Requests, Variables, Environments],
 );
 
 command_keys!(
@@ -219,55 +273,6 @@ pub enum Completion {
     OptKey,
     OptValue(OptKey),
     Command(&'static [CommandKey]),
-}
-
-// TODO: HashMap of CommandKey => &[CommandKey]
-const CMDS: &'static [CommandKey] = &[CommandKey::Create, CommandKey::Print];
-
-fn parse_command_kind(
-    input: &str,
-    completion: bool,
-) -> Result<(&str, CommandKind), Option<(&str, Completion)>> {
-    let input = strip_leading_space(input);
-    // Happy case.
-    if let Ok((rest, cmd)) = CommandKind::parse(input) {
-        if !(completion && rest.len() == 0) {
-            return Ok((strip_leading_space(rest), cmd));
-        }
-    }
-
-    // Error case. Figure out what the completion should be.
-    if input.len() == 0 {
-        return Err(Some((input, Completion::Command(CMDS))));
-    }
-
-    let (rest, cmd) = match CMDS.iter().filter_map(|cmd| cmd.parse(input).ok()).next() {
-        Some((rest, cmd)) => (rest, cmd),
-        None => {
-            return Err(match terminated(word, space1)(input) {
-                Ok(_) => None,
-                _ => Some((input, Completion::Command(CMDS))),
-            })
-        }
-    };
-
-    let (rest, _) =
-        space1(rest).map_err(|_: nom::Err<ParseError<_>>| (input, Completion::Command(CMDS)))?;
-
-    let sub_cmds: &'static [CommandKey] = match cmd {
-        CommandKey::Create => &[CommandKey::Request, CommandKey::Variable],
-        CommandKey::Print => &[
-            CommandKey::Requests,
-            CommandKey::Variables,
-            CommandKey::Environments,
-        ],
-        _ => unreachable!(),
-    };
-
-    Err(match terminated(word, space1)(rest) {
-        Ok(_) => None,
-        _ => Some((rest, Completion::Command(sub_cmds))),
-    })
 }
 
 fn word(input: &str) -> IResult<&str> {
