@@ -20,142 +20,205 @@ use print_environments::{PrintEnvironments, PrintEnvironmentsBuilder};
 use print_requests::{PrintRequests, PrintRequestsBuilder};
 use print_variables::{PrintVariables, PrintVariablesBuilder};
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Command {
-    CreateRequest(CreateRequest),
-    CreateVariable(CreateVariable),
-    PrintRequests(PrintRequests),
-    PrintVariables(PrintVariables),
-    PrintEnvironments(PrintEnvironments),
-}
+macro_rules! commands {
+    ($($( ($( $word:ident )+) => ($kind:ident, $builder:ident) )+$(,)?)*) => {
+        #[derive(Debug, PartialEq, Clone)]
+        pub enum Command {
+            $($( $kind($kind), )*)*
+        }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Builder {
-    CreateRequestBuilder(CreateRequestBuilder),
-    CreateVariableBuilder(CreateVariableBuilder),
-    PrintRequestsBuilder(PrintRequestsBuilder),
-    PrintVariablesBuilder(PrintVariablesBuilder),
-    PrintEnvironmentsBuilder(PrintEnvironmentsBuilder),
-}
+        #[derive(Debug, PartialEq, Clone)]
+        enum CommandKind {
+            $($( $kind, )*)*
+        }
 
-impl Builder {
-    pub fn opts(&self) -> &'static [OptKey] {
-        match self {
-            Self::CreateRequestBuilder(_) => CreateRequestBuilder::OPTS,
-            Self::CreateVariableBuilder(_) => CreateVariableBuilder::OPTS,
-            Self::PrintRequestsBuilder(_) => PrintRequestsBuilder::OPTS,
-            Self::PrintVariablesBuilder(_) => PrintVariablesBuilder::OPTS,
-            Self::PrintEnvironmentsBuilder(_) => PrintEnvironmentsBuilder::OPTS,
-        }
-    }
-}
-
-pub fn parse_command(input: &str) -> Result<Command, ()> {
-    let (rest, kind) = parse_command_kind(input, false).map_err(|_| ())?;
-    Ok(match kind {
-        CommandKind::CreateRequest => {
-            Command::CreateRequest(parse_subcommand::<CreateRequestBuilder>(rest)?.try_into()?)
-        }
-        CommandKind::CreateVariable => {
-            Command::CreateVariable(parse_subcommand::<CreateVariableBuilder>(rest)?.try_into()?)
-        }
-        CommandKind::PrintRequests => {
-            Command::PrintRequests(parse_subcommand::<PrintRequestsBuilder>(rest)?.try_into()?)
-        }
-        CommandKind::PrintVariables => {
-            Command::PrintVariables(parse_subcommand::<PrintVariablesBuilder>(rest)?.try_into()?)
-        }
-        CommandKind::PrintEnvironments => Command::PrintEnvironments(
-            parse_subcommand::<PrintEnvironmentsBuilder>(rest)?.try_into()?,
-        ),
-    })
-}
-
-pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, Completion)>), ()> {
-    let (rest, kind) = match parse_command_kind(input, true) {
-        Ok(ok) => ok,
-        Err(err) => return Ok((None, err)),
-    };
-    Ok(match kind {
-        CommandKind::CreateRequest => {
-            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
-            (
-                Some(Builder::CreateRequestBuilder(builder)),
-                completion.map(|c| (s, c)),
-            )
-        }
-        CommandKind::CreateVariable => {
-            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
-            (
-                Some(Builder::CreateVariableBuilder(builder)),
-                completion.map(|c| (s, c)),
-            )
-        }
-        CommandKind::PrintRequests => {
-            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
-            (
-                Some(Builder::PrintRequestsBuilder(builder)),
-                completion.map(|c| (s, c)),
-            )
-        }
-        CommandKind::PrintVariables => {
-            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
-            (
-                Some(Builder::PrintVariablesBuilder(builder)),
-                completion.map(|c| (s, c)),
-            )
-        }
-        CommandKind::PrintEnvironments => {
-            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
-            (
-                Some(Builder::PrintEnvironmentsBuilder(builder)),
-                completion.map(|c| (s, c)),
-            )
-        }
-    })
-}
-
-#[derive(Debug, PartialEq, Clone)]
-enum CommandKind {
-    CreateRequest,
-    CreateVariable,
-    PrintRequests,
-    PrintVariables,
-    PrintEnvironments,
-}
-
-impl CommandKind {
-    const KINDS: &'static [Self] = &[
-        Self::CreateRequest,
-        Self::CreateVariable,
-        Self::PrintRequests,
-        Self::PrintVariables,
-        Self::PrintEnvironments,
-    ];
-    fn keys(&self) -> &'static [CommandKey] {
-        use CommandKey::*;
-        match self {
-            Self::CreateRequest => &[Create, Request],
-            Self::CreateVariable => &[Create, Variable],
-            Self::PrintRequests => &[Print, Requests],
-            Self::PrintVariables => &[Print, Variables],
-            Self::PrintEnvironments => &[Print, Environments],
-        }
-    }
-    fn parse(input: &str) -> Result<(&str, Self), ()> {
-        'main: for kind in Self::KINDS.into_iter() {
-            let mut input = input;
-            for key in kind.keys() {
-                input = strip_leading_space(input);
-                input = match tuple((|i| key.parse(i), eow))(input) {
-                    Ok((input, _)) => input,
-                    _ => continue 'main,
+        impl CommandKind {
+            const KINDS: &'static [Self] = &[
+                $($( Self::$kind, )*)*
+            ];
+            fn keys(&self) -> &'static [CommandKey] {
+                use CommandKey::*;
+                match self {
+                    $($( Self::$kind => &[$( $word, )*], )*)*
                 }
             }
-            return Ok((input, kind.to_owned()));
+            fn parse(input: &str) -> Result<(&str, Self), ()> {
+                'main: for kind in Self::KINDS.into_iter() {
+                    let mut input = input;
+                    for key in kind.keys() {
+                        input = strip_leading_space(input);
+                        input = match tuple((|i| key.parse(i), eow))(input) {
+                            Ok((input, _)) => input,
+                            _ => continue 'main,
+                        }
+                    }
+                    return Ok((input, kind.to_owned()));
+                }
+                Err(())
+            }
         }
-        Err(())
+
+        #[derive(Debug, PartialEq, Clone)]
+        pub enum Builder {
+            $($( $builder($builder), )*)*
+        }
+
+        impl Builder {
+            pub fn opts(&self) -> &'static [OptKey] {
+                match self {
+                    $($(
+                        Self::$builder(_) => $builder::OPTS,
+                    )*)*
+                }
+            }
+        }
+        pub fn parse_command(input: &str) -> Result<Command, ()> {
+            let (rest, kind) = parse_command_kind(input, false).map_err(|_| ())?;
+            Ok(match kind {
+                $($(
+                    CommandKind::$kind => {
+                        Command::$kind(parse_subcommand::<$builder>(rest)?.try_into()?)
+                    }
+                )*)*
+            })
+        }
+        pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, Completion)>), ()> {
+            let (rest, kind) = match parse_command_kind(input, true) {
+                Ok(ok) => ok,
+                Err(err) => return Ok((None, err)),
+            };
+            Ok(match kind {
+                $($(
+                    CommandKind::$kind => {
+                        let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
+                        (
+                            Some(Builder::$builder(builder)),
+                            completion.map(|c| (s, c)),
+                        )
+                    }
+                )*)*
+            })
+        }
     }
+}
+
+macro_rules! command_keys {
+    ($($( $key:ident => $lits:expr )+$(,)?)*) => {
+        #[derive(Debug, PartialEq, Clone)]
+        pub enum CommandKey {
+            $($( $key, )*)*
+        }
+        impl CommandKey {
+            pub fn completions<'a>(&'a self) -> &'static [&'static str] {
+                match self {
+                    $($( CommandKey::$key => &$lits, )*)*
+                }
+            }
+            fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {
+                map(
+                    |i| parse_literal(i, self.completions()),
+                    |_| self.to_owned(),
+                )(input)
+            }
+        }
+    }
+}
+
+macro_rules! opt_keys {
+    ($($( $key:ident => $lits:expr )+$(,)?)*) => {
+        #[derive(Debug, PartialEq, Clone)]
+        pub enum OptKey {
+            Unknown,
+            $($( $key, )*)*
+        }
+
+        impl OptKey {
+            pub fn completions<'a>(&'a self) -> &'static [&'static str] {
+                match &self {
+                    OptKey::Unknown => &[],
+                    $($( OptKey::$key => &$lits, )*)*
+                }
+            }
+            fn parse<'a>(&'a self, input: &'a str) -> IResult<&str> {
+                if *self == OptKey::Unknown {
+                    // TODO: Parse value too.
+                    return cut(recognize(delimited(
+                        alt((tag("--"), tag("-"))),
+                        alphanumeric1,
+                        eoo,
+                    )))(input);
+                }
+                for variant in self.completions() {
+                    if let Ok((rest, _)) = terminated(tag(*variant), eoo)(input) {
+                        let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
+                        return match sep {
+                            "=" => cut(word)(rest),
+                            _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
+                        };
+                    }
+                }
+                Err(nom::Err::Error(ParseError::default()))
+            }
+        }
+    }
+}
+
+commands!(
+    (Create Request) => (CreateRequest, CreateRequestBuilder),
+    (Create Variable) => (CreateVariable, CreateVariableBuilder),
+    (Print Requests) => (PrintRequests, PrintRequestsBuilder),
+    (Print Variables) => (PrintVariables, PrintVariablesBuilder),
+    (Print Environments) => (PrintEnvironments, PrintEnvironmentsBuilder),
+);
+
+command_keys!(
+    Create => ["create", "new", "add", "c"],
+    Print => ["print", "get", "show", "p"],
+    Request => ["request", "req", "r"],
+    Requests => ["requests", "request", "reqs", "req", "r"],
+    Variable => ["variable", "var", "v"],
+    Variables => ["variables", "variable", "vars", "var", "v"],
+    Environments => ["environments", "environment", "envs", "env", "e"],
+);
+
+opt_keys!(
+    Header => ["--header", "-H"],
+    Method => ["--method", "-m"],
+);
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ArgKey {
+    Unknown,
+    Name,
+    URL,
+}
+
+trait CmdLineBuilder: Default {
+    const ARGS: &'static [ArgKey];
+    const OPTS: &'static [OptKey];
+    fn add_arg<S: Into<String>>(&mut self, _: ArgKey, arg: S) -> Result<(), ParseError<S>> {
+        Err(ParseError {
+            kind: ParseErrorKind::InvalidArg,
+            word: arg,
+        })
+    }
+    fn add_opt<S: Into<String>>(&mut self, _: OptKey, arg: S) -> Result<(), ParseError<S>> {
+        Err(ParseError {
+            kind: ParseErrorKind::InvalidArg,
+            word: arg,
+        })
+    }
+    fn get_completion(&self, kind: Completion) -> Option<Completion> {
+        Some(kind)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Completion {
+    Arg(ArgKey),
+    OptKey,
+    OptValue(OptKey),
+    Command(&'static [CommandKey]),
 }
 
 // TODO: HashMap of CommandKey => &[CommandKey]
@@ -237,109 +300,6 @@ fn eow(input: &str) -> IResult<&str> {
 
 fn eoo(input: &str) -> IResult<&str> {
     peek(alt((space1, tag("="), eof)))(input)
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum CommandKey {
-    Create,
-    Print,
-    Request,
-    Requests,
-    Variable,
-    Variables,
-    Environments,
-}
-
-impl CommandKey {
-    pub fn completions<'a>(&'a self) -> &'static [&'static str] {
-        match self {
-            CommandKey::Create => &["create", "new", "add", "c"],
-            CommandKey::Print => &["print", "get", "show", "p"],
-            CommandKey::Request => &["request", "req", "r"],
-            CommandKey::Requests => &["requests", "request", "reqs", "req", "r"],
-            CommandKey::Variable => &["variable", "var", "v"],
-            CommandKey::Variables => &["variables", "variable", "vars", "var", "v"],
-            CommandKey::Environments => &["environments", "environment", "envs", "env", "e"],
-        }
-    }
-    fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {
-        map(
-            |i| parse_literal(i, self.completions()),
-            |_| self.to_owned(),
-        )(input)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum OptKey {
-    Unknown,
-    Header,
-    Method,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ArgKey {
-    Unknown,
-    Name,
-    URL,
-}
-
-impl OptKey {
-    pub fn completions<'a>(&'a self) -> &'static [&'static str] {
-        match &self {
-            OptKey::Unknown => &[],
-            OptKey::Header => &["--header", "-H"],
-            OptKey::Method => &["--method", "-m"],
-        }
-    }
-    fn parse<'a>(&'a self, input: &'a str) -> IResult<&str> {
-        if *self == OptKey::Unknown {
-            // TODO: Parse value too.
-            return cut(recognize(delimited(
-                alt((tag("--"), tag("-"))),
-                alphanumeric1,
-                eoo,
-            )))(input);
-        }
-        for variant in self.completions() {
-            if let Ok((rest, _)) = terminated(tag(*variant), eoo)(input) {
-                let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
-                return match sep {
-                    "=" => cut(word)(rest),
-                    _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
-                };
-            }
-        }
-        Err(nom::Err::Error(ParseError::default()))
-    }
-}
-
-trait CmdLineBuilder: Default {
-    const ARGS: &'static [ArgKey];
-    const OPTS: &'static [OptKey];
-    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
-        Err(ParseError {
-            kind: ParseErrorKind::InvalidArg,
-            word: arg,
-        })
-    }
-    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ParseError<S>> {
-        Err(ParseError {
-            kind: ParseErrorKind::InvalidArg,
-            word: arg,
-        })
-    }
-    fn get_completion(&self, kind: Completion) -> Option<Completion> {
-        Some(kind)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Completion {
-    Arg(ArgKey),
-    OptKey,
-    OptValue(OptKey),
-    Command(&'static [CommandKey]),
 }
 
 fn strip_leading_space(s: &str) -> &str {
