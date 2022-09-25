@@ -1,8 +1,14 @@
 pub mod models;
 pub use models::DisplayTable;
 
-use sqlx::migrate::MigrateDatabase;
-use sqlx::{self, Sqlite, SqlitePool};
+use std::path::Path;
+
+use sqlx::{
+    self,
+    migrate::MigrateDatabase,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode},
+    Sqlite, SqlitePool,
+};
 
 use crate::error::{Error, Result};
 
@@ -18,6 +24,8 @@ pub struct Db {
 }
 
 impl Db {
+    const PLAYGROUND: &'static str = "file:memdb?mode=memory&cache=shared";
+
     /// Open new connection to `path` and create it if it does
     /// not exist.
     pub async fn new<P>(path: P) -> Result<Self>
@@ -33,10 +41,27 @@ impl Db {
         Ok(db)
     }
 
+    /// Creates an in-memory database for experimentation.
+    pub async fn new_playground() -> Result<Self> {
+        Self::new(Self::PLAYGROUND).await
+    }
+
     /// Return a reference to the connection pool for executing sqlite
     /// statements.
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
+    }
+
+    /// Return the name of the database.
+    pub fn name(&self) -> &str {
+        if self.path == Self::PLAYGROUND {
+            return "playground";
+        }
+        let path = Path::new(self.path.as_str());
+        match path.file_name().and_then(|o| o.to_str()) {
+            Some(s) => s.strip_suffix(".db").unwrap_or(s),
+            None => self.path.as_str(),
+        }
     }
 
     /// Try to load the connection pool from a path to the sqlite
@@ -47,7 +72,10 @@ impl Db {
         if !Sqlite::database_exists(path).await? {
             Sqlite::create_database(path).await?
         }
-        Ok(SqlitePool::connect(path).await?)
+        let options = SqliteConnectOptions::new()
+            .filename(path)
+            .journal_mode(SqliteJournalMode::Off);
+        Ok(SqlitePool::connect_with(options).await?)
     }
 
     /// Try to create all tables required in the database file.

@@ -19,9 +19,8 @@ pub struct Repl {
 impl Repl {
     /// Create a new Repl struct with a Db and LineReader struct.
     pub async fn new(conf: ReplConfig) -> Result<Self> {
-        // build db
-        let path = conf.data_dir.join("repost.db");
-        let db = Db::new(path.to_str().ok_or(Error::ConfigDataToStr)?).await?;
+        // start with an in-memory database
+        let db = Db::new_playground().await?;
         // build editor
         let mut editor = LineReader::new();
         editor.set_completer(&db);
@@ -32,7 +31,7 @@ impl Repl {
     /// Read stdin into input using the LineReader.
     /// Returns None on EOF or error.
     pub fn get_input(&mut self, input: &mut String) -> Option<()> {
-        self.editor.read_line(input, "> ")
+        self.editor.read_line(input, self.prompt().as_ref())
     }
 
     /// Execute a command line.
@@ -40,5 +39,9 @@ impl Repl {
         let cmd = parser::parse_command(input).map_err(|_| Error::ParseError("foo"))?;
         dbg!(cmd);
         Ok(())
+    }
+
+    fn prompt(&self) -> String {
+        format!("[{}] > ", self.db.name())
     }
 }
