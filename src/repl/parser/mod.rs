@@ -1,6 +1,7 @@
 mod create_request;
 mod create_variable;
 mod error;
+mod print_environments;
 mod print_requests;
 mod print_variables;
 
@@ -9,21 +10,13 @@ use create_variable::{CreateVariable, CreateVariableBuilder};
 use error::{IResult, ParseError, ParseErrorKind};
 use nom::Err::{Error, Failure};
 use nom::{
-    branch::{alt, permutation},
-    bytes::complete::{escaped, escaped_transform, tag, take, take_till, take_till1, take_until},
-    character::complete::{
-        alpha1, alphanumeric1, digit0, digit1, line_ending, none_of, not_line_ending, one_of,
-        space0, space1,
-    },
-    character::is_space,
-    combinator::{
-        all_consuming, complete, cut, eof, fail, map, map_res, not, opt, peek, recognize, value,
-        verify,
-    },
-    multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded, terminated, tuple},
-    Parser,
+    branch::alt,
+    bytes::complete::{escaped, tag, take},
+    character::complete::{none_of, one_of, space0, space1},
+    combinator::{cut, eof, map, peek, verify},
+    sequence::{delimited, terminated, tuple},
 };
+use print_environments::{PrintEnvironments, PrintEnvironmentsBuilder};
 use print_requests::{PrintRequests, PrintRequestsBuilder};
 use print_variables::{PrintVariables, PrintVariablesBuilder};
 
@@ -31,8 +24,9 @@ use print_variables::{PrintVariables, PrintVariablesBuilder};
 pub enum Command {
     CreateRequest(CreateRequest),
     CreateVariable(CreateVariable),
-    PrintRequest(PrintRequests),
-    PrintVariable(PrintVariables),
+    PrintRequests(PrintRequests),
+    PrintVariables(PrintVariables),
+    PrintEnvironments(PrintEnvironments),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -41,6 +35,7 @@ pub enum Builder {
     CreateVariableBuilder(CreateVariableBuilder),
     PrintRequestsBuilder(PrintRequestsBuilder),
     PrintVariablesBuilder(PrintVariablesBuilder),
+    PrintEnvironmentsBuilder(PrintEnvironmentsBuilder),
 }
 
 impl Builder {
@@ -50,6 +45,7 @@ impl Builder {
             Self::CreateVariableBuilder(_) => CreateVariableBuilder::OPTS,
             Self::PrintRequestsBuilder(_) => PrintRequestsBuilder::OPTS,
             Self::PrintVariablesBuilder(_) => PrintVariablesBuilder::OPTS,
+            Self::PrintEnvironmentsBuilder(_) => PrintEnvironmentsBuilder::OPTS,
         }
     }
 }
@@ -64,11 +60,14 @@ pub fn parse_command(input: &str) -> Result<Command, ()> {
             Command::CreateVariable(parse_subcommand::<CreateVariableBuilder>(rest)?.try_into()?)
         }
         CommandKind::PrintRequests => {
-            Command::PrintRequest(parse_subcommand::<PrintRequestsBuilder>(rest)?.try_into()?)
+            Command::PrintRequests(parse_subcommand::<PrintRequestsBuilder>(rest)?.try_into()?)
         }
         CommandKind::PrintVariables => {
-            Command::PrintVariable(parse_subcommand::<PrintVariablesBuilder>(rest)?.try_into()?)
+            Command::PrintVariables(parse_subcommand::<PrintVariablesBuilder>(rest)?.try_into()?)
         }
+        CommandKind::PrintEnvironments => Command::PrintEnvironments(
+            parse_subcommand::<PrintEnvironmentsBuilder>(rest)?.try_into()?,
+        ),
     })
 }
 
@@ -106,6 +105,13 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
                 completion.map(|c| (s, c)),
             )
         }
+        CommandKind::PrintEnvironments => {
+            let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
+            (
+                Some(Builder::PrintEnvironmentsBuilder(builder)),
+                completion.map(|c| (s, c)),
+            )
+        }
     })
 }
 
@@ -118,6 +124,7 @@ enum CommandKind {
     CreateVariable,
     PrintRequests,
     PrintVariables,
+    PrintEnvironments,
 }
 
 impl CommandKind {
@@ -126,6 +133,7 @@ impl CommandKind {
         Self::CreateVariable,
         Self::PrintRequests,
         Self::PrintVariables,
+        Self::PrintEnvironments,
     ];
     fn keys(&self) -> &'static [CommandKey] {
         use CommandKey::*;
@@ -134,6 +142,7 @@ impl CommandKind {
             Self::CreateVariable => &[Create, Variable],
             Self::PrintRequests => &[Print, Requests],
             Self::PrintVariables => &[Print, Variables],
+            Self::PrintEnvironments => &[Print, Environments],
         }
     }
     fn parse(input: &str) -> Result<(&str, Self), ()> {
@@ -187,7 +196,11 @@ fn parse_command_kind(
 
     let sub_cmds: &'static [CommandKey] = match cmd {
         CommandKey::Create => &[CommandKey::Request, CommandKey::Variable],
-        CommandKey::Print => &[CommandKey::Requests, CommandKey::Variables],
+        CommandKey::Print => &[
+            CommandKey::Requests,
+            CommandKey::Variables,
+            CommandKey::Environments,
+        ],
         _ => unreachable!(),
     };
 
@@ -256,6 +269,7 @@ pub enum CommandKey {
     Requests,
     Variable,
     Variables,
+    Environments,
 }
 
 impl CommandKey {
@@ -267,6 +281,7 @@ impl CommandKey {
             CommandKey::Requests => &["requests", "request", "reqs", "req", "r"],
             CommandKey::Variable => &["variable", "var", "v"],
             CommandKey::Variables => &["variables", "variable", "vars", "var", "v"],
+            CommandKey::Environments => &["environments", "environment", "envs", "env", "e"],
         }
     }
     fn parse<'a>(&'a self, input: &'a str) -> IResult<Self> {
