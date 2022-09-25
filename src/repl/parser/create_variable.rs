@@ -1,3 +1,4 @@
+use super::error::{ParseError, ParseErrorKind};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -16,11 +17,14 @@ impl CmdLineBuilder for CreateVariableBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name];
     const OPTS: &'static [OptKey] = &[];
 
-    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
+    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         match key {
             ArgKey::Name => Ok(self.name = Some(arg.into())),
             ArgKey::Unknown => Ok(self.env_vals.push(arg.into())),
-            _ => Err(()),
+            _ => Err(ParseError {
+                kind: ParseErrorKind::InvalidArg,
+                word: arg,
+            }),
         }
     }
 }

@@ -1,3 +1,4 @@
+use super::error::{ParseError, ParseErrorKind};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -24,18 +25,26 @@ impl CmdLineBuilder for CreateRequestBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name, ArgKey::URL];
     const OPTS: &'static [OptKey] = &[OptKey::Header, OptKey::Method];
 
-    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
+    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         match key {
             ArgKey::Name => Ok(self.name = Some(arg.into())),
             ArgKey::URL => Ok(self.url = Some(arg.into())),
-            _ => Err(()),
+            _ => Err(ParseError {
+                kind: ParseErrorKind::InvalidArg,
+                word: arg,
+            }),
         }
     }
-    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()> {
+    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ParseError<S>> {
         match key {
             OptKey::Header => self.headers.push(arg.into()),
             OptKey::Method => self.method = Some(arg.into()),
-            _ => return Err(()),
+            _ => {
+                return Err(ParseError {
+                    kind: ParseErrorKind::InvalidOpt,
+                    word: arg,
+                })
+            }
         }
         Ok(())
     }

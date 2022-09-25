@@ -1,7 +1,5 @@
 use nom;
 
-use std::collections::HashMap;
-
 pub type IResult<'a, O> = nom::IResult<&'a str, O, ParseError<&'a str>>;
 
 #[derive(Debug, PartialEq, Default)]
@@ -15,6 +13,8 @@ pub enum ParseErrorKind {
     #[default]
     Unknown,
     Fixed(&'static [&'static str]),
+    InvalidArg,
+    InvalidOpt,
 }
 
 impl<I> nom::error::ParseError<I> for ParseError<I> {

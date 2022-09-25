@@ -12,8 +12,8 @@ use nom::Err::{Error, Failure};
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take},
-    character::complete::{none_of, one_of, space0, space1},
-    combinator::{cut, eof, map, peek, verify},
+    character::complete::{alphanumeric1, none_of, one_of, space0, space1},
+    combinator::{cut, eof, map, peek, recognize, verify},
     sequence::{delimited, terminated, tuple},
 };
 use print_environments::{PrintEnvironments, PrintEnvironmentsBuilder};
@@ -115,9 +115,6 @@ pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, C
     })
 }
 
-// Create: { Request, Variable }
-// Print: { Requests, Variables, Environments }
-
 #[derive(Debug, PartialEq, Clone)]
 enum CommandKind {
     CreateRequest,
@@ -210,28 +207,6 @@ fn parse_command_kind(
     })
 }
 
-fn all<'a, O, F>(
-    mut parser: F,
-    kind: ParseErrorKind,
-) -> impl FnMut(&'a str) -> nom::IResult<&'a str, O, ParseError<&'a str>>
-where
-    F: nom::Parser<&'a str, O, ParseError<&'a str>>,
-{
-    move |input: &str| match parser.parse(input.clone()) {
-        Err(_) => match word(input) {
-            Ok((_, word)) => Err(Error(ParseError {
-                kind: kind.clone(),
-                word: word,
-            })),
-            _ => Err(Error(ParseError {
-                kind: kind.clone(),
-                word: input,
-            })),
-        },
-        rest => rest,
-    }
-}
-
 fn word(input: &str) -> IResult<&str> {
     // return an error if the input is empty
     take(1_usize)(input)?;
@@ -239,14 +214,17 @@ fn word(input: &str) -> IResult<&str> {
     let esc_single = escaped(none_of("\\'"), '\\', tag("'"));
     let esc_double = escaped(none_of("\\\""), '\\', tag("\""));
     let esc_space = escaped(none_of("\\ \t'\""), '\\', one_of(" \t'\""));
-    terminated(
-        alt((
+    alt((
+        terminated(
             delimited(tag("'"), alt((esc_single, tag(""))), tag("'")),
+            eow,
+        ),
+        terminated(
             delimited(tag("\""), alt((esc_double, tag(""))), tag("\"")),
-            esc_space,
-        )),
-        eow,
-    )(input)
+            eow,
+        ),
+        terminated(esc_space, eow),
+    ))(input)
 }
 
 fn eol(input: &str) -> IResult<&str> {
@@ -294,6 +272,7 @@ impl CommandKey {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum OptKey {
+    Unknown,
     Header,
     Method,
 }
@@ -308,11 +287,20 @@ pub enum ArgKey {
 impl OptKey {
     pub fn completions<'a>(&'a self) -> &'static [&'static str] {
         match &self {
+            OptKey::Unknown => &[],
             OptKey::Header => &["--header", "-H"],
             OptKey::Method => &["--method", "-m"],
         }
     }
     fn parse<'a>(&'a self, input: &'a str) -> IResult<&str> {
+        if *self == OptKey::Unknown {
+            // TODO: Parse value too.
+            return cut(recognize(delimited(
+                alt((tag("--"), tag("-"))),
+                alphanumeric1,
+                eoo,
+            )))(input);
+        }
         for variant in self.completions() {
             if let Ok((rest, _)) = terminated(tag(*variant), eoo)(input) {
                 let (rest, sep) = cut(alt((space1, tag("="))))(rest)?;
@@ -329,11 +317,17 @@ impl OptKey {
 trait CmdLineBuilder: Default {
     const ARGS: &'static [ArgKey];
     const OPTS: &'static [OptKey];
-    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ()> {
-        Err(())
+    fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
+        Err(ParseError {
+            kind: ParseErrorKind::InvalidArg,
+            word: arg,
+        })
     }
-    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ()> {
-        Err(())
+    fn add_opt<S: Into<String>>(&mut self, key: OptKey, arg: S) -> Result<(), ParseError<S>> {
+        Err(ParseError {
+            kind: ParseErrorKind::InvalidArg,
+            word: arg,
+        })
     }
     fn get_completion(&self, kind: Completion) -> Option<Completion> {
         Some(kind)
@@ -387,7 +381,7 @@ where
     let mut builder = B::default();
     let mut double_dash = false;
     let mut arg: &str;
-    let err = |_| nom::Err::Error(ParseError::default());
+    let err = |e| nom::Err::Error(dbg!(e));
     let done_parsing = if completion {
         |s: &str| terminated(word, space1)(s).is_err()
     } else {
@@ -448,11 +442,13 @@ where
                 _ => (),
             }
         }
-        // Nothing successfully parsed the input, return an error.
-        return Err(nom::Err::Failure(ParseError {
-            kind: ParseErrorKind::Unknown,
-            word: input,
-        }));
+        // TODO: Try to parse any flags.
+        // Nothing successfully parsed the input, try adding it as an unknown option.
+        // TODO: get the key and value from parsing
+        // let flag;
+        // (input, flag, arg) = OptKey::parse_unknown(input)?;
+        (input, arg) = dbg!(OptKey::Unknown.parse(input))?;
+        builder.add_opt(OptKey::Unknown, arg).map_err(err)?;
     }
     if !completion {
         return Ok((input, (builder, None)));
@@ -793,12 +789,9 @@ mod test {
             parse_command_kind("p v", false),
             Ok(("", CommandKind::PrintVariables))
         );
-        assert_eq!(
+        assert!(matches!(
             parse_command_kind("p v", true),
-            Err(Some((
-                "v",
-                Completion::Command(&[CommandKey::Requests, CommandKey::Variables])
-            )))
-        );
+            Err(Some(("v", _))),
+        ));
     }
 }
