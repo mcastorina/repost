@@ -82,9 +82,7 @@ impl Request {
     {
         Self {
             name: name.into(),
-            // Method::TryInto returns Infallible so it's okay to unwrap
-            // unfortunately, From<&str> is not implemented for Method
-            method: method.try_into().unwrap(),
+            method: method.try_into().unwrap_or(Method::GET),
             url: url.into(),
             headers: vec![],
             body: None,
@@ -199,6 +197,7 @@ mod test {
         assert_eq!(method!("GET"), Method::GET);
         assert_eq!(method!("get"), Method::from_str("get").unwrap());
         assert_eq!(method!("foo"), Method::from_str("foo").unwrap());
+        assert_eq!(method!(""), Method::GET);
     }
 
     #[test]

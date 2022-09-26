@@ -1,5 +1,8 @@
 use super::error::{ParseError, ParseErrorKind};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
+use crate::cmd;
+use crate::error::Error;
+use reqwest::Method;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CreateRequest {
@@ -69,6 +72,31 @@ impl TryFrom<CreateRequestBuilder> for CreateRequest {
             headers: builder.headers,
             method: builder.method,
             body: builder.body,
+        })
+    }
+}
+
+impl TryFrom<CreateRequest> for cmd::CreateRequestArgs {
+    type Error = Error;
+    fn try_from(args: CreateRequest) -> Result<Self, Self::Error> {
+        let header = |h: String| {
+            h.split_once(':')
+                .map(|(k, v)| (k.to_string(), v.trim_start().to_string()))
+                .ok_or(Error::ParseError("Invalid header"))
+        };
+        Ok(Self {
+            name: args.name,
+            url: args.url,
+            headers: args
+                .headers
+                .into_iter()
+                .map(header)
+                .collect::<Result<Vec<_>, _>>()?,
+            method: args
+                .method
+                .and_then(|m| Method::from_bytes(m.as_bytes()).ok())
+                .unwrap_or(Method::GET),
+            body: args.body,
         })
     }
 }

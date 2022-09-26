@@ -47,8 +47,8 @@ impl DisplayTable for super::Request {
         let headers = self
             .headers
             .iter()
-            .flat_map(|(k, v)| [k.as_str(), ": ", v.as_str()])
-            .fold(String::new(), |s, h| s + h + "\n");
+            .map(|(k, v)| k.to_string() + ": " + v.as_str())
+            .fold(String::new(), |s, h| s + h.as_str() + "\n");
         let headers = headers.trim();
         table.add_row(&[
             &self.name,

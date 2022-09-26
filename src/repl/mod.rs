@@ -4,9 +4,11 @@ mod parser;
 
 pub use config::ReplConfig;
 
+use crate::cmd::Cmd;
 use crate::db::Db;
 use crate::error::{Error, Result};
 use line_reader::LineReader;
+use parser::Command;
 
 /// Repl object for handling readline editing, a database,
 /// and executing commands.
@@ -36,8 +38,14 @@ impl Repl {
 
     /// Execute a command line.
     pub async fn execute(&mut self, input: &str) -> Result<()> {
-        let cmd = parser::parse_command(input).map_err(|_| Error::ParseError("foo"))?;
-        dbg!(cmd);
+        let cmd = Cmd::new(&self.db);
+        match parser::parse_command(input).map_err(|_| Error::ParseError("foo"))? {
+            Command::CreateRequest(args) => cmd.create_request(args.try_into()?).await?,
+            Command::CreateVariable(_) => (),
+            Command::PrintRequests(_) => cmd.print_requests().await?,
+            Command::PrintVariables(_) => (),
+            Command::PrintEnvironments(_) => (),
+        }
         Ok(())
     }
 
