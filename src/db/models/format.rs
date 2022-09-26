@@ -9,15 +9,26 @@ pub trait DisplayTable {
 
     fn build(&self, table: &mut Table);
     fn print(&self) {
-        self.write(io::stdout()).expect("could not write to stdout");
+        self.print_with_header(Self::HEADER)
     }
-    fn write<W: io::Write>(&self, mut w: W) -> Result<(), io::Error> {
+    fn write<W: io::Write>(&self, w: W) -> Result<(), io::Error> {
+        self.write_with_header(w, Self::HEADER)
+    }
+    fn print_with_header(&self, header: &'static [&'static str]) {
+        self.write_with_header(io::stdout(), header)
+            .expect("could not write to stdout");
+    }
+    fn write_with_header<W: io::Write>(
+        &self,
+        mut w: W,
+        header: &'static [&'static str],
+    ) -> Result<(), io::Error> {
         // generate table
         let mut table = Table::new();
         table
             .load_preset(TABLE_FORMAT)
             .set_table_width(80)
-            .set_header(Self::HEADER);
+            .set_header(header);
         // add rows from the vector
         self.build(&mut table);
         // print a blank line
@@ -79,5 +90,33 @@ impl DisplayTable for super::Variable {
             self.value.as_ref().unwrap_or(&String::new()),
             &self.source,
         ]);
+    }
+}
+
+impl DisplayTable for &str {
+    const HEADER: &'static [&'static str] = &[];
+    fn build(&self, table: &mut Table) {
+        table.add_row(&[self]);
+    }
+}
+
+impl DisplayTable for (&str, &str) {
+    const HEADER: &'static [&'static str] = &[];
+    fn build(&self, table: &mut Table) {
+        table.add_row(&[self.0, self.1]);
+    }
+}
+
+impl DisplayTable for String {
+    const HEADER: &'static [&'static str] = &[];
+    fn build(&self, table: &mut Table) {
+        table.add_row(&[&self]);
+    }
+}
+
+impl DisplayTable for (String, String) {
+    const HEADER: &'static [&'static str] = &[];
+    fn build(&self, table: &mut Table) {
+        table.add_row(&[&self.0, &self.1]);
     }
 }
