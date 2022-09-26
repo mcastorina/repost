@@ -55,12 +55,12 @@ impl<'db> Cmd<'db> {
     }
 
     pub async fn print_environments(&self) -> Result<()> {
-        let reqs = db::query_as_environment!(
-            sqlx::query_as("SELECT * FROM environments")
+        let envs = db::query_as_environment!(
+            sqlx::query_as("SELECT DISTINCT env AS name FROM variables")
                 .fetch_all(self.db.pool())
                 .await?
         );
-        reqs.print();
+        envs.print();
         Ok(())
     }
 }

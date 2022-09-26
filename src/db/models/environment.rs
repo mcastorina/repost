@@ -26,12 +26,4 @@ impl Environment {
     {
         Self { name: name.into() }
     }
-    pub async fn save(&self, pool: &SqlitePool) -> Result<(), Error> {
-        // TODO: ignore conflicts
-        sqlx::query("INSERT INTO environments (name) VALUES (?)")
-            .bind(self.name.as_str())
-            .execute(pool)
-            .await?;
-        Ok(())
-    }
 }

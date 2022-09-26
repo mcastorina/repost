@@ -82,7 +82,6 @@ impl Db {
     async fn create_tables(&self) -> Result<()> {
         sqlx::query(
             "
-            CREATE TABLE IF NOT EXISTS environments (name TEXT PRIMARY KEY NOT NULL);
             CREATE TABLE IF NOT EXISTS variables (
                 id          INTEGER PRIMARY KEY,
                 name        TEXT NOT NULL,
