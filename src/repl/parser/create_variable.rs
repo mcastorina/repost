@@ -1,5 +1,7 @@
 use super::error::{ParseError, ParseErrorKind};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
+use crate::cmd;
+use crate::error::Error;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CreateVariable {
@@ -38,6 +40,26 @@ impl TryFrom<CreateVariableBuilder> for CreateVariable {
         Ok(CreateVariable {
             name: builder.name.unwrap(),
             env_vals: builder.env_vals,
+        })
+    }
+}
+
+impl TryFrom<CreateVariable> for cmd::CreateVariableArgs {
+    type Error = Error;
+    fn try_from(args: CreateVariable) -> Result<Self, Self::Error> {
+        let env_val = |h: String| {
+            h.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .ok_or(Error::ParseError("Invalid environment value pair"))
+        };
+        Ok(Self {
+            name: args.name,
+            env_vals: args
+                .env_vals
+                .into_iter()
+                .map(env_val)
+                .collect::<Result<Vec<_>, _>>()?,
+            source: "user".to_string(),
         })
     }
 }

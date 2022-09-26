@@ -1,6 +1,6 @@
 use crate::db::{
     self,
-    models::{DisplayTable, Request},
+    models::{DisplayTable, Request, Variable},
     Db,
 };
 use crate::error::Result;
@@ -26,9 +26,37 @@ impl<'db> Cmd<'db> {
         Ok(())
     }
 
+    pub async fn create_variable(&self, args: CreateVariableArgs) -> Result<()> {
+        for (env, val) in args.env_vals {
+            let var = Variable::new(&args.name, env, val, &args.source);
+            var.save(self.db.pool()).await?;
+        }
+        Ok(())
+    }
+
     pub async fn print_requests(&self) -> Result<()> {
         let reqs = db::query_as_request!(
             sqlx::query_as("SELECT * FROM requests")
+                .fetch_all(self.db.pool())
+                .await?
+        );
+        reqs.print();
+        Ok(())
+    }
+
+    pub async fn print_variables(&self) -> Result<()> {
+        let reqs = db::query_as_variable!(
+            sqlx::query_as("SELECT * FROM variables")
+                .fetch_all(self.db.pool())
+                .await?
+        );
+        reqs.print();
+        Ok(())
+    }
+
+    pub async fn print_environments(&self) -> Result<()> {
+        let reqs = db::query_as_environment!(
+            sqlx::query_as("SELECT * FROM environments")
                 .fetch_all(self.db.pool())
                 .await?
         );
@@ -44,4 +72,11 @@ pub struct CreateRequestArgs {
     pub method: Method,
     pub headers: Vec<(String, String)>,
     pub body: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct CreateVariableArgs {
+    pub name: String,
+    pub env_vals: Vec<(String, String)>,
+    pub source: String,
 }

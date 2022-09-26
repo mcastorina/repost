@@ -41,10 +41,10 @@ impl Repl {
         let cmd = Cmd::new(&self.db);
         match parser::parse_command(input).map_err(|_| Error::ParseError("foo"))? {
             Command::CreateRequest(args) => cmd.create_request(args.try_into()?).await?,
-            Command::CreateVariable(_) => (),
+            Command::CreateVariable(args) => cmd.create_variable(args.try_into()?).await?,
             Command::PrintRequests(_) => cmd.print_requests().await?,
-            Command::PrintVariables(_) => (),
-            Command::PrintEnvironments(_) => (),
+            Command::PrintVariables(_) => cmd.print_variables().await?,
+            Command::PrintEnvironments(_) => cmd.print_environments().await?,
         }
         Ok(())
     }
