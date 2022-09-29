@@ -4,6 +4,7 @@ mod error;
 mod print_environments;
 mod print_requests;
 mod print_variables;
+mod print_workspaces;
 
 use create_request::{CreateRequest, CreateRequestBuilder};
 use create_variable::{CreateVariable, CreateVariableBuilder};
@@ -19,6 +20,7 @@ use nom::{
 use print_environments::{PrintEnvironments, PrintEnvironmentsBuilder};
 use print_requests::{PrintRequests, PrintRequestsBuilder};
 use print_variables::{PrintVariables, PrintVariablesBuilder};
+use print_workspaces::{PrintWorkspaces, PrintWorkspacesBuilder};
 
 macro_rules! commands {
     ($($( ($( $word:ident )+) => ($kind:ident, $builder:ident) )+$(,)?)*) => {
@@ -218,11 +220,12 @@ commands!(
     (Print Requests) => (PrintRequests, PrintRequestsBuilder),
     (Print Variables) => (PrintVariables, PrintVariablesBuilder),
     (Print Environments) => (PrintEnvironments, PrintEnvironmentsBuilder),
+    (Print Workspaces) => (PrintWorkspaces, PrintWorkspacesBuilder),
 );
 
 command_parsing!(
     Create => [Request, Variable],
-    Print => [Requests, Variables, Environments],
+    Print => [Requests, Variables, Environments, Workspaces],
 );
 
 command_keys!(
@@ -233,6 +236,8 @@ command_keys!(
     Variable => ["variable", "var", "v"],
     Variables => ["variables", "variable", "vars", "var", "v"],
     Environments => ["environments", "environment", "envs", "env", "e"],
+    Workspace => ["workspace", "ws", "w"],
+    Workspaces => ["workspaces", "workspace", "ws", "w"],
 );
 
 opt_keys!(

@@ -54,13 +54,17 @@ impl Db {
 
     /// Return the name of the database.
     pub fn name(&self) -> &str {
-        if self.path == Self::PLAYGROUND {
+        Self::name_of(&self.path)
+    }
+
+    pub fn name_of<S: AsRef<str> + ?Sized>(path: &S) -> &str {
+        let path = path.as_ref();
+        if path == Self::PLAYGROUND {
             return "playground";
         }
-        let path = Path::new(self.path.as_str());
-        match path.file_name().and_then(|o| o.to_str()) {
+        match Path::new(path).file_name().and_then(|o| o.to_str()) {
             Some(s) => s.strip_suffix(".db").unwrap_or(s),
-            None => self.path.as_str(),
+            None => path,
         }
     }
 

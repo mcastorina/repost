@@ -5,7 +5,7 @@ mod parser;
 pub use config::ReplConfig;
 
 use crate::cmd::Cmd;
-use crate::db::Db;
+use crate::db::{Db, DisplayTable};
 use crate::error::{Error, Result};
 use line_reader::LineReader;
 use parser::Command;
@@ -45,11 +45,21 @@ impl Repl {
             Command::PrintRequests(_) => cmd.print_requests().await?,
             Command::PrintVariables(_) => cmd.print_variables().await?,
             Command::PrintEnvironments(_) => cmd.print_environments().await?,
+            Command::PrintWorkspaces(_) => self.workspaces()?.print_with_header(&["workspaces"]),
         }
         Ok(())
     }
 
     fn prompt(&self) -> String {
         format!("[{}] > ", self.db.name())
+    }
+
+    fn workspaces(&self) -> Result<Vec<String>> {
+        Ok(self
+            .conf
+            .dbs()?
+            .into_iter()
+            .map(|db| Db::name_of(&db.to_string_lossy()).to_owned())
+            .collect())
     }
 }
