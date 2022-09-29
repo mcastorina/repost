@@ -4,6 +4,7 @@ use crate::error::Error;
 use reqwest::{Body, Method};
 use serde_json;
 use sqlx::{FromRow, SqlitePool};
+use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug, FromRow, PartialEq)]
@@ -134,6 +135,23 @@ impl Request {
         self
     }
 
+    /// Returns the unique set of input variables for this request.
+    pub fn input_variables(&self) -> HashSet<&str> {
+        let set_union = |vars: HashSet<_>, vs| vars.union(&vs).copied().collect();
+
+        let mut vars = HashSet::new();
+        vars = set_union(vars, self.url.variables());
+        for (header, value) in &self.headers {
+            vars = set_union(vars, header.variables());
+            vars = set_union(vars, value.variables());
+        }
+        if let Some(RequestBody::Payload(body)) = &self.body {
+            vars = set_union(vars, body.variables());
+        }
+        vars
+    }
+
+    /// Save the request to a sqlite database.
     pub async fn save(self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
         let db_req: DbRequest = self.into();
         // TODO: update on conflict
@@ -183,12 +201,21 @@ impl TryFrom<DbRequest> for Request {
 #[cfg(test)]
 mod test {
     use super::{Method, Request};
+    use std::collections::HashSet;
     use std::str::FromStr;
 
     macro_rules! method {
         ($m:expr) => {
             Request::new("name", $m, "url").method
         };
+    }
+
+    macro_rules! set {
+        ($( $x:expr ),*) => {{
+            let mut set = HashSet::new();
+            $( set.insert($x);)*
+            set
+        }};
     }
 
     #[test]
@@ -217,6 +244,17 @@ mod test {
                 .headers
                 .len(),
             3
+        );
+    }
+
+    #[test]
+    fn input_variables() {
+        assert_eq!(
+            Request::new("foo", "bar", "{baz}")
+                .header("{header}", "{value}")
+                .body("{body}{baz}")
+                .input_variables(),
+            set!["baz", "header", "value", "body"],
         );
     }
 }

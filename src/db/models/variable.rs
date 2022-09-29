@@ -127,6 +127,14 @@ impl VarString {
     pub fn as_str(&self) -> &str {
         self.source.as_str()
     }
+
+    pub fn variables(&self) -> HashSet<&str> {
+        let mut vars = HashSet::new();
+        for var in &self.vars {
+            vars.insert(var.as_str());
+        }
+        vars
+    }
 }
 
 impl<T> From<T> for VarString

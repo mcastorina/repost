@@ -179,19 +179,6 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_env_get_set() {
-        let db = test_db().await;
-        let env = Environment::new("foo");
-        env.save(db.pool()).await.expect("could not set");
-
-        let got: Environment = sqlx::query_as("SELECT * FROM environments")
-            .fetch_one(db.pool())
-            .await
-            .expect("could not get");
-        assert_eq!(got, env);
-    }
-
-    #[tokio::test]
     async fn test_var_get_set() {
         let db = test_db().await;
         let var = Variable::new("foo", "env", "value", "source");
