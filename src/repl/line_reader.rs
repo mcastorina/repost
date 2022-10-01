@@ -145,16 +145,15 @@ impl CommandCompleter {
         completion: Completion,
     ) -> Result<Vec<String>> {
         match builder {
-            Builder::SetEnvironmentBuilder(_) => self.set_environment(completion, prefix).await,
+            Builder::SetEnvironmentBuilder(_) => self.set_environment(completion).await,
             _ => Err(Error::ParseError("not implemented")),
         }
     }
 
-    async fn set_environment(&self, completion: Completion, prefix: &str) -> Result<Vec<String>> {
+    async fn set_environment(&self, completion: Completion) -> Result<Vec<String>> {
         let candidates = match completion {
             Completion::Arg(ArgKey::Name) => {
-                sqlx::query_scalar("SELECT DISTINCT env FROM variables WHERE env LIKE ?")
-                    .bind(format!("{}%", prefix))
+                sqlx::query_scalar("SELECT DISTINCT env FROM variables")
                     .fetch_all(self.state.db.pool())
                     .await?
             }
