@@ -54,19 +54,8 @@ impl Repl {
             Command::PrintEnvironments(_) => cmd.print_environments().await?,
             Command::PrintWorkspaces(_) => self.workspaces()?.print_with_header(&["workspaces"]),
             Command::SetEnvironment(args) => {
-                self.env = match args.environment {
-                    Some(env) => {
-                        let env = sqlx::query_scalar("SELECT DISTINCT env FROM variables")
-                            .fetch_all(self.db.pool())
-                            .await?
-                            .into_iter()
-                            .find(|e: &String| e == &env)
-                            .map(Environment::from)
-                            .ok_or(Error::ParseError("Not found"))?;
-                        Some(env)
-                    }
-                    None => None,
-                }
+                self.set_environment(args.environment.map(Environment::from))
+                    .await?
             }
         }
         Ok(())
@@ -86,5 +75,19 @@ impl Repl {
             .into_iter()
             .map(|db| Db::name_of(&db.to_string_lossy()).to_owned())
             .collect())
+    }
+
+    async fn set_environment(&mut self, env: Option<Environment>) -> Result<()> {
+        if env.is_none() {
+            self.env = None;
+            return Ok(());
+        }
+        let cand = env.as_ref().unwrap();
+        let _: bool = sqlx::query_scalar("SELECT 1 FROM variables WHERE env = ? LIMIT 1")
+            .bind(cand.as_ref())
+            .fetch_one(self.db.pool())
+            .await?;
+        self.env = env;
+        Ok(())
     }
 }
