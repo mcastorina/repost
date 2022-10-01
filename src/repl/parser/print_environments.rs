@@ -26,11 +26,10 @@ impl CmdLineBuilder for PrintEnvironmentsBuilder {
     }
 }
 
-impl TryFrom<PrintEnvironmentsBuilder> for PrintEnvironments {
-    type Error = ();
-    fn try_from(builder: PrintEnvironmentsBuilder) -> Result<Self, Self::Error> {
-        Ok(PrintEnvironments {
+impl From<PrintEnvironmentsBuilder> for PrintEnvironments {
+    fn from(builder: PrintEnvironmentsBuilder) -> Self {
+        PrintEnvironments {
             filters: builder.filters,
-        })
+        }
     }
 }

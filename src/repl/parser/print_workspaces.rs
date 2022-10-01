@@ -26,11 +26,10 @@ impl CmdLineBuilder for PrintWorkspacesBuilder {
     }
 }
 
-impl TryFrom<PrintWorkspacesBuilder> for PrintWorkspaces {
-    type Error = ();
-    fn try_from(builder: PrintWorkspacesBuilder) -> Result<Self, Self::Error> {
-        Ok(PrintWorkspaces {
+impl From<PrintWorkspacesBuilder> for PrintWorkspaces {
+    fn from(builder: PrintWorkspacesBuilder) -> Self {
+        PrintWorkspaces {
             filters: builder.filters,
-        })
+        }
     }
 }

@@ -60,11 +60,13 @@ impl CmdLineBuilder for CreateRequestBuilder {
 }
 
 impl TryFrom<CreateRequestBuilder> for CreateRequest {
-    type Error = ();
+    type Error = Error;
     fn try_from(builder: CreateRequestBuilder) -> Result<Self, Self::Error> {
-        match (&builder.name, &builder.url) {
-            (Some(_), Some(_)) => (),
-            _ => return Err(()),
+        if builder.name.is_none() {
+            return Err(Error::ParseError("Missing required argument: NAME"));
+        }
+        if builder.url.is_none() {
+            return Err(Error::ParseError("Missing required argument: URL"));
         }
         Ok(CreateRequest {
             name: builder.name.unwrap(),

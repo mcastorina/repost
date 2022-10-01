@@ -39,7 +39,7 @@ impl Repl {
     /// Execute a command line.
     pub async fn execute(&mut self, input: &str) -> Result<()> {
         let cmd = Cmd::new(&self.db);
-        match parser::parse_command(input).map_err(|_| Error::ParseError("foo"))? {
+        match parser::parse_command(input)? {
             Command::CreateRequest(args) => cmd.create_request(args.try_into()?).await?,
             Command::CreateVariable(args) => cmd.create_variable(args.try_into()?).await?,
             Command::PrintRequests(_) => cmd.print_requests().await?,

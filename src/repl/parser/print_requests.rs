@@ -26,11 +26,10 @@ impl CmdLineBuilder for PrintRequestsBuilder {
     }
 }
 
-impl TryFrom<PrintRequestsBuilder> for PrintRequests {
-    type Error = ();
-    fn try_from(builder: PrintRequestsBuilder) -> Result<Self, Self::Error> {
-        Ok(PrintRequests {
+impl From<PrintRequestsBuilder> for PrintRequests {
+    fn from(builder: PrintRequestsBuilder) -> Self {
+        PrintRequests {
             filters: builder.filters,
-        })
+        }
     }
 }

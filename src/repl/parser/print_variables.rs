@@ -26,11 +26,10 @@ impl CmdLineBuilder for PrintVariablesBuilder {
     }
 }
 
-impl TryFrom<PrintVariablesBuilder> for PrintVariables {
-    type Error = ();
-    fn try_from(builder: PrintVariablesBuilder) -> Result<Self, Self::Error> {
-        Ok(PrintVariables {
+impl From<PrintVariablesBuilder> for PrintVariables {
+    fn from(builder: PrintVariablesBuilder) -> Self {
+        PrintVariables {
             filters: builder.filters,
-        })
+        }
     }
 }

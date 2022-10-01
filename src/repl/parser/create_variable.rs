@@ -32,10 +32,13 @@ impl CmdLineBuilder for CreateVariableBuilder {
 }
 
 impl TryFrom<CreateVariableBuilder> for CreateVariable {
-    type Error = ();
+    type Error = Error;
     fn try_from(builder: CreateVariableBuilder) -> Result<Self, Self::Error> {
-        if builder.name.is_none() || builder.env_vals.len() == 0 {
-            return Err(());
+        if builder.name.is_none() {
+            return Err(Error::ParseError("Missing required argument: NAME"));
+        }
+        if builder.env_vals.len() == 0 {
+            return Err(Error::ParseError("Expected at least one ENV=VAL argument"));
         }
         Ok(CreateVariable {
             name: builder.name.unwrap(),

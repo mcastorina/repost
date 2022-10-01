@@ -6,10 +6,10 @@ mod print_requests;
 mod print_variables;
 mod print_workspaces;
 
+use crate::error::Error;
 use create_request::{CreateRequest, CreateRequestBuilder};
 use create_variable::{CreateVariable, CreateVariableBuilder};
 use error::{IResult, ParseError, ParseErrorKind};
-use nom::Err::{Error, Failure};
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take},
@@ -77,8 +77,8 @@ macro_rules! commands {
                 }
             }
         }
-        pub fn parse_command(input: &str) -> Result<Command, ()> {
-            let (rest, kind) = parse_command_kind(input, false).map_err(|_| ())?;
+        pub fn parse_command(input: &str) -> Result<Command, Error> {
+            let (rest, kind) = parse_command_kind(input, false).map_err(|_| Error::ParseError("parse_command error"))?;
             Ok(match kind {
                 $($(
                     CommandKind::$kind => {
@@ -96,11 +96,12 @@ macro_rules! commands {
                         println!();
                     }
                     println!();
-                    return Err(());
+                    // TODO: indicate help message was printed
+                    return Err(Error::ParseError("help"));
                 }
             })
         }
-        pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, Completion)>), ()> {
+        pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, Completion)>), Error> {
             let (rest, kind) = match parse_command_kind(input, true) {
                 Ok(ok) => ok,
                 Err(err) => return Ok((None, err)),
@@ -108,14 +109,14 @@ macro_rules! commands {
             Ok(match kind {
                 $($(
                     CommandKind::$kind => {
-                        let (s, (builder, completion)) = parse_subcommand_completion(rest).map_err(|_| ())?;
+                        let (s, (builder, completion)) = parse_subcommand_completion(rest)?;
                         (
                             Some(Builder::$builder(builder)),
                             completion.map(|c| (s, c)),
                         )
                     }
                 )*)*
-                CommandKind::Help => return Err(()),
+                CommandKind::Help => return Err(Error::ParseError("help")),
             })
         }
     }
@@ -348,12 +349,12 @@ fn parse_literal<'a>(input: &'a str, aliases: &'static [&'static str]) -> IResul
     Err(nom::Err::Error(ParseError::default()))
 }
 
-fn parse_subcommand<B>(input: &str) -> Result<B, ()>
+fn parse_subcommand<B>(input: &str) -> Result<B, ParseError<&str>>
 where
     B: CmdLineBuilder,
 {
     let parser = |i| _parse_subcommand(i, false);
-    let (_, builder): (_, B) = map(parser, |(b, _)| b)(input).map_err(|_| ())?;
+    let (_, builder): (_, B) = map(parser, |(b, _)| b)(input)?;
     Ok(builder)
 }
 
@@ -423,8 +424,8 @@ where
                     continue 'main;
                 }
                 // Non-recoverable error (e.g. the key parsed but not the value).
-                Err(ret @ Failure(_)) if !completion => return Err(ret),
-                Err(Failure(err)) if completion => {
+                Err(ret @ nom::Err::Failure(_)) if !completion => return Err(ret),
+                Err(nom::Err::Failure(err)) if completion => {
                     let completion = builder.get_completion(Completion::OptValue(opt.to_owned()));
                     return Ok((err.word, (builder, completion)));
                 }
