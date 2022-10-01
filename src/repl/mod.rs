@@ -5,6 +5,7 @@ mod parser;
 pub use config::ReplConfig;
 
 use crate::cmd::Cmd;
+use crate::db::models::Environment;
 use crate::db::{Db, DisplayTable};
 use crate::error::{Error, Result};
 use line_reader::LineReader;
@@ -16,6 +17,7 @@ pub struct Repl {
     conf: ReplConfig,
     db: Db,
     editor: LineReader,
+    env: Option<Environment>,
 }
 
 impl Repl {
@@ -27,7 +29,12 @@ impl Repl {
         let mut editor = LineReader::new();
         editor.set_completer(&db);
 
-        Ok(Self { conf, db, editor })
+        Ok(Self {
+            conf,
+            db,
+            editor,
+            env: None,
+        })
     }
 
     /// Read stdin into input using the LineReader.
@@ -51,7 +58,10 @@ impl Repl {
     }
 
     fn prompt(&self) -> String {
-        format!("[{}] > ", self.db.name())
+        match &self.env {
+            Some(env) => format!("[{}][{}] > ", self.db.name(), env.name),
+            None => format!("[{}] > ", self.db.name()),
+        }
     }
 
     fn workspaces(&self) -> Result<Vec<String>> {
