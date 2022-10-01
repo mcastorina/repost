@@ -5,6 +5,7 @@ mod print_environments;
 mod print_requests;
 mod print_variables;
 mod print_workspaces;
+mod set_environment;
 
 use crate::error::Error;
 use create_request::{CreateRequest, CreateRequestBuilder};
@@ -21,6 +22,7 @@ use print_environments::{PrintEnvironments, PrintEnvironmentsBuilder};
 use print_requests::{PrintRequests, PrintRequestsBuilder};
 use print_variables::{PrintVariables, PrintVariablesBuilder};
 use print_workspaces::{PrintWorkspaces, PrintWorkspacesBuilder};
+use set_environment::{SetEnvironment, SetEnvironmentBuilder};
 
 macro_rules! commands {
     ($($( ($( $word:ident )+) => ($kind:ident, $builder:ident) )+$(,)?)*) => {
@@ -239,12 +241,14 @@ commands!(
     (Print Variables) => (PrintVariables, PrintVariablesBuilder),
     (Print Environments) => (PrintEnvironments, PrintEnvironmentsBuilder),
     (Print Workspaces) => (PrintWorkspaces, PrintWorkspacesBuilder),
+    (Set Environment) => (SetEnvironment, SetEnvironmentBuilder),
 );
 
 command_parsing!(
     Help => [],
     Create => [Request, Variable],
     Print => [Requests, Variables, Environments, Workspaces],
+    Set => [Environment],
 );
 
 command_keys!(
@@ -255,9 +259,11 @@ command_keys!(
     Requests => ["requests", "request", "reqs", "req", "r"],
     Variable => ["variable", "var", "v"],
     Variables => ["variables", "variable", "vars", "var", "v"],
+    Environment => ["environment", "env", "e"],
     Environments => ["environments", "environment", "envs", "env", "e"],
     Workspace => ["workspace", "ws", "w"],
     Workspaces => ["workspaces", "workspace", "ws", "w"],
+    Set => ["set", "use"],
 );
 
 opt_keys!(

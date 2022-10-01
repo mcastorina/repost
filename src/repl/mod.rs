@@ -53,6 +53,7 @@ impl Repl {
             Command::PrintVariables(_) => cmd.print_variables().await?,
             Command::PrintEnvironments(_) => cmd.print_environments().await?,
             Command::PrintWorkspaces(_) => self.workspaces()?.print_with_header(&["workspaces"]),
+            Command::SetEnvironment(args) => self.env = args.environment.map(|e| e.into()),
         }
         Ok(())
     }
