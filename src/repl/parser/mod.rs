@@ -32,16 +32,19 @@ macro_rules! commands {
         #[derive(Debug, PartialEq, Clone)]
         enum CommandKind {
             $($( $kind, )*)*
+            Help,
         }
 
         impl CommandKind {
             const KINDS: &'static [Self] = &[
                 $($( Self::$kind, )*)*
+                Self::Help,
             ];
             fn keys(&self) -> &'static [CommandKey] {
                 use CommandKey::*;
                 match self {
                     $($( Self::$kind => &[$( $word, )*], )*)*
+                    Self::Help => &[Help],
                 }
             }
             fn parse(input: &str) -> Result<(&str, Self), ()> {
@@ -82,6 +85,19 @@ macro_rules! commands {
                         Command::$kind(parse_subcommand::<$builder>(rest)?.try_into()?)
                     }
                 )*)*
+                CommandKind::Help => {
+                    // TODO: better help message
+                    println!("\nUSAGE:\n    [COMMAND]\n\nCOMMANDS:");
+                    for kind in CommandKind::KINDS {
+                        print!("    ");
+                        for key in kind.keys() {
+                            print!("{} ", key.completions()[0]);
+                        }
+                        println!();
+                    }
+                    println!();
+                    return Err(());
+                }
             })
         }
         pub fn parse_completion(input: &str) -> Result<(Option<Builder>, Option<(&str, Completion)>), ()> {
@@ -99,6 +115,7 @@ macro_rules! commands {
                         )
                     }
                 )*)*
+                CommandKind::Help => return Err(()),
             })
         }
     }
@@ -224,11 +241,13 @@ commands!(
 );
 
 command_parsing!(
+    Help => [],
     Create => [Request, Variable],
     Print => [Requests, Variables, Environments, Workspaces],
 );
 
 command_keys!(
+    Help => ["help", "h", "what", "wut", "?"],
     Create => ["create", "new", "add", "c"],
     Print => ["print", "get", "show", "p"],
     Request => ["request", "req", "r"],
@@ -241,6 +260,7 @@ command_keys!(
 );
 
 opt_keys!(
+    Help => ["--help", "-h"],
     Header => ["--header", "-H"],
     Method => ["--method", "-m"],
 );
