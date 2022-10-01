@@ -3,9 +3,8 @@ use rustyline::config::OutputStreamType;
 use rustyline::{error::ReadlineError, CompletionType, Config, Context, EditMode, Editor, Result};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
-use crate::db::Db;
-use crate::error::Error;
 use crate::repl::parser::{self, Completion};
+use crate::repl::ReplState;
 
 pub struct LineReader {
     reader: Editor<CommandCompleter>,
@@ -24,9 +23,8 @@ impl LineReader {
         }
     }
 
-    pub fn set_completer(&mut self, db: &Db) {
-        self.reader
-            .set_helper(Some(CommandCompleter { db: db.clone() }));
+    pub fn set_completer(&mut self, state: ReplState) {
+        self.reader.set_helper(Some(CommandCompleter { state }));
     }
 
     pub fn read_line(&mut self, input: &mut String, prompt: &str) -> Option<()> {
@@ -58,7 +56,7 @@ impl LineReader {
 
 #[derive(Helper, Validator, Highlighter, Hinter)]
 struct CommandCompleter {
-    db: Db,
+    state: ReplState,
 }
 
 impl Completer for CommandCompleter {
