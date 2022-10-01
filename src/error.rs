@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug)]
@@ -31,11 +30,5 @@ pub enum Error {
     ParseError(&'static str),
 
     #[error("Infallible")]
-    Infallible,
-}
-
-impl From<Infallible> for Error {
-    fn from(_: Infallible) -> Self {
-        Self::Infallible
-    }
+    Infallible(#[from] std::convert::Infallible),
 }

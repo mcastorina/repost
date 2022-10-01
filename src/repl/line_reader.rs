@@ -1,10 +1,15 @@
 use rustyline::completion::{Completer, Pair};
 use rustyline::config::OutputStreamType;
-use rustyline::{error::ReadlineError, CompletionType, Config, Context, EditMode, Editor, Result};
+use rustyline::{
+    error::ReadlineError, CompletionType, Config, Context, EditMode, Editor,
+    Result as ReadlineResult,
+};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
-use crate::repl::parser::{self, Completion};
+use crate::error::{Error, Result};
+use crate::repl::parser::{self, ArgKey, Builder, Completion, OptKey};
 use crate::repl::ReplState;
+use tokio::runtime::Handle;
 
 pub struct LineReader {
     reader: Editor<CommandCompleter>,
@@ -67,7 +72,7 @@ impl Completer for CommandCompleter {
         line: &str,
         pos: usize,
         _ctx: &Context<'_>,
-    ) -> Result<(usize, Vec<Self::Candidate>)> {
+    ) -> ReadlineResult<(usize, Vec<Self::Candidate>)> {
         let line = &line[..pos];
         let (builder, completion) = match parser::parse_completion(line) {
             Ok(ok) => ok,
@@ -88,6 +93,9 @@ impl Completer for CommandCompleter {
                             .filter(|cand| cand.starts_with(prefix))
                             .next()
                     })
+                    // TODO: only allocate after filtering results
+                    .copied()
+                    .map(String::from)
                     .collect(),
             ),
             Some((prefix, Completion::OptKey)) => {
@@ -98,15 +106,22 @@ impl Completer for CommandCompleter {
                         .opts()
                         .iter()
                         .flat_map(|opt| opt.completions())
+                        // TODO: only allocate after filtering results
+                        .copied()
+                        .map(String::from)
                         .collect(),
                 )
             }
-            Some((prefix, completion)) => {
-                let builder = builder.unwrap();
-                // builder.smart_complete(completion, self.db)
-                dbg!(builder, prefix, completion);
-                (prefix, vec![])
-            }
+            Some((prefix, completion)) => (
+                prefix,
+                tokio::task::block_in_place(|| {
+                    Handle::current().block_on(async {
+                        self.smart_complete(prefix, builder.unwrap(), completion)
+                            .await
+                    })
+                })
+                .unwrap_or_default(),
+            ),
             None => ("", vec![]),
         };
 
@@ -119,5 +134,39 @@ impl Completer for CommandCompleter {
             })
             .collect();
         Ok((line.len() - prefix.len(), candidates))
+    }
+}
+
+impl CommandCompleter {
+    async fn smart_complete(
+        &self,
+        prefix: &str,
+        builder: Builder,
+        completion: Completion,
+    ) -> Result<Vec<String>> {
+        match builder {
+            Builder::SetEnvironmentBuilder(_) => self.set_environment(completion, prefix).await,
+            _ => Err(Error::ParseError("not implemented")),
+        }
+    }
+
+    async fn set_environment(&self, completion: Completion, prefix: &str) -> Result<Vec<String>> {
+        let candidates = match completion {
+            Completion::Arg(ArgKey::Name) => {
+                sqlx::query_scalar("SELECT DISTINCT env FROM variables WHERE env LIKE ?")
+                    .bind(format!("{}%", prefix))
+                    .fetch_all(self.state.db.pool())
+                    .await?
+            }
+            _ => return Err(Error::ParseError("Invalid completion")),
+        };
+
+        Ok(match &self.state.env {
+            Some(env) => candidates
+                .into_iter()
+                .filter(|e| e != env.as_ref())
+                .collect(),
+            None => candidates,
+        })
     }
 }
