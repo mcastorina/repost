@@ -25,6 +25,7 @@ use print_variables::{PrintVariables, PrintVariablesBuilder};
 use print_workspaces::{PrintWorkspaces, PrintWorkspacesBuilder};
 use set_environment::{SetEnvironment, SetEnvironmentBuilder};
 use set_workspace::{SetWorkspace, SetWorkspaceBuilder};
+use std::iter;
 
 macro_rules! commands {
     ($($( ($( $word:ident )+) => ($kind:ident, $builder:ident) )+$(,)?)*) => {
@@ -79,12 +80,14 @@ macro_rules! commands {
         }
 
         impl Builder {
-            pub fn opts(&self) -> &'static [OptKey] {
-                match self {
-                    $($(
-                        Self::$builder(_) => $builder::OPTS,
-                    )*)*
-                }
+            pub fn opts(&self) -> impl Iterator<Item = &OptKey> {
+                let opts = match self {
+                    $($( Self::$builder(_) => $builder::OPTS, )*)*
+                };
+                let flags = match self {
+                    $($( Self::$builder(_) => $builder::FLAGS, )*)*
+                };
+                opts.iter().chain(flags.iter()).chain(iter::once(&OptKey::Help))
             }
         }
         pub fn parse_command(input: &str) -> Result<Command, Error> {
@@ -154,7 +157,7 @@ macro_rules! command_keys {
 
 macro_rules! opt_keys {
     ($($( $key:ident => $lits:expr )+$(,)?)*) => {
-        #[derive(Debug, PartialEq, Clone)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
         pub enum OptKey {
             Unknown,
             $($( $key, )*)*
@@ -183,6 +186,22 @@ macro_rules! opt_keys {
                             "=" => cut(word)(rest),
                             _ => cut(verify(word, |s: &str| !s.starts_with('-')))(rest),
                         };
+                    }
+                }
+                Err(nom::Err::Error(ParseError::default()))
+            }
+            fn parse_flag<'a>(&'a self, input: &'a str) -> IResult<&str> {
+                if *self == OptKey::Unknown {
+                    return cut(recognize(delimited(
+                        alt((tag("--"), tag("-"))),
+                        alphanumeric1,
+                        eoo,
+                    )))(input);
+                }
+                for variant in self.completions() {
+                    let ret = terminated(tag(*variant), eow)(input);
+                    if ret.is_ok() {
+                        return ret;
                     }
                 }
                 Err(nom::Err::Error(ParseError::default()))
@@ -287,8 +306,9 @@ pub enum ArgKey {
 }
 
 trait CmdLineBuilder: Default {
-    const ARGS: &'static [ArgKey];
-    const OPTS: &'static [OptKey];
+    const ARGS: &'static [ArgKey] = &[];
+    const OPTS: &'static [OptKey] = &[];
+    const FLAGS: &'static [OptKey] = &[];
     const HELP: &'static str = "";
     fn add_arg<S: Into<String>>(&mut self, _: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         Err(ParseError {
@@ -301,6 +321,9 @@ trait CmdLineBuilder: Default {
             kind: ParseErrorKind::InvalidArg,
             word: arg,
         })
+    }
+    fn add_flag<S: Into<String>>(&mut self, key: OptKey) -> Result<(), ParseError<S>> {
+        Ok(())
     }
     fn get_completion(&self, kind: Completion) -> Option<Completion> {
         Some(kind)
@@ -448,10 +471,31 @@ where
             }
         }
         // TODO: Try to parse any flags.
+        for flag in B::FLAGS.into_iter().chain(iter::once(&OptKey::Help)) {
+            match flag.parse_flag(input) {
+                // Successfully parsed the flag.
+                Ok(ret) => {
+                    (input, arg) = ret;
+                    let flag = flag.to_owned();
+                    if completion && input.len() == 0 {
+                        let completion = builder.get_completion(Completion::OptKey);
+                        return Ok((arg, (builder, completion)));
+                    }
+                    builder.add_flag(flag).map_err(err)?;
+                    continue 'main;
+                }
+                // Non-recoverable error (e.g. the key parsed but not the value).
+                Err(ret @ nom::Err::Failure(_)) if !completion => return Err(ret),
+                Err(nom::Err::Failure(err)) if completion => {
+                    let completion = builder.get_completion(Completion::OptKey);
+                    return Ok((err.word, (builder, completion)));
+                }
+                // Recoverable error, do nothing and try the next parser.
+                _ => (),
+            }
+        }
         // Nothing successfully parsed the input, try adding it as an unknown option.
         // TODO: get the key and value from parsing
-        // let flag;
-        // (input, flag, arg) = OptKey::parse_unknown(input)?;
         (input, arg) = OptKey::Unknown.parse(input)?;
         builder.add_opt(OptKey::Unknown, arg).map_err(err)?;
     }

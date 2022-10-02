@@ -14,6 +14,7 @@ use tokio::runtime::Handle;
 
 pub struct LineReader {
     reader: Editor<CommandCompleter>,
+    line: Option<String>,
 }
 
 impl LineReader {
@@ -26,6 +27,7 @@ impl LineReader {
 
         Self {
             reader: Editor::with_config(config),
+            line: None,
         }
     }
 
@@ -34,7 +36,10 @@ impl LineReader {
     }
 
     pub fn read_line(&mut self, input: &mut String, prompt: &str) -> Option<()> {
-        let readline = self.reader.readline(&prompt);
+        let readline = match self.line.take() {
+            Some(line) => self.reader.readline_with_initial(&prompt, (&line, "")),
+            None => self.reader.readline(&prompt),
+        };
         match readline {
             Ok(line) => {
                 self.reader.add_history_entry(line.as_str());
@@ -57,6 +62,10 @@ impl LineReader {
                 None
             }
         }
+    }
+
+    pub fn set_line(&mut self, line: String) {
+        self.line = Some(line);
     }
 }
 
@@ -105,7 +114,6 @@ impl Completer for CommandCompleter {
                     prefix,
                     builder
                         .opts()
-                        .iter()
                         .flat_map(|opt| opt.completions())
                         // TODO: only allocate after filtering results
                         .copied()
