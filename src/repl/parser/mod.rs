@@ -383,7 +383,7 @@ where
     let mut builder = B::default();
     let mut double_dash = false;
     let mut arg: &str;
-    let err = |e| nom::Err::Error(dbg!(e));
+    let err = |e| nom::Err::Error(e);
     let done_parsing = if completion {
         |s: &str| terminated(word, space1)(s).is_err()
     } else {
@@ -449,7 +449,7 @@ where
         // TODO: get the key and value from parsing
         // let flag;
         // (input, flag, arg) = OptKey::parse_unknown(input)?;
-        (input, arg) = dbg!(OptKey::Unknown.parse(input))?;
+        (input, arg) = OptKey::Unknown.parse(input)?;
         builder.add_opt(OptKey::Unknown, arg).map_err(err)?;
     }
     if !completion {
