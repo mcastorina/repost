@@ -14,6 +14,7 @@ pub struct SetEnvironmentBuilder {
 impl CmdLineBuilder for SetEnvironmentBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name];
     const OPTS: &'static [OptKey] = &[];
+    const HELP: &'static str = "Set the REPL's environment for variable substitution";
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         match key {

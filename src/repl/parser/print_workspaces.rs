@@ -14,6 +14,7 @@ pub struct PrintWorkspacesBuilder {
 impl CmdLineBuilder for PrintWorkspacesBuilder {
     const ARGS: &'static [ArgKey] = &[];
     const OPTS: &'static [OptKey] = &[];
+    const HELP: &'static str = "Print available workspaces";
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         match key {

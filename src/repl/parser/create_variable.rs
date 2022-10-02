@@ -18,6 +18,7 @@ pub struct CreateVariableBuilder {
 impl CmdLineBuilder for CreateVariableBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name];
     const OPTS: &'static [OptKey] = &[];
+    const HELP: &'static str = "Create a variable for an environment";
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         match key {

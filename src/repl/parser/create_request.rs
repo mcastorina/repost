@@ -27,6 +27,7 @@ pub struct CreateRequestBuilder {
 impl CmdLineBuilder for CreateRequestBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name, ArgKey::URL];
     const OPTS: &'static [OptKey] = &[OptKey::Header, OptKey::Method];
+    const HELP: &'static str = "Create a named HTTP request";
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         match key {

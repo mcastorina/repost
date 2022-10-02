@@ -14,6 +14,7 @@ pub struct PrintVariablesBuilder {
 impl CmdLineBuilder for PrintVariablesBuilder {
     const ARGS: &'static [ArgKey] = &[];
     const OPTS: &'static [OptKey] = &[];
+    const HELP: &'static str = "Print existing variables in the workspace";
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         match key {

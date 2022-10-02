@@ -63,6 +63,12 @@ macro_rules! commands {
                 }
                 Err(())
             }
+            fn help(&self) -> &'static str {
+                match self {
+                    $($( Self::$kind => $builder::HELP, )*)*
+                    Self::Help => "Print this help message",
+                }
+            }
         }
 
         #[derive(Debug, PartialEq, Clone)]
@@ -91,11 +97,9 @@ macro_rules! commands {
                     // TODO: better help message
                     println!("\nUSAGE:\n    [COMMAND]\n\nCOMMANDS:");
                     for kind in CommandKind::KINDS {
-                        print!("    ");
-                        for key in kind.keys() {
-                            print!("{} ", key.completions()[0]);
-                        }
-                        println!();
+                        let cmd = kind.keys().iter().map(|key| key.completions()[0]).collect::<Vec<_>>().join(" ");
+                        print!("    {cmd:<22}");
+                        println!("{}", kind.help());
                     }
                     println!();
                     // TODO: indicate help message was printed
@@ -263,7 +267,7 @@ command_keys!(
     Environments => ["environments", "environment", "envs", "env", "e"],
     Workspace => ["workspace", "ws", "w"],
     Workspaces => ["workspaces", "workspace", "ws", "w"],
-    Set => ["set", "use"],
+    Set => ["set", "use", "u"],
 );
 
 opt_keys!(
@@ -282,6 +286,7 @@ pub enum ArgKey {
 trait CmdLineBuilder: Default {
     const ARGS: &'static [ArgKey];
     const OPTS: &'static [OptKey];
+    const HELP: &'static str = "";
     fn add_arg<S: Into<String>>(&mut self, _: ArgKey, arg: S) -> Result<(), ParseError<S>> {
         Err(ParseError {
             kind: ParseErrorKind::InvalidArg,
