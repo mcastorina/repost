@@ -14,7 +14,6 @@ use parser::Command;
 /// Repl object for handling readline editing, a database,
 /// and executing commands.
 pub struct Repl {
-    conf: ReplConfig,
     editor: LineReader,
     state: ReplState,
 }
@@ -22,6 +21,7 @@ pub struct Repl {
 #[derive(Clone)]
 pub struct ReplState {
     db: Db,
+    conf: ReplConfig,
     env: Option<Environment>,
 }
 
@@ -31,11 +31,11 @@ impl Repl {
         // start with an in-memory database
         let state = ReplState {
             db: Db::new_playground().await?,
+            conf,
             env: None,
         };
 
         Ok(Self {
-            conf,
             editor: LineReader::new(),
             state,
         })
@@ -58,23 +58,17 @@ impl Repl {
             Command::PrintRequests(_) => cmd.print_requests().await?,
             Command::PrintVariables(_) => cmd.print_variables().await?,
             Command::PrintEnvironments(_) => cmd.print_environments().await?,
-            Command::PrintWorkspaces(_) => self.workspaces()?.print_with_header(&["workspaces"]),
+            Command::PrintWorkspaces(_) => {
+                self.state.workspaces()?.print_with_header(&["workspaces"])
+            }
             Command::SetEnvironment(args) => {
                 self.state
                     .set_environment(args.environment.map(Environment::from))
                     .await?
             }
+            Command::SetWorkspace(args) => self.state.set_workspace(args.workspace).await?,
         }
         Ok(())
-    }
-
-    fn workspaces(&self) -> Result<Vec<String>> {
-        Ok(self
-            .conf
-            .dbs()?
-            .into_iter()
-            .map(|db| Db::name_of(&db.to_string_lossy()).to_owned())
-            .collect())
     }
 }
 
@@ -85,6 +79,21 @@ impl ReplState {
             Some(env) => format!("[{}][{}] > ", db, env.name),
             None => format!("[{}] > ", db),
         }
+    }
+
+    async fn set_workspace(&mut self, workspace: Option<String>) -> Result<()> {
+        let workspace = workspace.unwrap_or_else(|| String::from("playground"));
+        if self.db.name() == workspace {
+            return Ok(());
+        }
+        self.db = match workspace.as_ref() {
+            "playground" => Db::new_playground().await?,
+            workspace => {
+                let path = self.conf.data_dir.join(workspace).with_extension("db");
+                Db::new(path.to_string_lossy()).await?
+            }
+        };
+        Ok(())
     }
 
     async fn set_environment(&mut self, env: Option<Environment>) -> Result<()> {
@@ -99,5 +108,14 @@ impl ReplState {
             .await?;
         self.env = env;
         Ok(())
+    }
+
+    fn workspaces(&self) -> Result<Vec<String>> {
+        Ok(self
+            .conf
+            .dbs()?
+            .into_iter()
+            .map(|db| Db::name_of(&db.to_string_lossy()).to_owned())
+            .collect())
     }
 }

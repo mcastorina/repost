@@ -3,6 +3,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[derive(Clone)]
 pub struct ReplConfig {
     pub data_dir: PathBuf,
 }

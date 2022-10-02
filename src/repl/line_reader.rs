@@ -9,6 +9,7 @@ use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use crate::error::{Error, Result};
 use crate::repl::parser::{self, ArgKey, Builder, Completion, OptKey};
 use crate::repl::ReplState;
+use std::iter;
 use tokio::runtime::Handle;
 
 pub struct LineReader {
@@ -146,8 +147,21 @@ impl CommandCompleter {
     ) -> Result<Vec<String>> {
         match builder {
             Builder::SetEnvironmentBuilder(_) => self.set_environment(completion).await,
+            Builder::SetWorkspaceBuilder(_) => self.set_workspace(completion).await,
             _ => Err(Error::ParseError("not implemented")),
         }
+    }
+
+    async fn set_workspace(&self, completion: Completion) -> Result<Vec<String>> {
+        let candidates = match completion {
+            Completion::Arg(ArgKey::Name) => self.state.workspaces()?,
+            _ => return Err(Error::ParseError("Invalid completion")),
+        };
+        Ok(candidates
+            .into_iter()
+            .chain(iter::once(String::from("playground")))
+            .filter(|ws| ws != self.state.db.name())
+            .collect())
     }
 
     async fn set_environment(&self, completion: Completion) -> Result<Vec<String>> {
