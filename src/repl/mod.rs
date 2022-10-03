@@ -8,6 +8,7 @@ use crate::cmd::Cmd;
 use crate::db::models::Environment;
 use crate::db::{Db, DisplayTable};
 use crate::error::{Error, Result};
+use colored::Colorize;
 use line_reader::LineReader;
 use parser::Command;
 
@@ -80,9 +81,9 @@ impl Repl {
 
 impl ReplState {
     fn prompt(&self) -> String {
-        let db = self.db.name();
+        let db = self.db.name().yellow();
         match &self.env {
-            Some(env) => format!("[{}][{}] > ", db, env.name),
+            Some(env) => format!("[{}][{}] > ", db, env.name.cyan().bold()),
             None => format!("[{}] > ", db),
         }
     }
