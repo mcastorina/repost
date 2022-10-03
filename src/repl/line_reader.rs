@@ -36,6 +36,7 @@ impl LineReader {
     }
 
     pub fn read_line(&mut self, input: &mut String, prompt: &str) -> Option<()> {
+        input.clear();
         let readline = match self.line.take() {
             Some(line) => self.reader.readline_with_initial(&prompt, (&line, "")),
             None => self.reader.readline(&prompt),
