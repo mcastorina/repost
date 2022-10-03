@@ -558,8 +558,10 @@ mod test {
 
     #[test]
     fn test_create_request() {
-        let create_request =
-            |input| parse_subcommand::<CreateRequestBuilder>(input).and_then(|b| b.try_into());
+        let create_request = |input| {
+            parse_subcommand::<CreateRequestBuilder>(input)
+                .and_then(|b| b.try_into().map_err(|_| ParseError::default()))
+        };
         assert_eq!(
             create_request("foo bar"),
             Ok(CreateRequest {
