@@ -92,6 +92,7 @@ impl Variable {
         .bind(self.value.as_ref())
         .bind(self.source.as_str())
         .bind(self.timestamp)
+        .bind(id)
         .execute(pool)
         .await?;
         Ok(())

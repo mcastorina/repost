@@ -1,5 +1,6 @@
 mod create_request;
 mod create_variable;
+mod delete_variables;
 mod error;
 mod print_environments;
 mod print_requests;
@@ -11,6 +12,7 @@ mod set_workspace;
 use crate::error::Error;
 use create_request::{CreateRequest, CreateRequestBuilder};
 use create_variable::{CreateVariable, CreateVariableBuilder};
+use delete_variables::{DeleteVariables, DeleteVariablesBuilder};
 use error::{IResult, ParseError, ParseErrorKind};
 use nom::{
     branch::alt,
@@ -279,6 +281,7 @@ commands!(
     (Print Workspaces) => (PrintWorkspaces, PrintWorkspacesBuilder),
     (Set Environment) => (SetEnvironment, SetEnvironmentBuilder),
     (Set Workspace) => (SetWorkspace, SetWorkspaceBuilder),
+    (Delete Variables) => (DeleteVariables, DeleteVariablesBuilder),
 );
 
 command_parsing!(
@@ -286,6 +289,7 @@ command_parsing!(
     Create => [Request, Variable],
     Print => [Requests, Variables, Environments, Workspaces],
     Set => [Environment, Workspace],
+    Delete => [Variables],
 );
 
 command_keys!(
@@ -301,6 +305,7 @@ command_keys!(
     Workspace => ["workspace", "ws", "w"],
     Workspaces => ["workspaces", "workspace", "ws", "w"],
     Set => ["set", "use", "u"],
+    Delete => ["delete", "del", "remove", "rm"],
 );
 
 opt_keys!(
