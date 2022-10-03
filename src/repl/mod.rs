@@ -69,7 +69,9 @@ impl Repl {
             Command::SetWorkspace(args) => self.state.set_workspace(args.workspace).await?,
             Command::Help(builder) => {
                 builder.help();
-                self.editor.set_line(String::from(input));
+                self.editor.set_line(String::from(
+                    input.trim_end_matches("--help").trim_end_matches("-h"),
+                ));
             }
         }
         Ok(())
