@@ -30,6 +30,7 @@ impl CmdLineBuilder for CreateVariableBuilder {
             }),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Create variables for environments. Names matching those found in requests will");

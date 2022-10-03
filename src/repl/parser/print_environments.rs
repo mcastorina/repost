@@ -25,6 +25,7 @@ impl CmdLineBuilder for PrintEnvironmentsBuilder {
             }),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Environments are derived from existing variables. If no filters are");

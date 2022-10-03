@@ -58,6 +58,7 @@ impl CmdLineBuilder for CreateRequestBuilder {
             _ => Some(kind),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Create a named request to run. Variables may be used in the form {{variable}}");

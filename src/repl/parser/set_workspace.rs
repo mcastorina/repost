@@ -25,6 +25,7 @@ impl CmdLineBuilder for SetWorkspaceBuilder {
             }),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    A workspace is where all requests and variables are stored and is written");

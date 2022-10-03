@@ -25,6 +25,7 @@ impl CmdLineBuilder for PrintRequestsBuilder {
             }),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Print information about requests in the current workspace. If no filters");

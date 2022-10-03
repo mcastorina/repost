@@ -25,6 +25,7 @@ impl CmdLineBuilder for PrintWorkspacesBuilder {
             }),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Print a list of workspaces found in the configured data directory. A");

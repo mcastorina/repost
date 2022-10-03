@@ -25,6 +25,7 @@ impl CmdLineBuilder for PrintVariablesBuilder {
             }),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Print information about variables in the current workspace. If no filters");

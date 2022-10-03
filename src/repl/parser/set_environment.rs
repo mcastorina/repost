@@ -25,6 +25,7 @@ impl CmdLineBuilder for SetEnvironmentBuilder {
             }),
         }
     }
+    #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Environments are derived from existing variables. When the REPL has an");
