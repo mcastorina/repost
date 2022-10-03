@@ -25,6 +25,18 @@ impl CmdLineBuilder for PrintWorkspacesBuilder {
             }),
         }
     }
+    fn usage(&self) {
+        println!("{}\n", Self::HELP);
+        println!("    Print a list of workspaces found in the configured data directory. A");
+        println!("    workspace is where all requests and variables are stored. If no filters");
+        println!("    are provided, all workspaces are printed. If one or more more filters are");
+        println!("    provided, the output will show workspaces that match any of the given");
+        println!("    filters.");
+        println!("\nUSAGE:\n    print workspaces [filter]...");
+        println!("\nARGS:");
+        println!("    [filter]...    Print workspaces matching the filter");
+        println!("\n");
+    }
 }
 
 impl From<PrintWorkspacesBuilder> for PrintWorkspaces {

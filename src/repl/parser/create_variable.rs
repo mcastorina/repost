@@ -30,6 +30,16 @@ impl CmdLineBuilder for CreateVariableBuilder {
             }),
         }
     }
+    fn usage(&self) {
+        println!("{}\n", Self::HELP);
+        println!("    Create variables for environments. Names matching those found in requests will");
+        println!("    be substituted for the value in the current environment.");
+        println!("\nUSAGE:\n    create variable <name> <environment=value>...");
+        println!("\nARGS:");
+        println!("    <name>                    Name of the variable");
+        println!("    <environment=value>...    Value for the environment");
+        println!("\n");
+    }
 }
 
 impl TryFrom<CreateVariableBuilder> for CreateVariable {

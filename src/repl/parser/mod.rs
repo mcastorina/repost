@@ -90,9 +90,9 @@ macro_rules! commands {
                 };
                 opts.iter().chain(flags.iter()).chain(iter::once(&OptKey::Help))
             }
-            pub fn help(&self) {
+            pub fn usage(&self) {
                 match self {
-                    $($( Self::$builder(b) => b.help(), )*)*
+                    $($( Self::$builder(b) => b.usage(), )*)*
                 }
             }
         }
@@ -339,8 +339,8 @@ trait CmdLineBuilder: Default {
     fn get_completion(&self, kind: Completion) -> Option<Completion> {
         Some(kind)
     }
-    fn help(&self) {
-        println!("{}", Self::HELP);
+    fn usage(&self) {
+        println!("{}\n", Self::HELP);
     }
 }
 

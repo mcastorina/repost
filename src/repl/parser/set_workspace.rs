@@ -25,6 +25,16 @@ impl CmdLineBuilder for SetWorkspaceBuilder {
             }),
         }
     }
+    fn usage(&self) {
+        println!("{}\n", Self::HELP);
+        println!("    A workspace is where all requests and variables are stored and is written");
+        println!("    to disk for persistence in the configured data directory. The 'playground'");
+        println!("    workspace uses in-memory storage and will be lost when repost exits.");
+        println!("\nUSAGE:\n    set workspace [name]");
+        println!("\nARGS:");
+        println!("    [name]    Name of the workspace (default: playground)");
+        println!("\n");
+    }
 }
 
 impl From<SetWorkspaceBuilder> for SetWorkspace {

@@ -25,6 +25,16 @@ impl CmdLineBuilder for SetEnvironmentBuilder {
             }),
         }
     }
+    fn usage(&self) {
+        println!("{}\n", Self::HELP);
+        println!("    Environments are derived from existing variables. When the REPL has an");
+        println!("    environment set, the variables from that environment will be used for");
+        println!("    request variable substitution.");
+        println!("\nUSAGE:\n    set environment [name]");
+        println!("\nARGS:");
+        println!("    [name]    Name of the environment (default: clears environment)");
+        println!("\n");
+    }
 }
 
 impl From<SetEnvironmentBuilder> for SetEnvironment {

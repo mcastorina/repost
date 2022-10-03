@@ -25,6 +25,16 @@ impl CmdLineBuilder for PrintRequestsBuilder {
             }),
         }
     }
+    fn usage(&self) {
+        println!("{}\n", Self::HELP);
+        println!("    Print information about requests in the current workspace. If no filters");
+        println!("    are provided, all requests are printed. If one or more more filters are");
+        println!("    provided, the output will show requests that match any of the given filters.");
+        println!("\nUSAGE:\n    print requests [filter]...");
+        println!("\nARGS:");
+        println!("    [filter]...    Print requests matching the filter");
+        println!("\n");
+    }
 }
 
 impl From<PrintRequestsBuilder> for PrintRequests {

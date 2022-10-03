@@ -58,6 +58,20 @@ impl CmdLineBuilder for CreateRequestBuilder {
             _ => Some(kind),
         }
     }
+    fn usage(&self) {
+        println!("{}\n", Self::HELP);
+        println!("    Create a named request to run. Variables may be used in the form {{variable}}");
+        println!("    in the URL, headers, and body. If method is not provided, it will be inferred");
+        println!("    from the name of the request, defaulting to GET.");
+        println!("\nUSAGE:\n    create request [OPTIONS] <name> <url>");
+        println!("\nARGS:");
+        println!("    <name>    Name of the request");
+        println!("    <url>     HTTP request URL");
+        println!("\nOPTIONS:");
+        println!("    -H, --header <headers>...    HTTP request headers");
+        println!("    -m, --method <method>        HTTP request method");
+        println!("\n");
+    }
 }
 
 impl TryFrom<CreateRequestBuilder> for CreateRequest {
