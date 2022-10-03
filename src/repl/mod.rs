@@ -67,6 +67,10 @@ impl Repl {
                     .await?
             }
             Command::SetWorkspace(args) => self.state.set_workspace(args.workspace).await?,
+            Command::Help(builder) => {
+                builder.help();
+                self.editor.set_line(String::from(input));
+            }
         }
         Ok(())
     }

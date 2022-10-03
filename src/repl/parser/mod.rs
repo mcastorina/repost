@@ -32,6 +32,7 @@ macro_rules! commands {
         #[derive(Debug, PartialEq, Clone)]
         pub enum Command {
             $($( $kind($kind), )*)*
+            Help(Builder),
         }
 
         #[derive(Debug, PartialEq, Clone)]
@@ -89,13 +90,23 @@ macro_rules! commands {
                 };
                 opts.iter().chain(flags.iter()).chain(iter::once(&OptKey::Help))
             }
+            pub fn help(&self) {
+                match self {
+                    $($( Self::$builder(b) => b.help(), )*)*
+                }
+            }
         }
         pub fn parse_command(input: &str) -> Result<Command, Error> {
             let (rest, kind) = parse_command_kind(input, false).map_err(|_| Error::ParseError("parse_command error"))?;
             Ok(match kind {
                 $($(
                     CommandKind::$kind => {
-                        Command::$kind(parse_subcommand::<$builder>(rest)?.try_into()?)
+                        let (builder, help) = parse_subcommand::<$builder>(rest)?;
+                        if help {
+                            Command::Help(Builder::$builder(builder))
+                        } else {
+                            Command::$kind(builder.try_into()?)
+                        }
                     }
                 )*)*
                 CommandKind::Help => {
@@ -328,6 +339,9 @@ trait CmdLineBuilder: Default {
     fn get_completion(&self, kind: Completion) -> Option<Completion> {
         Some(kind)
     }
+    fn help(&self) {
+        println!("{}", Self::HELP);
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -386,23 +400,26 @@ fn parse_literal<'a>(input: &'a str, aliases: &'static [&'static str]) -> IResul
     Err(nom::Err::Error(ParseError::default()))
 }
 
-fn parse_subcommand<B>(input: &str) -> Result<B, ParseError<&str>>
+fn parse_subcommand<B>(input: &str) -> Result<(B, bool), ParseError<&str>>
 where
     B: CmdLineBuilder,
 {
     let parser = |i| _parse_subcommand(i, false);
-    let (_, builder): (_, B) = map(parser, |(b, _)| b)(input)?;
-    Ok(builder)
+    let (_, (builder, help)): (_, (B, bool)) = map(parser, |(r, _)| r)(input)?;
+    Ok((builder, help))
 }
 
 fn parse_subcommand_completion<B>(input: &str) -> IResult<(B, Option<Completion>)>
 where
     B: CmdLineBuilder,
 {
-    _parse_subcommand(input, true)
+    map(|i| _parse_subcommand(i, true), |((b, _), c)| (b, c))(input)
 }
 
-fn _parse_subcommand<B>(mut input: &str, completion: bool) -> IResult<(B, Option<Completion>)>
+fn _parse_subcommand<B>(
+    mut input: &str,
+    completion: bool,
+) -> IResult<((B, bool), Option<Completion>)>
 where
     B: CmdLineBuilder,
 {
@@ -455,7 +472,7 @@ where
                     let opt = opt.to_owned();
                     if completion && input.len() == 0 {
                         let completion = builder.get_completion(Completion::OptValue(opt));
-                        return Ok((arg, (builder, completion)));
+                        return Ok((arg, ((builder, false), completion)));
                     }
                     builder.add_opt(opt, arg).map_err(err)?;
                     continue 'main;
@@ -464,7 +481,7 @@ where
                 Err(ret @ nom::Err::Failure(_)) if !completion => return Err(ret),
                 Err(nom::Err::Failure(err)) if completion => {
                     let completion = builder.get_completion(Completion::OptValue(opt.to_owned()));
-                    return Ok((err.word, (builder, completion)));
+                    return Ok((err.word, ((builder, false), completion)));
                 }
                 // Recoverable error, do nothing and try the next parser.
                 _ => (),
@@ -474,12 +491,15 @@ where
         for flag in B::FLAGS.into_iter().chain(iter::once(&OptKey::Help)) {
             match flag.parse_flag(input) {
                 // Successfully parsed the flag.
+                Ok(_) if !completion && flag == &OptKey::Help => {
+                    return Ok(("", ((builder, true), None)));
+                }
                 Ok(ret) => {
                     (input, arg) = ret;
                     let flag = flag.to_owned();
                     if completion && input.len() == 0 {
                         let completion = builder.get_completion(Completion::OptKey);
-                        return Ok((arg, (builder, completion)));
+                        return Ok((arg, ((builder, false), completion)));
                     }
                     builder.add_flag(flag).map_err(err)?;
                     continue 'main;
@@ -488,7 +508,7 @@ where
                 Err(ret @ nom::Err::Failure(_)) if !completion => return Err(ret),
                 Err(nom::Err::Failure(err)) if completion => {
                     let completion = builder.get_completion(Completion::OptKey);
-                    return Ok((err.word, (builder, completion)));
+                    return Ok((err.word, ((builder, false), completion)));
                 }
                 // Recoverable error, do nothing and try the next parser.
                 _ => (),
@@ -500,14 +520,14 @@ where
         builder.add_opt(OptKey::Unknown, arg).map_err(err)?;
     }
     if !completion {
-        return Ok((input, (builder, None)));
+        return Ok((input, ((builder, false), None)));
     }
     let completion = match (double_dash, input.starts_with('-')) {
         (true, _) => builder.get_completion(Completion::Arg(arg_key())),
         (_, true) => builder.get_completion(Completion::OptKey),
         (_, false) => builder.get_completion(Completion::Arg(arg_key())),
     };
-    Ok((input, (builder, completion)))
+    Ok((input, ((builder, false), completion)))
 }
 
 #[cfg(test)]
