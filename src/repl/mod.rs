@@ -56,6 +56,7 @@ impl Repl {
         match parser::parse_command(input)? {
             Command::CreateRequest(args) => cmd.create_request(args.try_into()?).await?,
             Command::CreateVariable(args) => cmd.create_variable(args.try_into()?).await?,
+            Command::DeleteRequests(args) => cmd.delete_requests(args.into()).await?,
             Command::DeleteVariables(args) => cmd.delete_variables(args.into()).await?,
             Command::PrintRequests(_) => cmd.print_requests().await?,
             Command::PrintVariables(_) => cmd.print_variables().await?,

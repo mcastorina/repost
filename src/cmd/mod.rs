@@ -34,6 +34,16 @@ impl<'db> Cmd<'db> {
         Ok(())
     }
 
+    pub async fn delete_requests(&self, args: DeleteRequestsArgs) -> Result<()> {
+        for name in args.names {
+            sqlx::query("DELETE FROM requests WHERE name = ?")
+                .bind(name)
+                .execute(self.db.pool())
+                .await?;
+        }
+        Ok(())
+    }
+
     pub async fn delete_variables(&self, args: DeleteVariablesArgs) -> Result<()> {
         // TODO: display deleted variables
         for name_or_id in args.name_or_ids.iter() {
@@ -108,4 +118,9 @@ pub struct CreateVariableArgs {
 #[derive(Debug)]
 pub struct DeleteVariablesArgs {
     pub name_or_ids: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct DeleteRequestsArgs {
+    pub names: Vec<String>,
 }
