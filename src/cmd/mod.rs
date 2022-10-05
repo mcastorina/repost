@@ -1,6 +1,6 @@
 use crate::db::{
     self,
-    models::{DisplayTable, Request, Variable},
+    models::{Request, Variable},
     Db,
 };
 use crate::error::Result;
@@ -70,32 +70,29 @@ impl<'db> Cmd<'db> {
         Ok(())
     }
 
-    pub async fn print_requests(&self) -> Result<()> {
+    pub async fn get_requests(&self) -> Result<Vec<Request>> {
         let reqs = db::query_as_request!(
             sqlx::query_as("SELECT * FROM requests")
                 .fetch_all(self.db.pool())
                 .await?
         );
-        reqs.print();
-        Ok(())
+        Ok(reqs)
     }
 
-    pub async fn print_variables(&self) -> Result<()> {
-        let reqs = db::query_as_variable!(
+    pub async fn get_variables(&self) -> Result<Vec<Variable>> {
+        let vars = db::query_as_variable!(
             sqlx::query_as("SELECT * FROM variables")
                 .fetch_all(self.db.pool())
                 .await?
         );
-        reqs.print();
-        Ok(())
+        Ok(vars)
     }
 
-    pub async fn print_environments(&self) -> Result<()> {
+    pub async fn get_environments(&self) -> Result<Vec<String>> {
         let envs: Vec<String> = sqlx::query_scalar("SELECT DISTINCT env FROM variables")
             .fetch_all(self.db.pool())
             .await?;
-        envs.print_with_header(&["environment"]);
-        Ok(())
+        Ok(envs)
     }
 }
 
