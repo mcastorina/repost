@@ -9,6 +9,7 @@ use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use crate::error::{Error, Result};
 use crate::repl::parser::{self, ArgKey, Builder, Completion, OptKey};
 use crate::repl::ReplState;
+use std::collections::HashSet;
 use std::iter;
 use tokio::runtime::Handle;
 
@@ -157,8 +158,34 @@ impl CommandCompleter {
         match builder {
             Builder::SetEnvironmentBuilder(_) => self.set_environment(completion).await,
             Builder::SetWorkspaceBuilder(_) => self.set_workspace(completion).await,
+            Builder::DeleteRequestsBuilder(b) => self.delete_requests(b).await,
+            Builder::DeleteVariablesBuilder(b) => self.delete_variables(b).await,
             _ => Err(Error::ParseError("not implemented")),
         }
+    }
+
+    async fn delete_requests(&self, builder: parser::DeleteRequestsBuilder) -> Result<Vec<String>> {
+        let existing_names: HashSet<_> = builder.names.into_iter().collect();
+        Ok(sqlx::query_scalar("SELECT name FROM requests")
+            .fetch_all(self.state.db.pool())
+            .await?
+            .into_iter()
+            .filter(|s| !existing_names.contains(s))
+            .collect())
+    }
+
+    async fn delete_variables(
+        &self,
+        builder: parser::DeleteVariablesBuilder,
+    ) -> Result<Vec<String>> {
+        // TODO: complete IDs
+        let existing_names: HashSet<_> = builder.name_or_ids.into_iter().collect();
+        Ok(sqlx::query_scalar("SELECT DISTINCT name FROM variables")
+            .fetch_all(self.state.db.pool())
+            .await?
+            .into_iter()
+            .filter(|s| !existing_names.contains(s))
+            .collect())
     }
 
     async fn set_workspace(&self, completion: Completion) -> Result<Vec<String>> {

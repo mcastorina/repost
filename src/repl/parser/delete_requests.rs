@@ -48,9 +48,6 @@ impl From<DeleteRequestsBuilder> for DeleteRequests {
 
 impl From<DeleteRequests> for cmd::DeleteRequestsArgs {
     fn from(args: DeleteRequests) -> Self {
-        Self {
-            names: args.names,
-        }
+        Self { names: args.names }
     }
 }
-

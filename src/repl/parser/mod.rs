@@ -11,10 +11,6 @@ mod set_environment;
 mod set_workspace;
 
 use crate::error::Error;
-use create_request::{CreateRequest, CreateRequestBuilder};
-use create_variable::{CreateVariable, CreateVariableBuilder};
-use delete_requests::{DeleteRequests, DeleteRequestsBuilder};
-use delete_variables::{DeleteVariables, DeleteVariablesBuilder};
 use error::{IResult, ParseError, ParseErrorKind};
 use nom::{
     branch::alt,
@@ -23,13 +19,18 @@ use nom::{
     combinator::{cut, eof, map, peek, recognize, verify},
     sequence::{delimited, terminated, tuple},
 };
-use print_environments::{PrintEnvironments, PrintEnvironmentsBuilder};
-use print_requests::{PrintRequests, PrintRequestsBuilder};
-use print_variables::{PrintVariables, PrintVariablesBuilder};
-use print_workspaces::{PrintWorkspaces, PrintWorkspacesBuilder};
-use set_environment::{SetEnvironment, SetEnvironmentBuilder};
-use set_workspace::{SetWorkspace, SetWorkspaceBuilder};
 use std::iter;
+
+pub use create_request::{CreateRequest, CreateRequestBuilder};
+pub use create_variable::{CreateVariable, CreateVariableBuilder};
+pub use delete_requests::{DeleteRequests, DeleteRequestsBuilder};
+pub use delete_variables::{DeleteVariables, DeleteVariablesBuilder};
+pub use print_environments::{PrintEnvironments, PrintEnvironmentsBuilder};
+pub use print_requests::{PrintRequests, PrintRequestsBuilder};
+pub use print_variables::{PrintVariables, PrintVariablesBuilder};
+pub use print_workspaces::{PrintWorkspaces, PrintWorkspacesBuilder};
+pub use set_environment::{SetEnvironment, SetEnvironmentBuilder};
+pub use set_workspace::{SetWorkspace, SetWorkspaceBuilder};
 
 macro_rules! commands {
     ($($( ($( $word:ident )+) => ($kind:ident, $builder:ident) )+$(,)?)*) => {
