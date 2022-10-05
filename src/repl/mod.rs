@@ -6,7 +6,7 @@ pub use config::ReplConfig;
 
 use crate::cmd::Cmd;
 use crate::db::models::Environment;
-use crate::db::{Db, DisplayTable};
+use crate::db::{self, Db, DisplayTable};
 use crate::error::{Error, Result};
 use colored::Colorize;
 use line_reader::LineReader;
@@ -62,7 +62,8 @@ impl Repl {
             Command::PrintVariables(_) => cmd.print_variables().await?,
             Command::PrintEnvironments(_) => cmd.print_environments().await?,
             Command::PrintWorkspaces(_) => {
-                self.state.workspaces()?.print_with_header(&["workspaces"])
+                RowHighlighter::new(self.state.workspaces()?, |w| self.state.db.name() == w)
+                    .print_with_header(&["workspaces"])
             }
             Command::SetEnvironment(args) => {
                 self.state
@@ -126,5 +127,52 @@ impl ReplState {
             .into_iter()
             .map(|db| Db::name_of(&db.to_string_lossy()).to_owned())
             .collect())
+    }
+}
+
+struct RowHighlighter<T: DisplayTable, F: Fn(&T) -> bool> {
+    rows: Vec<T>,
+    color: comfy_table::Color,
+    column_index: usize,
+    predicate: F,
+}
+
+impl<T: DisplayTable, F: Fn(&T) -> bool> DisplayTable for RowHighlighter<T, F> {
+    const HEADER: &'static [&'static str] = T::HEADER;
+    fn build(&self, table: &mut comfy_table::Table) {
+        for (i, item) in self.rows.iter().enumerate() {
+            item.build(table);
+            if !(self.predicate)(item) {
+                continue;
+            }
+            if let Some(row) = table.get_row_mut(i) {
+                *row = row
+                    .cell_iter()
+                    .enumerate()
+                    .map(|(i, cell)| {
+                        if i == self.column_index {
+                            cell.clone().fg(self.color)
+                        } else {
+                            cell.clone()
+                        }
+                    })
+                    .fold(comfy_table::Row::new(), |mut row, cell| {
+                        row.add_cell(cell);
+                        row
+                    });
+            }
+        }
+    }
+}
+
+impl<T: DisplayTable, F: Fn(&T) -> bool> RowHighlighter<T, F> {
+    fn new(rows: Vec<T>, predicate: F) -> Self {
+        let column_index = T::HEADER.iter().position(|&s| s == "name").unwrap_or(0);
+        Self {
+            rows,
+            column_index,
+            color: comfy_table::Color::Green,
+            predicate,
+        }
     }
 }

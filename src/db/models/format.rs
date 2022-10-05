@@ -11,16 +11,16 @@ pub trait DisplayTable {
     fn print(&self) {
         self.print_with_header(Self::HEADER)
     }
-    fn write<W: io::Write>(&self, w: W) -> Result<(), io::Error> {
+    fn write(&self, w: impl io::Write) -> Result<(), io::Error> {
         self.write_with_header(w, Self::HEADER)
     }
     fn print_with_header(&self, header: &'static [&'static str]) {
         self.write_with_header(io::stdout(), header)
             .expect("could not write to stdout");
     }
-    fn write_with_header<W: io::Write>(
+    fn write_with_header(
         &self,
-        mut w: W,
+        mut w: impl io::Write,
         header: &'static [&'static str],
     ) -> Result<(), io::Error> {
         // generate table
