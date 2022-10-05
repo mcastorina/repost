@@ -113,16 +113,6 @@ impl Db {
 // Macros to make querying more ergonomic
 // TODO: make generic over a type
 
-/// Convenience macro for querying for environments and converting
-/// from a Vec<DbEnvironment> to a Vec<Environment>.
-macro_rules! query_as_environment {
-    ($query:expr) => {{
-        let got: Vec<crate::db::models::DbEnvironment> = $query;
-        crate::db::vec_into!(got, crate::db::models::Environment)
-    }};
-}
-pub(crate) use query_as_environment;
-
 /// Convenience macro for querying for variables and converting
 /// from a Vec<DbVariable> to a Vec<Variable>.
 macro_rules! query_as_variable {
