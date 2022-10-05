@@ -58,10 +58,10 @@ impl Repl {
             Command::CreateVariable(args) => cmd.create_variable(args.try_into()?).await?,
             Command::DeleteRequests(args) => cmd.delete_requests(args.into()).await?,
             Command::DeleteVariables(args) => cmd.delete_variables(args.into()).await?,
-            Command::PrintRequests(_) => cmd.get_requests().await?.print(),
-            Command::PrintVariables(_) => cmd.get_variables().await?.print(),
-            Command::PrintEnvironments(_) => RowHighlighter::new(
-                cmd.get_environments().await?,
+            Command::PrintRequests(args) => cmd.get_requests(args.into()).await?.print(),
+            Command::PrintVariables(args) => cmd.get_variables(args.into()).await?.print(),
+            Command::PrintEnvironments(args) => RowHighlighter::new(
+                cmd.get_environments(args.into()).await?,
                 |e| matches!(&self.state.env, Some(env) if &env.name == e),
             )
             .print_with_header(&["environment"]),

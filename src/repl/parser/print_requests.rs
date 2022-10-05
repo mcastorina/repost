@@ -1,5 +1,6 @@
 use super::error::{ParseError, ParseErrorKind};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
+use crate::cmd;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PrintRequests {
@@ -42,6 +43,14 @@ impl From<PrintRequestsBuilder> for PrintRequests {
     fn from(builder: PrintRequestsBuilder) -> Self {
         PrintRequests {
             filters: builder.filters,
+        }
+    }
+}
+
+impl From<PrintRequests> for cmd::GetRequestsArgs {
+    fn from(args: PrintRequests) -> Self {
+        Self {
+            filters: args.filters,
         }
     }
 }

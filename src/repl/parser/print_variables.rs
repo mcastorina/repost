@@ -1,5 +1,6 @@
 use super::error::{ParseError, ParseErrorKind};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
+use crate::cmd;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PrintVariables {
@@ -42,6 +43,14 @@ impl From<PrintVariablesBuilder> for PrintVariables {
     fn from(builder: PrintVariablesBuilder) -> Self {
         PrintVariables {
             filters: builder.filters,
+        }
+    }
+}
+
+impl From<PrintVariables> for cmd::GetVariablesArgs {
+    fn from(args: PrintVariables) -> Self {
+        Self {
+            filters: args.filters,
         }
     }
 }

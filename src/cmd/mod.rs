@@ -70,7 +70,7 @@ impl<'db> Cmd<'db> {
         Ok(())
     }
 
-    pub async fn get_requests(&self) -> Result<Vec<Request>> {
+    pub async fn get_requests(&self, _args: GetRequestsArgs) -> Result<Vec<Request>> {
         let reqs = db::query_as_request!(
             sqlx::query_as("SELECT * FROM requests")
                 .fetch_all(self.db.pool())
@@ -79,7 +79,7 @@ impl<'db> Cmd<'db> {
         Ok(reqs)
     }
 
-    pub async fn get_variables(&self) -> Result<Vec<Variable>> {
+    pub async fn get_variables(&self, _args: GetVariablesArgs) -> Result<Vec<Variable>> {
         let vars = db::query_as_variable!(
             sqlx::query_as("SELECT * FROM variables")
                 .fetch_all(self.db.pool())
@@ -88,7 +88,7 @@ impl<'db> Cmd<'db> {
         Ok(vars)
     }
 
-    pub async fn get_environments(&self) -> Result<Vec<String>> {
+    pub async fn get_environments(&self, _args: GetEnvironmentsArgs) -> Result<Vec<String>> {
         let envs: Vec<String> = sqlx::query_scalar("SELECT DISTINCT env FROM variables")
             .fetch_all(self.db.pool())
             .await?;
@@ -110,6 +110,21 @@ pub struct CreateVariableArgs {
     pub name: String,
     pub env_vals: Vec<(String, String)>,
     pub source: String,
+}
+
+#[derive(Debug)]
+pub struct GetRequestsArgs {
+    pub filters: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct GetVariablesArgs {
+    pub filters: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct GetEnvironmentsArgs {
+    pub filters: Vec<String>,
 }
 
 #[derive(Debug)]

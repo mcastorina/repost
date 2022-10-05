@@ -1,5 +1,6 @@
 use super::error::{ParseError, ParseErrorKind};
 use super::{ArgKey, CmdLineBuilder, Completion, OptKey};
+use crate::cmd;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PrintEnvironments {
@@ -43,6 +44,14 @@ impl From<PrintEnvironmentsBuilder> for PrintEnvironments {
     fn from(builder: PrintEnvironmentsBuilder) -> Self {
         PrintEnvironments {
             filters: builder.filters,
+        }
+    }
+}
+
+impl From<PrintEnvironments> for cmd::GetEnvironmentsArgs {
+    fn from(args: PrintEnvironments) -> Self {
+        Self {
+            filters: args.filters,
         }
     }
 }
