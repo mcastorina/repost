@@ -158,10 +158,51 @@ impl CommandCompleter {
         match builder {
             Builder::SetEnvironmentBuilder(_) => self.set_environment(completion).await,
             Builder::SetWorkspaceBuilder(_) => self.set_workspace(completion).await,
+            Builder::CreateVariableBuilder(b) => self.create_variable(prefix, b, completion).await,
             Builder::DeleteRequestsBuilder(b) => self.delete_requests(b).await,
             Builder::DeleteVariablesBuilder(b) => self.delete_variables(b).await,
             _ => Err(Error::ParseError("not implemented")),
         }
+    }
+
+    async fn create_variable(
+        &self,
+        prefix: &str,
+        builder: parser::CreateVariableBuilder,
+        completion: Completion,
+    ) -> Result<Vec<String>> {
+        Ok(match completion {
+            Completion::Arg(ArgKey::Name) => {
+                // TODO: Use request input variables
+                sqlx::query_scalar("SELECT DISTINCT name FROM variables")
+                    .fetch_all(self.state.db.pool())
+                    .await?
+            }
+            Completion::Arg(_) => {
+                match prefix.split_once('=') {
+                    None => {
+                        // Environments that exist but that do not have a builder.name variable
+                        // TODO: this completion should display as 'foo' and replace as 'foo='
+                        // instead of 'foo '
+                        // If ArgKey::Name is not the completion, builder.name has a value and it
+                        // is safe to unwrap here.
+                        let name = builder.name.unwrap();
+                        sqlx::query_scalar(
+                            "SELECT DISTINCT env FROM variables WHERE name != ?1 AND
+                            (env NOT IN (SELECT DISTINCT env FROM variables WHERE name = ?1))",
+                        )
+                        .bind(name)
+                        .fetch_all(self.state.db.pool())
+                        .await?
+                    }
+                    Some((_env, _)) => {
+                        // TODO:
+                        Vec::new()
+                    }
+                }
+            }
+            _ => unreachable!(),
+        })
     }
 
     async fn delete_requests(&self, builder: parser::DeleteRequestsBuilder) -> Result<Vec<String>> {
