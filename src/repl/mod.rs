@@ -11,6 +11,7 @@ use crate::error::{Error, Result};
 use colored::Colorize;
 use line_reader::LineReader;
 use parser::Command;
+use std::collections::HashSet;
 
 /// Repl object for handling readline editing, a database,
 /// and executing commands.
@@ -58,7 +59,14 @@ impl Repl {
             Command::CreateVariable(args) => cmd.create_variable(args.try_into()?).await?,
             Command::DeleteRequests(args) => cmd.delete_requests(args.into()).await?,
             Command::DeleteVariables(args) => cmd.delete_variables(args.into()).await?,
-            Command::PrintRequests(args) => cmd.get_requests(args.into()).await?.print(),
+            Command::PrintRequests(args) => {
+                let existing_variables = self.state.variables().await?;
+                let existing_variables = existing_variables.iter().map(|s| s.as_str()).collect();
+                RowHighlighter::new(cmd.get_requests(args.into()).await?, |r| {
+                    r.input_variables().is_subset(&existing_variables)
+                })
+                .print()
+            }
             Command::PrintVariables(args) => cmd.get_variables(args.into()).await?.print(),
             Command::PrintEnvironments(args) => RowHighlighter::new(
                 cmd.get_environments(args.into()).await?,
@@ -122,6 +130,20 @@ impl ReplState {
             .await?;
         self.env = env;
         Ok(())
+    }
+
+    async fn variables(&self) -> Result<HashSet<String>> {
+        Ok(match &self.env {
+            None => HashSet::new(),
+            Some(env) => {
+                let vars: Vec<String> =
+                    sqlx::query_scalar("SELECT DISTINCT name FROM variables WHERE env = ?")
+                        .bind(&env.name)
+                        .fetch_all(self.db.pool())
+                        .await?;
+                vars.into_iter().collect()
+            }
+        })
     }
 
     fn workspaces(&self) -> Result<Vec<String>> {
