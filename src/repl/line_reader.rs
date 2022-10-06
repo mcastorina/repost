@@ -184,23 +184,35 @@ impl CommandCompleter {
                 variables.iter().map(|s| s.to_string()).collect()
             }
             Completion::Arg(_) => {
-                match prefix.split_once('=') {
-                    None => {
+                match (prefix.split_once('='), &self.state.env) {
+                    (None, None) => {
                         // Environments that exist but that do not have a builder.name variable
                         // TODO: this completion should display as 'foo' and replace as 'foo='
                         // instead of 'foo '
+                        let existing_envs: HashSet<_> = builder
+                            .env_vals
+                            .iter()
+                            .filter_map(|ev| ev.split_once('='))
+                            .map(|(e, _)| e)
+                            .collect();
                         // If ArgKey::Name is not the completion, builder.name has a value and it
                         // is safe to unwrap here.
                         let name = builder.name.unwrap();
-                        sqlx::query_scalar(
+                        let candidates: Vec<String> = sqlx::query_scalar(
                             "SELECT DISTINCT env FROM variables WHERE name != ?1 AND
                             (env NOT IN (SELECT DISTINCT env FROM variables WHERE name = ?1))",
                         )
                         .bind(name)
                         .fetch_all(self.state.db.pool())
-                        .await?
+                        .await?;
+                        candidates
+                            .into_iter()
+                            .filter(|cand| !existing_envs.contains(cand.as_str()))
+                            .collect()
                     }
-                    Some((_env, _)) => {
+                    (None, Some(env)) if builder.env_vals.len() == 0 => vec![env.name.to_string()],
+                    (None, Some(_)) => Vec::new(),
+                    (Some((_env, _)), _) => {
                         // TODO:
                         Vec::new()
                     }
