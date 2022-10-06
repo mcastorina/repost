@@ -6,6 +6,7 @@ use rustyline::{
 };
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
+use crate::db;
 use crate::error::{Error, Result};
 use crate::repl::parser::{self, ArgKey, Builder, Completion, OptKey};
 use crate::repl::ReplState;
@@ -173,10 +174,14 @@ impl CommandCompleter {
     ) -> Result<Vec<String>> {
         Ok(match completion {
             Completion::Arg(ArgKey::Name) => {
-                // TODO: Use request input variables
-                sqlx::query_scalar("SELECT DISTINCT name FROM variables")
-                    .fetch_all(self.state.db.pool())
-                    .await?
+                let requests = db::query_as_request!(
+                    sqlx::query_as("SELECT * FROM requests")
+                        .fetch_all(self.state.db.pool())
+                        .await?
+                );
+                let variables: Vec<_> = requests.iter().map(|r| r.input_variables()).collect();
+                let variables: HashSet<_> = variables.iter().flat_map(|v| v.iter()).collect();
+                variables.iter().map(|s| s.to_string()).collect()
             }
             Completion::Arg(_) => {
                 match prefix.split_once('=') {
