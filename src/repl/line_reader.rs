@@ -159,11 +159,45 @@ impl CommandCompleter {
         match builder {
             Builder::SetEnvironmentBuilder(_) => self.set_environment(completion).await,
             Builder::SetWorkspaceBuilder(_) => self.set_workspace(completion).await,
+            Builder::CreateRequestBuilder(b) => self.create_request(prefix, b, completion).await,
             Builder::CreateVariableBuilder(b) => self.create_variable(prefix, b, completion).await,
             Builder::DeleteRequestsBuilder(b) => self.delete_requests(b).await,
             Builder::DeleteVariablesBuilder(b) => self.delete_variables(b).await,
             _ => Err(Error::ParseError("not implemented")),
         }
+    }
+
+    async fn create_request(
+        &self,
+        prefix: &str,
+        builder: parser::CreateRequestBuilder,
+        completion: Completion,
+    ) -> Result<Vec<String>> {
+        Ok(match completion {
+            Completion::Arg(ArgKey::Name) => {
+                // TODO
+                return Err(Error::ParseError("not implemented"));
+            }
+            Completion::Arg(ArgKey::URL) => {
+                // TODO
+                return Err(Error::ParseError("not implemented"));
+            }
+            Completion::Arg(_) => return Err(Error::ParseError("no completions")),
+            Completion::OptValue(OptKey::Header) => self.complete_header(prefix),
+            Completion::OptValue(OptKey::Method) => vec![
+                // TODO: case insensitive completion that replaces with all caps
+                String::from("get"),
+                String::from("post"),
+                String::from("put"),
+                String::from("patch"),
+                String::from("delete"),
+                String::from("head"),
+                String::from("options"),
+                String::from("trace"),
+                String::from("connect"),
+            ],
+            _ => return Err(Error::ParseError("no completions")),
+        })
     }
 
     async fn create_variable(
@@ -275,5 +309,63 @@ impl CommandCompleter {
                 .collect(),
             None => candidates,
         })
+    }
+
+    fn complete_header(&self, prefix: &str) -> Vec<String> {
+        match prefix.split_once(':') {
+            Some((key, _)) => match key.to_ascii_lowercase().as_str() {
+                // TODO: this is terrible
+                "content-type" => vec![key.to_owned() + ":application/json"],
+                _ => {
+                    // TODO
+                    Vec::new()
+                }
+            },
+            None => vec![
+                // TODO: case insensitive completion that replaces with canonical casing
+                String::from("A-IM"),
+                String::from("Accept"),
+                String::from("Accept-Charset"),
+                String::from("Accept-Datetime"),
+                String::from("Accept-Encoding"),
+                String::from("Accept-Language"),
+                String::from("Access-Control-Request-Method"),
+                String::from("Access-Control-Request-Headers"),
+                String::from("Authorization"),
+                String::from("Cache-Control"),
+                String::from("Connection"),
+                String::from("Permanent"),
+                String::from("Content-Encoding"),
+                String::from("Content-Length"),
+                String::from("Content-MD5"),
+                String::from("Content-Type"),
+                String::from("Cookie"),
+                String::from("Date"),
+                String::from("Expect"),
+                String::from("Forwarded"),
+                String::from("From"),
+                String::from("Host"),
+                String::from("HTTP2-Settings"),
+                String::from("If-Match"),
+                String::from("If-Modified-Since"),
+                String::from("If-None-Match"),
+                String::from("If-Range"),
+                String::from("If-Unmodified-Since"),
+                String::from("Max-Forwards"),
+                String::from("Origin"),
+                String::from("Pragma"),
+                String::from("Prefer"),
+                String::from("Proxy-Authorization"),
+                String::from("Range"),
+                String::from("Referer"),
+                String::from("TE"),
+                String::from("Trailer"),
+                String::from("Transfer-Encoding"),
+                String::from("User-Agent"),
+                String::from("Upgrade"),
+                String::from("Via"),
+                String::from("Warning"),
+            ],
+        }
     }
 }
