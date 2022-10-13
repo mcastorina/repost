@@ -1,4 +1,4 @@
-use rustyline::completion::{Completer, Pair};
+use rustyline::completion::{Candidate, Completer, Pair};
 use rustyline::config::OutputStreamType;
 use rustyline::{
     error::ReadlineError, CompletionType, Config, Context, EditMode, Editor,
@@ -76,7 +76,6 @@ impl LineReader {
 struct CommandCompleter {
     state: ReplState,
 }
-
 impl Completer for CommandCompleter {
     type Candidate = Pair;
 
@@ -96,75 +95,94 @@ impl Completer for CommandCompleter {
         //     (None, Some((prefix, completion)) => (prefix, completion.complete(prefix)),
         //     (Some(builder), Some((prefix, completion))) => (prefix, builder.smart_complete(prefix, completion)),
         // };
-        let (prefix, candidates) = match completion {
-            Some((prefix, Completion::Command(cmds))) => (
-                prefix,
-                cmds.iter()
-                    .filter_map(|cmd| {
-                        cmd.completions()
-                            .iter()
-                            .filter(|cand| cand.starts_with(prefix))
-                            .next()
-                    })
-                    // TODO: only allocate after filtering results
-                    .copied()
-                    .map(String::from)
-                    .collect(),
-            ),
-            Some((prefix, Completion::OptKey)) => {
-                let builder = builder.unwrap();
-                (
-                    prefix,
-                    builder
-                        .opts()
-                        .flat_map(|opt| opt.completions())
-                        // TODO: only allocate after filtering results
-                        .copied()
-                        .map(String::from)
-                        .collect(),
-                )
-            }
-            Some((prefix, completion)) => (
-                prefix,
-                tokio::task::block_in_place(|| {
+        let prefix = match completion {
+            Some((prefix, _)) => prefix,
+            _ => "",
+        };
+        let candidates = match completion {
+            Some((_, Completion::Command(cmds))) => cmds
+                .iter()
+                .filter_map(|cmd| {
+                    cmd.completions()
+                        .iter()
+                        .filter(|cand| cand.starts_with(prefix))
+                        .next()
+                })
+                .copied()
+                .filter(|cand| cand.starts_with(prefix))
+                .map(SmartCompletion::default)
+                .map(Pair::from)
+                .collect(),
+            Some((_, Completion::OptKey)) => builder
+                .unwrap()
+                .opts()
+                .flat_map(|opt| opt.completions())
+                .copied()
+                .filter(|cand| cand.starts_with(prefix))
+                .map(SmartCompletion::default)
+                .map(Pair::from)
+                .collect(),
+            Some((_, completion)) => {
+                return Ok(tokio::task::block_in_place(|| {
                     Handle::current().block_on(async {
-                        self.smart_complete(prefix, builder.unwrap(), completion)
+                        self.smart_complete(line, prefix, builder.unwrap(), completion)
                             .await
                     })
                 })
-                .unwrap_or_default(),
-            ),
-            None => ("", vec![]),
+                .unwrap_or_default());
+            }
+            None => vec![],
         };
 
-        let candidates = candidates
-            .into_iter()
-            .filter(|cand| cand.starts_with(prefix))
-            .map(|cand| Pair {
-                display: cand.to_string(),
-                replacement: format!("{} ", cand),
-            })
-            .collect();
         Ok((line.len() - prefix.len(), candidates))
     }
 }
 
 impl CommandCompleter {
+    #[rustfmt::skip]
+    const COMMON_HEADERS: &'static [&'static str] = &[
+        "A-IM", "Accept", "Accept-Charset", "Accept-Datetime", "Accept-Encoding",
+        "Accept-Language", "Access-Control-Request-Method", "Access-Control-Request-Headers",
+        "Authorization", "Cache-Control", "Connection", "Permanent", "Content-Encoding",
+        "Content-Length", "Content-MD5", "Content-Type", "Cookie", "Date", "Expect",
+        "Forwarded", "From", "Host", "HTTP2-Settings", "If-Match", "If-Modified-Since",
+        "If-None-Match", "If-Range", "If-Unmodified-Since", "Max-Forwards", "Origin",
+        "Pragma", "Prefer", "Proxy-Authorization", "Range", "Referer", "TE", "Trailer",
+        "Transfer-Encoding", "User-Agent", "Upgrade", "Via", "Warning",
+    ];
+    const COMMON_METHODS: &'static [&'static str] = &[
+        "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT",
+    ];
     async fn smart_complete(
         &self,
+        line: &str,
         prefix: &str,
         builder: Builder,
         completion: Completion,
-    ) -> Result<Vec<String>> {
-        match builder {
+    ) -> Result<(usize, Vec<Pair>)> {
+        let (delim, prefix) = match prefix.chars().next() {
+            c @ Some('\'') | c @ Some('"') => (c, &prefix[1..]),
+            _ => (None, prefix),
+        };
+        let candidates: Vec<_> = match builder {
             Builder::SetEnvironmentBuilder(_) => self.set_environment(completion).await,
             Builder::SetWorkspaceBuilder(_) => self.set_workspace(completion).await,
             Builder::CreateRequestBuilder(b) => self.create_request(prefix, b, completion).await,
             Builder::CreateVariableBuilder(b) => self.create_variable(prefix, b, completion).await,
             Builder::DeleteRequestsBuilder(b) => self.delete_requests(b).await,
             Builder::DeleteVariablesBuilder(b) => self.delete_variables(b).await,
-            _ => Err(Error::ParseError("not implemented")),
-        }
+            _ => return Err(Error::ParseError("Unsupported completion")),
+        }?
+        .into_iter()
+        .filter(|cand| cand.starts_with(prefix))
+        .map(|cand| cand.with_delim(delim))
+        .map(Pair::from)
+        .collect();
+
+        Ok(match delim {
+            Some(_) => (line.len() - prefix.len() - 1, candidates),
+            None => (line.len() - prefix.len(), candidates),
+        })
     }
 
     async fn create_request(
@@ -172,32 +190,27 @@ impl CommandCompleter {
         prefix: &str,
         builder: parser::CreateRequestBuilder,
         completion: Completion,
-    ) -> Result<Vec<String>> {
-        Ok(match completion {
+    ) -> Result<Vec<SmartCompletion>> {
+        match completion {
             Completion::Arg(ArgKey::Name) => {
                 // TODO
-                return Err(Error::ParseError("not implemented"));
+                Err(Error::ParseError("not implemented"))
             }
             Completion::Arg(ArgKey::URL) => {
                 // TODO
-                return Err(Error::ParseError("not implemented"));
+                Err(Error::ParseError("not implemented"))
             }
-            Completion::Arg(_) => return Err(Error::ParseError("no completions")),
-            Completion::OptValue(OptKey::Header) => self.complete_header(prefix),
-            Completion::OptValue(OptKey::Method) => vec![
-                // TODO: case insensitive completion that replaces with all caps
-                String::from("get"),
-                String::from("post"),
-                String::from("put"),
-                String::from("patch"),
-                String::from("delete"),
-                String::from("head"),
-                String::from("options"),
-                String::from("trace"),
-                String::from("connect"),
-            ],
-            _ => return Err(Error::ParseError("no completions")),
-        })
+            Completion::Arg(_) => Err(Error::ParseError("no completions")),
+            Completion::OptValue(OptKey::Header) => Ok(Self::COMMON_HEADERS
+                .iter()
+                .map(SmartCompletion::header_key)
+                .collect()),
+            Completion::OptValue(OptKey::Method) => Ok(Self::COMMON_METHODS
+                .iter()
+                .map(SmartCompletion::method)
+                .collect()),
+            _ => Err(Error::ParseError("no completions")),
+        }
     }
 
     async fn create_variable(
@@ -205,9 +218,10 @@ impl CommandCompleter {
         prefix: &str,
         builder: parser::CreateVariableBuilder,
         completion: Completion,
-    ) -> Result<Vec<String>> {
-        Ok(match completion {
+    ) -> Result<Vec<SmartCompletion>> {
+        match completion {
             Completion::Arg(ArgKey::Name) => {
+                // Name will probably come from request variables.
                 let requests = db::query_as_request!(
                     sqlx::query_as("SELECT * FROM requests")
                         .fetch_all(self.state.db.pool())
@@ -215,72 +229,89 @@ impl CommandCompleter {
                 );
                 let variables: Vec<_> = requests.iter().map(|r| r.input_variables()).collect();
                 let variables: HashSet<_> = variables.iter().flat_map(|v| v.iter()).collect();
-                variables.iter().map(|s| s.to_string()).collect()
+                Ok(variables.iter().map(SmartCompletion::default).collect())
             }
             Completion::Arg(_) => {
-                match (prefix.split_once('='), &self.state.env) {
-                    (None, None) => {
-                        // Environments that exist but that do not have a builder.name variable
-                        // TODO: this completion should display as 'foo' and replace as 'foo='
-                        // instead of 'foo '
+                // environment=value completion
+                // If ArgKey::Name is not the completion, builder.name has a value and it
+                // is safe to unwrap here.
+                let name = builder.name.unwrap();
+                match prefix.split_once('=') {
+                    None => {
+                        // Environment part of the environment=value completion.
                         let existing_envs: HashSet<_> = builder
                             .env_vals
                             .iter()
-                            .filter_map(|ev| ev.split_once('='))
-                            .map(|(e, _)| e)
+                            .filter_map(|ev| ev.split_once('=').map(|(e, _v)| e))
                             .collect();
-                        // If ArgKey::Name is not the completion, builder.name has a value and it
-                        // is safe to unwrap here.
-                        let name = builder.name.unwrap();
-                        let candidates: Vec<String> = sqlx::query_scalar(
+                        // Return environments that exist but don't have a variable associated with
+                        // name.
+                        Ok(sqlx::query_scalar(
                             "SELECT DISTINCT env FROM variables WHERE name != ?1 AND
                             (env NOT IN (SELECT DISTINCT env FROM variables WHERE name = ?1))",
                         )
                         .bind(name)
                         .fetch_all(self.state.db.pool())
-                        .await?;
-                        candidates
-                            .into_iter()
-                            .filter(|cand| !existing_envs.contains(cand.as_str()))
-                            .collect()
+                        .await?
+                        .into_iter()
+                        .chain(self.state.env.iter().map(|e| e.name.clone()))
+                        .filter(|cand: &String| !existing_envs.contains(cand.as_str()))
+                        .map(SmartCompletion::env_val_key)
+                        .collect())
                     }
-                    (None, Some(env)) if builder.env_vals.len() == 0 => vec![env.name.to_string()],
-                    (None, Some(_)) => Vec::new(),
-                    (Some((_env, _)), _) => {
-                        // TODO:
-                        Vec::new()
+                    Some((_env, _)) => {
+                        // Suggest the same value for variables with the same name.
+                        Ok(dbg!(
+                            sqlx::query_scalar::<_, String>(
+                                "SELECT DISTINCT value FROM variables WHERE name = ?"
+                            )
+                            .bind(name)
+                            .fetch_all(self.state.db.pool())
+                            .await?
+                        )
+                        .into_iter()
+                        // TODO: smart complete for EnvValValue (this currently never works)
+                        .map(SmartCompletion::default)
+                        .collect())
                     }
                 }
             }
             _ => unreachable!(),
-        })
+        }
     }
 
-    async fn delete_requests(&self, builder: parser::DeleteRequestsBuilder) -> Result<Vec<String>> {
+    async fn delete_requests(
+        &self,
+        builder: parser::DeleteRequestsBuilder,
+    ) -> Result<Vec<SmartCompletion>> {
         let existing_names: HashSet<_> = builder.names.into_iter().collect();
-        Ok(sqlx::query_scalar("SELECT name FROM requests")
+        Ok(sqlx::query_scalar::<_, String>("SELECT name FROM requests")
             .fetch_all(self.state.db.pool())
             .await?
             .into_iter()
             .filter(|s| !existing_names.contains(s))
+            .map(SmartCompletion::default)
             .collect())
     }
 
     async fn delete_variables(
         &self,
         builder: parser::DeleteVariablesBuilder,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<SmartCompletion>> {
         // TODO: complete IDs
         let existing_names: HashSet<_> = builder.name_or_ids.into_iter().collect();
-        Ok(sqlx::query_scalar("SELECT DISTINCT name FROM variables")
-            .fetch_all(self.state.db.pool())
-            .await?
-            .into_iter()
-            .filter(|s| !existing_names.contains(s))
-            .collect())
+        Ok(
+            sqlx::query_scalar::<_, String>("SELECT DISTINCT name FROM variables")
+                .fetch_all(self.state.db.pool())
+                .await?
+                .into_iter()
+                .filter(|s| !existing_names.contains(s))
+                .map(SmartCompletion::default)
+                .collect(),
+        )
     }
 
-    async fn set_workspace(&self, completion: Completion) -> Result<Vec<String>> {
+    async fn set_workspace(&self, completion: Completion) -> Result<Vec<SmartCompletion>> {
         let candidates = match completion {
             Completion::Arg(ArgKey::Name) => self.state.workspaces()?,
             _ => return Err(Error::ParseError("Invalid completion")),
@@ -289,83 +320,95 @@ impl CommandCompleter {
             .into_iter()
             .chain(iter::once(String::from("playground")))
             .filter(|ws| ws != self.state.db.name())
+            .map(SmartCompletion::default)
             .collect())
     }
 
-    async fn set_environment(&self, completion: Completion) -> Result<Vec<String>> {
-        let candidates = match completion {
+    async fn set_environment(&self, completion: Completion) -> Result<Vec<SmartCompletion>> {
+        Ok(match completion {
             Completion::Arg(ArgKey::Name) => {
-                sqlx::query_scalar("SELECT DISTINCT env FROM variables")
+                sqlx::query_scalar::<_, String>("SELECT DISTINCT env FROM variables")
                     .fetch_all(self.state.db.pool())
                     .await?
             }
             _ => return Err(Error::ParseError("Invalid completion")),
-        };
-
-        Ok(match &self.state.env {
-            Some(env) => candidates
-                .into_iter()
-                .filter(|e| e != env.as_ref())
-                .collect(),
-            None => candidates,
+        }
+        .into_iter()
+        .filter(|e| {
+            if let Some(env) = &self.state.env {
+                e != env.as_ref()
+            } else {
+                true
+            }
         })
+        .map(SmartCompletion::default)
+        .collect())
     }
+}
 
-    fn complete_header(&self, prefix: &str) -> Vec<String> {
-        match prefix.split_once(':') {
-            Some((key, _)) => match key.to_ascii_lowercase().as_str() {
-                // TODO: this is terrible
-                "content-type" => vec![key.to_owned() + ":application/json"],
-                _ => {
-                    // TODO
-                    Vec::new()
-                }
-            },
-            None => vec![
-                // TODO: case insensitive completion that replaces with canonical casing
-                String::from("A-IM"),
-                String::from("Accept"),
-                String::from("Accept-Charset"),
-                String::from("Accept-Datetime"),
-                String::from("Accept-Encoding"),
-                String::from("Accept-Language"),
-                String::from("Access-Control-Request-Method"),
-                String::from("Access-Control-Request-Headers"),
-                String::from("Authorization"),
-                String::from("Cache-Control"),
-                String::from("Connection"),
-                String::from("Permanent"),
-                String::from("Content-Encoding"),
-                String::from("Content-Length"),
-                String::from("Content-MD5"),
-                String::from("Content-Type"),
-                String::from("Cookie"),
-                String::from("Date"),
-                String::from("Expect"),
-                String::from("Forwarded"),
-                String::from("From"),
-                String::from("Host"),
-                String::from("HTTP2-Settings"),
-                String::from("If-Match"),
-                String::from("If-Modified-Since"),
-                String::from("If-None-Match"),
-                String::from("If-Range"),
-                String::from("If-Unmodified-Since"),
-                String::from("Max-Forwards"),
-                String::from("Origin"),
-                String::from("Pragma"),
-                String::from("Prefer"),
-                String::from("Proxy-Authorization"),
-                String::from("Range"),
-                String::from("Referer"),
-                String::from("TE"),
-                String::from("Trailer"),
-                String::from("Transfer-Encoding"),
-                String::from("User-Agent"),
-                String::from("Upgrade"),
-                String::from("Via"),
-                String::from("Warning"),
-            ],
+struct SmartCompletion {
+    display: String,
+    kind: CompletionKind,
+    delim: Option<char>,
+}
+
+enum CompletionKind {
+    Default,
+    HeaderKey,
+    Method,
+    EnvValKey,
+}
+
+impl SmartCompletion {
+    fn new(kind: CompletionKind, value: impl AsRef<str>) -> Self {
+        Self {
+            kind,
+            display: value.as_ref().to_string(),
+            delim: None,
+        }
+    }
+    fn default(s: impl AsRef<str>) -> Self {
+        Self::new(CompletionKind::Default, s)
+    }
+    fn header_key(s: impl AsRef<str>) -> Self {
+        Self::new(CompletionKind::HeaderKey, s)
+    }
+    fn method(s: impl AsRef<str>) -> Self {
+        Self::new(CompletionKind::Method, s)
+    }
+    fn env_val_key(s: impl AsRef<str>) -> Self {
+        Self::new(CompletionKind::EnvValKey, s)
+    }
+    fn with_delim(mut self, delim: Option<char>) -> Self {
+        self.delim = delim;
+        self
+    }
+    fn starts_with(&self, prefix: impl AsRef<str>) -> bool {
+        let prefix = prefix.as_ref();
+        match self.kind {
+            CompletionKind::Default | CompletionKind::EnvValKey => self.display.starts_with(prefix),
+            CompletionKind::Method | CompletionKind::HeaderKey => self
+                .display
+                .to_ascii_lowercase()
+                .starts_with(&prefix.to_ascii_lowercase()),
+        }
+    }
+}
+
+impl From<SmartCompletion> for Pair {
+    fn from(completion: SmartCompletion) -> Self {
+        let replacement = match (completion.kind, completion.delim) {
+            (CompletionKind::Default, None) => format!("{} ", completion.display),
+            (CompletionKind::Default, Some(c)) => format!("{c}{}{c} ", completion.display),
+            (CompletionKind::HeaderKey, None) => format!("{}:", completion.display),
+            (CompletionKind::HeaderKey, Some(c)) => format!("{c}{}: ", completion.display),
+            (CompletionKind::Method, _) => format!("{} ", completion.display.to_ascii_uppercase()),
+            (CompletionKind::EnvValKey, None) => format!("{}=", completion.display),
+            (CompletionKind::EnvValKey, Some(c)) => format!("{c}{}=", completion.display),
+        };
+        Self {
+            display: completion.display,
+            replacement,
         }
     }
 }
