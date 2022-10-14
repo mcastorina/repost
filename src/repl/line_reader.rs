@@ -193,8 +193,31 @@ impl CommandCompleter {
     ) -> Result<Vec<SmartCompletion>> {
         match completion {
             Completion::Arg(ArgKey::Name) => {
-                // TODO
-                Err(Error::ParseError("not implemented"))
+                if let Some((prefix, _)) = prefix.split_once('-') {
+                    let existing_requests: HashSet<_> = sqlx::query_scalar::<_, String>(
+                        "SELECT name FROM requests WHERE name LIKE '%-%'",
+                    )
+                    .fetch_all(self.state.db.pool())
+                    .await?
+                    .into_iter()
+                    .collect();
+                    let requests: HashSet<_> = existing_requests
+                        .iter()
+                        .filter_map(|s| s.split_once('-'))
+                        .map(|(_, name)| format!("{prefix}-{name}"))
+                        .filter(|name| !existing_requests.contains(name))
+                        .collect();
+                    Ok(requests.into_iter().map(SmartCompletion::default).collect())
+                } else {
+                    // TODO: should this find all names and generate all {prefix}-{name} combos
+                    // that are missing?
+                    Ok([
+                        "get-", "create-", "update-", "delete-", "post-", "put-", "patch-", "head-",
+                    ]
+                    .iter()
+                    .map(SmartCompletion::partial)
+                    .collect())
+                }
             }
             Completion::Arg(ArgKey::URL) => {
                 // TODO
@@ -354,6 +377,7 @@ struct SmartCompletion {
 
 enum CompletionKind {
     Default,
+    Partial,
     HeaderKey,
     Method,
     EnvValKey,
@@ -369,6 +393,9 @@ impl SmartCompletion {
     }
     fn default(s: impl AsRef<str>) -> Self {
         Self::new(CompletionKind::Default, s)
+    }
+    fn partial(s: impl AsRef<str>) -> Self {
+        Self::new(CompletionKind::Partial, s)
     }
     fn header_key(s: impl AsRef<str>) -> Self {
         Self::new(CompletionKind::HeaderKey, s)
@@ -386,7 +413,9 @@ impl SmartCompletion {
     fn starts_with(&self, prefix: impl AsRef<str>) -> bool {
         let prefix = prefix.as_ref();
         match self.kind {
-            CompletionKind::Default | CompletionKind::EnvValKey => self.display.starts_with(prefix),
+            CompletionKind::Default | CompletionKind::Partial | CompletionKind::EnvValKey => {
+                self.display.starts_with(prefix)
+            }
             CompletionKind::Method | CompletionKind::HeaderKey => self
                 .display
                 .to_ascii_lowercase()
@@ -400,6 +429,8 @@ impl From<SmartCompletion> for Pair {
         let replacement = match (completion.kind, completion.delim) {
             (CompletionKind::Default, None) => format!("{} ", completion.display),
             (CompletionKind::Default, Some(c)) => format!("{c}{}{c} ", completion.display),
+            (CompletionKind::Partial, None) => completion.display.clone(),
+            (CompletionKind::Partial, Some(c)) => format!("{c}{}", completion.display),
             (CompletionKind::HeaderKey, None) => format!("{}:", completion.display),
             (CompletionKind::HeaderKey, Some(c)) => format!("{c}{}: ", completion.display),
             (CompletionKind::Method, _) => format!("{} ", completion.display.to_ascii_uppercase()),
