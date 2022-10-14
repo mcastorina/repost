@@ -102,6 +102,11 @@ impl TryFrom<CreateRequest> for cmd::CreateRequestArgs {
                 .map(|(k, v)| (k.to_string(), v.trim_start().to_string()))
                 .ok_or(Error::ParseError("Invalid header"))
         };
+        let method_from_name = args
+            .name
+            .split_once('-')
+            .map(|(p, _)| str_to_method(p))
+            .unwrap_or(Method::GET);
         Ok(Self {
             name: args.name,
             url: args.url,
@@ -113,8 +118,19 @@ impl TryFrom<CreateRequest> for cmd::CreateRequestArgs {
             method: args
                 .method
                 .and_then(|m| Method::from_bytes(m.as_bytes()).ok())
-                .unwrap_or(Method::GET),
+                .unwrap_or(method_from_name),
             body: args.body,
         })
+    }
+}
+
+fn str_to_method(s: &str) -> Method {
+    match s.to_ascii_lowercase().as_str() {
+        "post" | "create" => Method::POST,
+        "delete" => Method::DELETE,
+        "put" | "replace" => Method::PUT,
+        "patch" | "update" => Method::PATCH,
+        "head" => Method::HEAD,
+        _ => Method::GET,
     }
 }
