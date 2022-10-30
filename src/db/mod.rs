@@ -102,6 +102,12 @@ impl Db {
                 body_kind   TEXT,
                 body        BLOB
             );
+            CREATE TABLE IF NOT EXISTS actions (
+                id          INTEGER PRIMARY KEY,
+                name        TEXT NOT NULL,
+                kind        TEXT NOT NULL,
+                spec        BLOB NOT NULL
+            );
             ",
         )
         .execute(self.pool())
@@ -155,7 +161,9 @@ pub(crate) use vec_into;
 
 #[cfg(test)]
 mod test {
-    use super::models::{DbRequest, DbVariable, Environment, Request, Variable};
+    use super::models::{
+        Action, ActionKind, DbAction, DbRequest, DbVariable, Environment, Request, Variable,
+    };
     use super::Db;
     use std::convert::TryInto;
 
@@ -206,5 +214,25 @@ mod test {
             .expect("could not get");
         let got: Request = got.try_into().expect("db data did not parse");
         assert_eq!(got, req);
+    }
+
+    #[tokio::test]
+    async fn action_get_set() {
+        let db = test_db().await;
+        let action = Action::new("test", ActionKind::header("request", "header", "variable"));
+        action.clone().save(db.pool()).await.expect("could not set");
+
+        let got: DbAction = sqlx::query_as("SELECT * FROM actions")
+            .fetch_one(db.pool())
+            .await
+            .expect("could not get");
+        let mut got: Action = got.try_into().expect("db data did not parse");
+
+        // when we get an action from the database, it's ID will be set
+        assert!(got.id.is_some());
+
+        // set to None for the rest of the comparison
+        got.id = None;
+        assert_eq!(got, action);
     }
 }
