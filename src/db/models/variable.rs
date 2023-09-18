@@ -12,6 +12,7 @@ pub struct DbVariable {
     pub name: String,
     pub env: String,
     pub value: Option<String>,
+    pub is_secret: bool,
     pub source: String,
     pub timestamp: DateTime<Local>,
 }
@@ -23,6 +24,7 @@ impl<'a> From<Variable> for DbVariable {
             name: var.name.into(),
             env: var.env.name.into(),
             value: var.value.map(|cow| cow.into()),
+            is_secret: var.is_secret,
             source: var.source.into(),
             timestamp: var.timestamp,
         }
@@ -35,12 +37,13 @@ pub struct Variable {
     pub name: String,
     pub env: Environment,
     pub value: Option<String>,
+    pub is_secret: bool,
     pub source: String,
     pub timestamp: DateTime<Local>,
 }
 
 impl Variable {
-    pub fn new<N, E, V, S>(name: N, env: E, value: V, source: S) -> Self
+    pub fn new<N, E, V, S>(name: N, env: E, value: V, is_secret: bool, source: S) -> Self
     where
         N: Into<String>,
         E: Into<Environment>,
@@ -52,6 +55,7 @@ impl Variable {
             name: name.into(),
             env: env.into(),
             value: Some(value.into()),
+            is_secret,
             source: source.into(),
             timestamp: Local::now(),
         }
@@ -68,12 +72,13 @@ impl Variable {
     async fn create(self, pool: &SqlitePool) -> Result<(), Error> {
         sqlx::query(
             "INSERT INTO variables
-                (name, env, value, source, timestamp)
-                VALUES (?, ?, ?, ?, ?);",
+                (name, env, value, is_secret, source, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?);",
         )
         .bind(self.name.as_str())
         .bind(self.env.as_ref())
         .bind(self.value.as_ref())
+        .bind(self.is_secret)
         .bind(self.source.as_str())
         .bind(self.timestamp)
         .execute(pool)
@@ -84,12 +89,13 @@ impl Variable {
     async fn update(self, id: i32, pool: &SqlitePool) -> Result<(), Error> {
         sqlx::query(
             "UPDATE variables SET
-                (name, env, value, source, timestamp) = (?, ?, ?, ?, ?)
+                (name, env, value, is_secret, source, timestamp) = (?, ?, ?, ?, ?, ?)
                 WHERE id = ?;",
         )
         .bind(self.name.as_str())
         .bind(self.env.as_ref())
         .bind(self.value.as_ref())
+        .bind(self.is_secret)
         .bind(self.source.as_str())
         .bind(self.timestamp)
         .bind(id)
@@ -106,6 +112,7 @@ impl From<DbVariable> for Variable {
             name: var.name.into(),
             env: var.env.into(),
             value: var.value.map(|s| s.into()),
+            is_secret: var.is_secret,
             source: var.source.into(),
             timestamp: var.timestamp,
         }

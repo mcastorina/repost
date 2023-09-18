@@ -316,6 +316,7 @@ opt_keys!(
     Help => ["--help", "-h"],
     Header => ["--header", "-H"],
     Method => ["--method", "-m"],
+    Secret => ["--secret", "-s"],
 );
 
 #[derive(Debug, PartialEq, Clone)]

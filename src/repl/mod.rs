@@ -176,10 +176,11 @@ impl<T: DisplayTable, F: Fn(&T) -> bool> DisplayTable for RowHighlighter<T, F> {
                     .cell_iter()
                     .enumerate()
                     .map(|(i, cell)| {
+                        let cell = cell.to_owned();
                         if i == self.column_index {
-                            cell.clone().fg(self.color)
+                            cell.fg(self.color)
                         } else {
-                            cell.clone()
+                            cell
                         }
                     })
                     .fold(comfy_table::Row::new(), |mut row, cell| {

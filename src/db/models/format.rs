@@ -83,11 +83,16 @@ impl DisplayTable for super::Variable {
     const HEADER: &'static [&'static str] = &["id", "name", "environment", "value", "source"];
 
     fn build(&self, table: &mut Table) {
+        // TODO: Add unique color.
+        let value = self
+            .is_secret
+            .then_some("*****")
+            .unwrap_or_else(|| self.value.as_ref().map(|s| s.as_str()).unwrap_or(""));
         table.add_row(&[
             &self.id.map(|id| id.to_string()).unwrap_or_default(),
             &self.name,
             &self.env.name,
-            self.value.as_ref().unwrap_or(&String::new()),
+            value,
             &self.source,
         ]);
     }

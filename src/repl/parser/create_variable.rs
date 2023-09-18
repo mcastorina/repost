@@ -7,17 +7,19 @@ use crate::error::Error;
 pub struct CreateVariable {
     pub name: String,
     pub env_vals: Vec<String>,
+    pub is_secret: bool,
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct CreateVariableBuilder {
     pub name: Option<String>,
     pub env_vals: Vec<String>,
+    pub is_secret: Option<bool>,
 }
 
 impl CmdLineBuilder for CreateVariableBuilder {
     const ARGS: &'static [ArgKey] = &[ArgKey::Name];
-    const OPTS: &'static [OptKey] = &[];
+    const FLAGS: &'static [OptKey] = &[OptKey::Secret];
     const HELP: &'static str = "Create a variable for an environment";
 
     fn add_arg<S: Into<String>>(&mut self, key: ArgKey, arg: S) -> Result<(), ParseError<S>> {
@@ -30,15 +32,22 @@ impl CmdLineBuilder for CreateVariableBuilder {
             }),
         }
     }
+    fn add_flag<S: Into<String>>(&mut self, key: OptKey) -> Result<(), ParseError<S>> {
+        self.is_secret = Some(true);
+        Ok(())
+    }
     #[rustfmt::skip]
     fn usage(&self) {
         println!("{}\n", Self::HELP);
         println!("    Create variables for environments. Names matching those found in requests will");
-        println!("    be substituted for the value in the current environment.");
+        println!("    be substituted for the value in the current environment. Variables marked as secret");
+        println!("    will not be printed to the screen.");
         println!("\nUSAGE:\n    create variable <name> <environment=value>...");
         println!("\nARGS:");
         println!("    <name>                    Name of the variable");
         println!("    <environment=value>...    Value for the environment");
+        println!("\nFLAGS:");
+        println!("    --secret, -s              Mark this variable as secret");
         println!("\n");
     }
 }
@@ -55,6 +64,7 @@ impl TryFrom<CreateVariableBuilder> for CreateVariable {
         Ok(CreateVariable {
             name: builder.name.unwrap(),
             env_vals: builder.env_vals,
+            is_secret: builder.is_secret.unwrap_or(false),
         })
     }
 }
@@ -74,6 +84,7 @@ impl TryFrom<CreateVariable> for cmd::CreateVariableArgs {
                 .into_iter()
                 .map(env_val)
                 .collect::<Result<Vec<_>, _>>()?,
+            is_secret: args.is_secret,
             source: "user".to_string(),
         })
     }

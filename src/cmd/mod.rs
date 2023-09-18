@@ -28,7 +28,7 @@ impl<'db> Cmd<'db> {
 
     pub async fn create_variable(&self, args: CreateVariableArgs) -> Result<()> {
         for (env, val) in args.env_vals {
-            let var = Variable::new(&args.name, env, val, &args.source);
+            let var = Variable::new(&args.name, env, val, args.is_secret, &args.source);
             var.save(self.db.pool()).await?;
         }
         Ok(())
@@ -109,6 +109,7 @@ pub struct CreateRequestArgs {
 pub struct CreateVariableArgs {
     pub name: String,
     pub env_vals: Vec<(String, String)>,
+    pub is_secret: bool,
     pub source: String,
 }
 

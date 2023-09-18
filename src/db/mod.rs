@@ -91,6 +91,7 @@ impl Db {
                 name        TEXT NOT NULL,
                 env         TEXT NOT NULL,
                 value       TEXT,
+                is_secret   INTEGER NOT NULL,
                 source      TEXT NOT NULL,
                 timestamp   TEXT NOT NULL
             );
